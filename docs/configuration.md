@@ -121,6 +121,8 @@ token_profile = "zhihu-personal"
 
 ChatEnv 是 token 的 canonical source。为了让扩展验证 RPC，Runner 在证明 exact extension identity 后，把同一个 runner-scoped token 写入该扩展自己的 `chrome.storage.local`。这个 Profile 内副本仍是秘密，但不是知乎 Cookie；轮换必须同时更新 ChatEnv 和扩展副本，任何一侧失败都让 Runner 退出 READY。
 
+这是 ChatPost 的新 ownership 提案，不是对旧实践的描述。已验证原型由扩展生成随机 token，再由受控脚本把同一值写入权限 `0600` 的 `.env`。正式实现如果改为 ChatEnv 生成/托管 canonical value，必须增加原子 provision/rotation 测试；不能假设现有扩展已经支持这个方向。
+
 读取优先级遵循 ChatArch 约定：
 
 ```text
@@ -197,6 +199,8 @@ token_profile = "remote-brand"
 ```
 
 PID 不能单独证明身份。`runner stop` 还必须匹配 user-data-dir、binary、Runner owner marker 或服务单元。
+
+当前 Wechatsync request/response message schema 没有协商 protocol version。`extension_protocol` 是 ChatPost 的待实现门禁：可以通过显式 handshake，或由 compatibility manifest 证明 exact bridge/extension artifact pair。在两者都没有之前必须报告 `PROTOCOL_UNVERIFIED`，不能伪报版本兼容。
 
 ## Account registry
 

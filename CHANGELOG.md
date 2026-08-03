@@ -20,3 +20,5 @@
 - Add ChatArch-managed Chrome installation and the `browser` proposal to the CLI tree.
 
 ### Fixed
+
+- Add the missing English Python interface page and clarify which token/protocol behaviors are proposals rather than verified Wechatsync capabilities.

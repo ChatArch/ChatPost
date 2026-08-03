@@ -83,6 +83,8 @@ profile       LOCKED_BY_THIS_RUNNER
 
 Any ambiguous layer prevents write readiness.
 
+The current Wechatsync message schema does not negotiate a protocol version. “Protocol version” here is an implementation requirement, not an existing capability: add a handshake or prove the exact bridge/extension artifact pair through the compatibility manifest. Otherwise enter `PROTOCOL_UNVERIFIED` and forbid a real write.
+
 ### 4. Register the Logical Account
 
 ```bash
@@ -267,6 +269,7 @@ ChatPost must:
 - **Profile locked**: report the owner; never kill daily Chrome.
 - **Wrong extension**: enter `EXTENSION_UNAVAILABLE`; a random service worker is not proof.
 - **Extension URL/token absent**: enter `NEEDS_EXTENSION_SETUP`, open the exact extension settings, and never write platform storage.
+- **Protocol compatibility unproven**: enter `PROTOCOL_UNVERIFIED` and forbid real writes after auth.
 - **Bridge disconnect**: fail before a write; enter `RESULT_UNKNOWN` after a possible write.
 - **Account logged out**: open visible Chrome and wait for the user.
 - **Image missing**: fail planning; do not create a truncated draft.

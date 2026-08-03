@@ -121,6 +121,8 @@ token_profile = "zhihu-personal"
 
 ChatEnv is the canonical token source. After proving exact extension identity, the runner writes the same runner-scoped token into that extension's own `chrome.storage.local` so it can validate RPC messages. This profile-local copy remains secret but is not a Zhihu cookie. Rotation updates ChatEnv and the extension copy together; failure on either side removes runner READY state.
 
+This is a new ChatPost ownership proposal, not a description of the verified prototype. The prototype let the extension generate a random token and used a controlled script to copy the same value into a mode-`0600` `.env`. If ChatPost moves canonical generation/ownership to ChatEnv, implementation needs atomic provisioning/rotation tests and must not assume the current extension already supports that direction.
+
 Resolution follows the ChatArch convention:
 
 ```text
@@ -197,6 +199,8 @@ External control endpoints require a controlled tunnel/VPN or TLS plus authentic
 ```
 
 A PID alone never proves identity. `runner stop` also matches the user-data-dir, binary, owner marker, or service unit.
+
+The current Wechatsync request/response message schema has no protocol-version negotiation. `extension_protocol` is a proposed ChatPost gate: satisfy it with an explicit handshake or with a compatibility manifest proving the exact bridge/extension artifact pair. Without either proof, report `PROTOCOL_UNVERIFIED` instead of claiming compatibility.
 
 ## Account Registry
 

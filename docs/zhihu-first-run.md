@@ -83,6 +83,8 @@ profile       LOCKED_BY_THIS_RUNNER
 
 任一项不明确时，Runner 不能进入可写状态。
 
+当前 Wechatsync message schema 尚未协商 protocol version。因此这里的“protocol version”是实现要求，不是现有能力：首版必须新增 handshake，或使用 compatibility manifest 证明 exact bridge/extension artifact pair；否则状态为 `PROTOCOL_UNVERIFIED`，禁止真实写入。
+
 ### 4. 注册逻辑账号
 
 ```bash
@@ -268,6 +270,7 @@ RUNNING -> RESULT_UNKNOWN
 - **Profile 被占用**：停止并报告 owner，不强杀日常 Chrome。
 - **扩展不匹配**：状态为 `EXTENSION_UNAVAILABLE`，不把任意 service worker 当目标扩展。
 - **扩展 URL/token 未配置**：状态为 `NEEDS_EXTENSION_SETUP`，打开 exact extension 设置页，不写入平台 storage。
+- **协议兼容性未证明**：状态为 `PROTOCOL_UNVERIFIED`，禁止 auth 之后的真实写入。
 - **Bridge 断开**：写操作前失败；写操作后则进入 `RESULT_UNKNOWN`。
 - **账号未登录**：打开可见浏览器，等待用户处理。
 - **图片不存在**：plan 失败，不创建残缺草稿。
