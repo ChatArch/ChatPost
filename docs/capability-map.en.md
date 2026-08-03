@@ -14,7 +14,7 @@ This page separates real `ChatPost 0.1.0` behavior, verified external evidence, 
 | One-shot draft create | Implemented | `chatpost zhihu draft create` invokes the adapter once; success writes a mode-`0600` receipt and ambiguity writes `RESULT_UNKNOWN`. |
 | ChatUp Playwright dependency | Implemented | Bounded `chatup>=0.2.4,<0.3.0`; read-only `chatup.playwright.resolve`. |
 | Raw-CDP extension wake | Implemented | Connects only to the exact extension target and configures its loopback bridge URL/token. |
-| Secret redaction | Implemented | Environment secret values in adapter output become `[REDACTED]`; receipts contain no tokens, cookies, or local storage. |
+| Secret redaction | Implemented | Environment secret values in adapter output become `[REDACTED]`; startup diagnostics also redact private assignments, URLs/connections, and ownership markers, and fail closed if the private env becomes unavailable; receipts contain no tokens, cookies, or local storage. |
 
 ## Verified Evidence
 

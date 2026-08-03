@@ -37,5 +37,7 @@ def test_quick_start_keeps_create_update_and_publish_boundaries_explicit():
         assert "MANUAL_RECOVERY_REQUIRED" in text
         if relative.endswith(".en.md"):
             assert "The `RESULT_UNKNOWN` receipt also records `cleanup_status`" in text
+            assert "fail closed to `[REDACTED]`" in text
         else:
             assert "`RESULT_UNKNOWN` receipt 同样记录 `cleanup_status`" in text
+            assert "fail-closed 为 `[REDACTED]`" in text

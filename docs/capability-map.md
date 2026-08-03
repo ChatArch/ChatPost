@@ -14,7 +14,7 @@
 | 单次草稿创建 | 已实现 | `chatpost zhihu draft create` 只调用一次 adapter；成功写 `0600` receipt，歧义写 `RESULT_UNKNOWN`。 |
 | ChatUp Playwright dependency | 已实现 | 有界依赖 `chatup>=0.2.4,<0.3.0`，只读调用 `chatup.playwright.resolve`。 |
 | 原始 CDP 扩展唤醒 | 已实现 | 只连接 exact extension target，把 bridge URL/token 设置到扩展；CDP 和 bridge 均为 loopback。 |
-| Secret redaction | 已实现 | adapter 输出中的 env secret value 替换为 `[REDACTED]`；receipt 不保存 token、Cookie 或 LocalStorage。 |
+| Secret redaction | 已实现 | adapter 输出中的 env secret value 替换为 `[REDACTED]`；启动诊断还会遮蔽私密赋值、URL/连接信息与 ownership marker，私有 env 不可用时整段 fail-closed；receipt 不保存 token、Cookie 或 LocalStorage。 |
 
 ## 已验证事实
 

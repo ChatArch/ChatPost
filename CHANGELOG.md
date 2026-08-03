@@ -23,7 +23,7 @@
 - Preserve a definitive draft result when browser cleanup needs manual recovery instead of masking it with a cleanup exception.
 - Record completed browser cleanup metadata on every `RESULT_UNKNOWN` receipt, including non-zero adapter exits and successful exits without a review URL.
 - Bind browser ownership to a per-run startup marker and captured WebSocket UUID before extension wake or cleanup.
-- Drain startup stderr before reporting an exit and redact private env values from bounded diagnostics.
+- Drain startup stderr before reporting an exit; redact private assignments, URLs/connections, and ownership markers from bounded diagnostics; and fail closed if the private env becomes unavailable after preflight.
 
 ## 0.0.2 - 2026-08-03
 

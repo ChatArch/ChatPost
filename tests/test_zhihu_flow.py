@@ -371,16 +371,90 @@ def test_cdp_startup_error_includes_bounded_redacted_diagnostics(tmp_path):
     assert "[REDACTED]" in message
 
 
-def test_browser_diagnostics_do_not_fail_if_private_env_disappears(tmp_path):
+def test_browser_diagnostics_fail_closed_if_private_env_disappears(tmp_path):
     config = load_runner_config(_config(tmp_path))
     config.env_file.unlink()
 
+    class Process:
+        returncode = 21
+
+        def poll(self):
+            return self.returncode
+
+    private_value = "vanished-private-value"
+    connection = "ws://127.0.0.1:9227/devtools/browser/private-id"
+    with pytest.raises(RuntimeError) as captured:
+        zhihu._wait_for_cdp(
+            config,
+            Process(),
+            "private-ownership-marker",
+            [
+                (
+                    f"profile in use: {config.profile_dir}; token={private_value}; "
+                    f"DevTools listening on {connection}"
+                )
+            ],
+        )
+
+    message = str(captured.value)
+    assert message == "Chrome exited before CDP became ready (21): [REDACTED]"
+    assert private_value not in message
+    assert connection not in message
+    assert str(config.profile_dir) not in message
+
+
+@pytest.mark.parametrize("private_env", [b"\xff", b"UNRELATED=value\n"])
+def test_browser_diagnostics_fail_closed_if_private_env_is_untrusted(
+    tmp_path, private_env
+):
+    config = load_runner_config(_config(tmp_path))
+    config.env_file.write_bytes(private_env)
+
     message = zhihu._sanitize_browser_diagnostics(
         config,
-        [f"profile in use: {config.profile_dir}"],
+        ["token=unknown-private-value; ws://127.0.0.1:9227/private-connection"],
     )
 
-    assert message == "profile in use: [PROFILE]"
+    assert message == "[REDACTED]"
+
+
+def test_browser_diagnostics_structurally_redact_connections_and_markers(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+
+    message = zhihu._sanitize_browser_diagnostics(
+        config,
+        [
+            (
+                "DevTools listening on "
+                "ws://127.0.0.1:9227/devtools/browser/private-id; "
+                "token=diagnostic-private-value; "
+                "data:text/plain,chatpost-run-private-marker"
+            ),
+            (
+                "HTTP probe http://localhost:9227/json/version; "
+                "raw CDP 127.0.0.1:9227/devtools/page/private-id; "
+                "password='quoted private value'"
+            ),
+            (
+                "Authorization: Bearer private-bearer-value; "
+                "cookie=session=private cookie value"
+            ),
+            "prefixed_runtime_token=private runtime token value",
+            "oauth_token=private oauth token value",
+            "client_secret=private client secret value",
+            "cookie=session=private; second-cookie=private-tail-value",
+        ],
+    )
+
+    assert message == (
+        "DevTools listening on [REDACTED]; token=[REDACTED]\n"
+        "HTTP probe [REDACTED]; raw CDP [REDACTED]; password=[REDACTED]\n"
+        "Authorization: [REDACTED]\n"
+        "prefixed_runtime_token=[REDACTED]\n"
+        "oauth_token=[REDACTED]\n"
+        "client_secret=[REDACTED]\n"
+        "cookie=[REDACTED]"
+    )
 
 
 def test_cdp_ownership_timeout_requires_manual_recovery(monkeypatch, tmp_path):

@@ -223,7 +223,7 @@ RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
 
 每次 browser 启动都会生成随机 `data:text/plain,chatpost-run-*` marker。ChatPost 只有在配置的 loopback 端口同时看到该 marker 和对应 browser WebSocket UUID 后，才把 CDP 绑定为本次进程所有。
 
-正常清理通过启动时捕获的 browser WebSocket endpoint 发送 CDP `Browser.close`，不会重新发现后来可能占用同一端口的其他浏览器，也不会发送进程终止信号。若草稿结果已经明确、但清理失败，receipt 仍保留 `DRAFT_CREATED`，并附带 `cleanup_status=MANUAL_RECOVERY_REQUIRED`；此时人工恢复进程，不能再次执行 create。browser 启动失败时，ChatPost 会先等待 stderr drain，再返回限长诊断；Profile 路径、私有 env 值和运行 marker 均经过脱敏。
+正常清理通过启动时捕获的 browser WebSocket endpoint 发送 CDP `Browser.close`，不会重新发现后来可能占用同一端口的其他浏览器，也不会发送进程终止信号。若草稿结果已经明确、但清理失败，receipt 仍保留 `DRAFT_CREATED`，并附带 `cleanup_status=MANUAL_RECOVERY_REQUIRED`；此时人工恢复进程，不能再次执行 create。browser 启动失败时，ChatPost 会先等待 stderr drain，再返回限长诊断；Profile 路径、私密赋值、URL/连接信息和运行 marker 均经过脱敏。若私有 env 在 preflight 后消失、不可读或不再包含预期 token，diagnostics 会 fail-closed 为 `[REDACTED]`，外围错误仍保留 browser 退出码。
 
 `RESULT_UNKNOWN` receipt 同样记录 `cleanup_status`；若需要人工恢复，还会包含 `cleanup_error`。这适用于 adapter 非零退出和成功退出但缺 review URL 两种歧义路径。receipt 不写入 browser endpoint、token 或连接信息。
 

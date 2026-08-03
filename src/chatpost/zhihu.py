@@ -40,6 +40,20 @@ RESULT_UNKNOWN = "RESULT_UNKNOWN"
 _REVIEW_URL = re.compile(r"https://zhuanlan\.zhihu\.com/p/(?P<id>[0-9]+)/edit")
 _EXTENSION_ID = re.compile(r"^[a-p]{32}$")
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+_DIAGNOSTIC_URL = re.compile(r"(?i)\b(?:wss?|https?)://[^\s\"'<>;,]+")
+_DIAGNOSTIC_LOOPBACK = re.compile(
+    r"(?i)(?<![\w.])(?:localhost|127(?:\.\d{1,3}){3}|\[::1\]):\d{1,5}"
+    r"(?:/[^\s\"'<>;,]*)?"
+)
+_DIAGNOSTIC_OWNERSHIP_MARKER = re.compile(
+    r"data:text/plain,chatpost-run-[^\s\"'<>;,]+"
+)
+_DIAGNOSTIC_PRIVATE_ASSIGNMENT = re.compile(
+    r"(?im)(?<![\w])((?:[A-Z0-9_-]*)(?:"
+    r"TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|PRIVATE[_-]?KEY|"
+    r"CREDENTIAL|AUTHORIZATION|COOKIE|SESSION|CSRF"
+    r")[A-Z0-9_-]*)(\s*[:=]\s*).*$"
+)
 _PROTECTED_BROWSER_ARGS = (
     "--user-data-dir",
     "--remote-debugging-address",
@@ -259,11 +273,12 @@ def _sanitize_browser_diagnostics(
     ):
         text = text.replace(value, replacement)
     try:
-        private_values = [
-            value for value in _read_env(config.env_file).values() if value
-        ]
+        private_env = _read_env(config.env_file)
     except (OSError, UnicodeError):
-        private_values = []
+        return "[REDACTED]" if text.strip() else ""
+    if not private_env.get("WECHATSYNC_TOKEN"):
+        return "[REDACTED]" if text.strip() else ""
+    private_values = [value for value in private_env.values() if value]
     private_values.extend(
         value
         for key, value in os.environ.items()
@@ -275,6 +290,12 @@ def _sanitize_browser_diagnostics(
         )
     )
     private_values.extend(value for value in extra_redactions if value)
+    text = _DIAGNOSTIC_URL.sub("[REDACTED]", text)
+    text = _DIAGNOSTIC_LOOPBACK.sub("[REDACTED]", text)
+    text = _DIAGNOSTIC_OWNERSHIP_MARKER.sub("[REDACTED]", text)
+    text = _DIAGNOSTIC_PRIVATE_ASSIGNMENT.sub(
+        lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", text
+    )
     return _redact(text, private_values)[-2000:].strip()
 
 
