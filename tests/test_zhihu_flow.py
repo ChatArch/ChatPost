@@ -244,6 +244,62 @@ def test_ambiguous_create_is_not_retried(tmp_path):
     assert error.value.status == RESULT_UNKNOWN
 
 
+def test_nonzero_create_receipt_includes_completed_cleanup(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# Infra title\n\nCHATPOST-PLAYWRIGHT-INFRA-V1", encoding="utf-8")
+
+    @contextmanager
+    def browser_session(_config):
+        browser = {"browser_version": "149.0.7827.55"}
+        yield browser
+        browser["cleanup_status"] = "CLOSED"
+
+    def adapter(*_args):
+        return subprocess.CompletedProcess([], 1, "", "ambiguous create failure")
+
+    with pytest.raises(ResultUnknownError) as error:
+        execute_task(
+            config,
+            source,
+            mode="create",
+            adapter_runner=adapter,
+            browser_session_factory=browser_session,
+        )
+
+    assert error.value.receipt["cleanup_status"] == "CLOSED"
+
+
+def test_missing_review_url_receipt_includes_cleanup_failure(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# Infra title\n\nCHATPOST-PLAYWRIGHT-INFRA-V1", encoding="utf-8")
+
+    @contextmanager
+    def browser_session(_config):
+        browser = {"browser_version": "149.0.7827.55"}
+        yield browser
+        browser.update(
+            cleanup_status="MANUAL_RECOVERY_REQUIRED",
+            cleanup_error="CDP close timed out",
+        )
+
+    def adapter(*_args):
+        return subprocess.CompletedProcess([], 0, "create may have succeeded", "")
+
+    with pytest.raises(ResultUnknownError) as error:
+        execute_task(
+            config,
+            source,
+            mode="create",
+            adapter_runner=adapter,
+            browser_session_factory=browser_session,
+        )
+
+    assert error.value.receipt["cleanup_status"] == "MANUAL_RECOVERY_REQUIRED"
+    assert error.value.receipt["cleanup_error"] == "CDP close timed out"
+
+
 def test_browser_session_rechecks_preflight_before_process_start(monkeypatch, tmp_path):
     config = load_runner_config(_config(tmp_path))
     installation = _installation(tmp_path)

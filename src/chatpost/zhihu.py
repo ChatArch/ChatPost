@@ -770,6 +770,22 @@ def _source_sha256(source: Path) -> str:
     return digest.hexdigest()
 
 
+def _result_unknown_receipt(
+    source: Path | None,
+    browser: dict[str, Any],
+) -> dict[str, Any]:
+    if source is None:
+        raise ValueError("A source file is required for a create receipt")
+    receipt: dict[str, Any] = {
+        "status": RESULT_UNKNOWN,
+        "source_sha256": _source_sha256(source),
+    }
+    for key in ("cleanup_status", "cleanup_error"):
+        if key in browser:
+            receipt[key] = browser[key]
+    return receipt
+
+
 def _open_login_page(config: ZhihuRunnerConfig) -> None:
     base = f"http://{config.cdp_host}:{config.cdp_port}"
     login_url = "https://www.zhihu.com/signin"
@@ -843,10 +859,7 @@ def execute_task(
         if mode == "create":
             raise ResultUnknownError(
                 "Wechatsync create did not return a definitive success; do not retry automatically",
-                receipt={
-                    "status": RESULT_UNKNOWN,
-                    "source_sha256": _source_sha256(source_path),
-                },
+                receipt=_result_unknown_receipt(source_path, browser),
             )
         raise RuntimeError(output.strip() or "Zhihu auth check failed")
 
@@ -857,10 +870,7 @@ def execute_task(
     if match is None:
         raise ResultUnknownError(
             "Wechatsync exited successfully without a review URL; do not retry automatically",
-            receipt={
-                "status": RESULT_UNKNOWN,
-                "source_sha256": _source_sha256(source_path),
-            },
+            receipt=_result_unknown_receipt(source_path, browser),
         )
     return {
         "status": "DRAFT_CREATED",

@@ -225,6 +225,8 @@ RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
 
 正常清理通过启动时捕获的 browser WebSocket endpoint 发送 CDP `Browser.close`，不会重新发现后来可能占用同一端口的其他浏览器，也不会发送进程终止信号。若草稿结果已经明确、但清理失败，receipt 仍保留 `DRAFT_CREATED`，并附带 `cleanup_status=MANUAL_RECOVERY_REQUIRED`；此时人工恢复进程，不能再次执行 create。browser 启动失败时，ChatPost 会先等待 stderr drain，再返回限长诊断；Profile 路径、私有 env 值和运行 marker 均经过脱敏。
 
+`RESULT_UNKNOWN` receipt 同样记录 `cleanup_status`；若需要人工恢复，还会包含 `cleanup_error`。这适用于 adapter 非零退出和成功退出但缺 review URL 两种歧义路径。receipt 不写入 browser endpoint、token 或连接信息。
+
 图片上传失败可以与草稿创建成功同时发生；必须按编辑页实际内容报告，不能把 CLI exit 0 当成图片完整证明。
 
 ## 10. 歧义恢复

@@ -196,6 +196,8 @@ Each browser startup creates a random `data:text/plain,chatpost-run-*` marker. C
 
 Normal cleanup sends CDP `Browser.close` to the browser WebSocket endpoint captured at startup. It does not rediscover whichever browser might later occupy the same port, and it sends no process termination signal. If the draft result is already definitive but cleanup fails, the receipt keeps `DRAFT_CREATED` and adds `cleanup_status=MANUAL_RECOVERY_REQUIRED`. Recover the process manually and do not run create again. For browser startup failures, ChatPost waits for stderr drain and returns only bounded diagnostics with Profile paths, private env values, and the run marker redacted.
 
+The `RESULT_UNKNOWN` receipt also records `cleanup_status` and includes `cleanup_error` when manual recovery is required. This applies both to a non-zero adapter exit and to a successful exit without a review URL. Browser endpoints, tokens, and connection details are never written to the receipt.
+
 Image-upload failure can coexist with successful draft creation. Report the actual editor content; exit code zero alone does not prove image completeness.
 
 ## 10. Ambiguity Recovery

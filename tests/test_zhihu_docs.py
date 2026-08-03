@@ -35,3 +35,7 @@ def test_quick_start_keeps_create_update_and_publish_boundaries_explicit():
         assert "chatpost-run-*" in text
         assert "WebSocket UUID" in text
         assert "MANUAL_RECOVERY_REQUIRED" in text
+        if relative.endswith(".en.md"):
+            assert "The `RESULT_UNKNOWN` receipt also records `cleanup_status`" in text
+        else:
+            assert "`RESULT_UNKNOWN` receipt 同样记录 `cleanup_status`" in text
