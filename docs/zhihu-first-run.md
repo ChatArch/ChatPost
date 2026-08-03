@@ -200,7 +200,7 @@ ARTICLE=/absolute/path/to/article.md
   -I
 ```
 
-确认标题、正文、图片引用和固定 marker 正确。dry-run 不启动浏览器、不连接扩展、不写知乎。
+从 JSON 的 `preview` 字段确认标题、正文、图片引用和固定 marker 正确。preview 最多返回 8000 个字符，并已按私有 env 中的值脱敏。dry-run 不启动浏览器、不连接扩展、不写知乎。
 
 ## 9. 只创建一次草稿
 
@@ -220,6 +220,8 @@ RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
 - receipt 权限为 `0600`；
 - 打开编辑页能回读期望标题和 marker；
 - 停在草稿箱，未最终发布。
+
+ChatPost 正常清理浏览器时通过 CDP `Browser.close` 请求优雅退出，不发送进程终止信号。若草稿结果已经明确、但清理失败，receipt 仍保留 `DRAFT_CREATED`，并附带 `cleanup_status=MANUAL_RECOVERY_REQUIRED`；此时人工恢复进程，不能再次执行 create。
 
 图片上传失败可以与草稿创建成功同时发生；必须按编辑页实际内容报告，不能把 CLI exit 0 当成图片完整证明。
 

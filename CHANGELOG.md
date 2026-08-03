@@ -18,6 +18,9 @@
 ### Fixed
 
 - Preserve the declared Python 3.10 support with a conditional `tomli` fallback for TOML parsing.
+- Return a bounded, secret-redacted dry-run preview so the title and marker can be reviewed before a write.
+- Capture bounded, path-redacted Chrome startup diagnostics and close owned browsers through CDP `Browser.close` instead of a process signal.
+- Preserve a definitive draft result when browser cleanup needs manual recovery instead of masking it with a cleanup exception.
 
 ## 0.0.2 - 2026-08-03
 

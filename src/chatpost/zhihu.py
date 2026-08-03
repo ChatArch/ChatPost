@@ -19,10 +19,12 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Callable, Iterator, Sequence
+from collections import deque
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Thread
 from typing import Any
 
 import websocket
@@ -236,12 +238,35 @@ def _http_json(url: str, *, method: str = "GET") -> Any:
         return json.load(response)
 
 
-def _wait_for_cdp(config: ZhihuRunnerConfig, process: subprocess.Popen[str]) -> None:
+def _sanitize_browser_diagnostics(
+    config: ZhihuRunnerConfig,
+    diagnostics: Iterable[str],
+) -> str:
+    text = "\n".join(list(diagnostics)[-40:])
+    for value, replacement in (
+        (str(config.profile_dir), "[PROFILE]"),
+        (str(config.extension_dir), "[EXTENSION]"),
+        (str(config.playwright_home), "[PLAYWRIGHT_HOME]"),
+        (str(Path.home()), "[HOME]"),
+    ):
+        text = text.replace(value, replacement)
+    return text[-2000:].strip()
+
+
+def _wait_for_cdp(
+    config: ZhihuRunnerConfig,
+    process: subprocess.Popen[str],
+    diagnostics: Iterable[str] = (),
+) -> None:
     url = f"http://{config.cdp_host}:{config.cdp_port}/json/version"
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
         if process.poll() is not None:
-            raise RuntimeError(f"Chrome exited before CDP became ready ({process.returncode})")
+            detail = _sanitize_browser_diagnostics(config, diagnostics)
+            suffix = f": {detail}" if detail else ""
+            raise RuntimeError(
+                f"Chrome exited before CDP became ready ({process.returncode}){suffix}"
+            )
         try:
             _http_json(url)
             return
@@ -392,6 +417,42 @@ def _browser_command(
     return command
 
 
+def _drain_browser_diagnostics(stream: Any, diagnostics: deque[str]) -> None:
+    for line in iter(stream.readline, ""):
+        diagnostics.append(line.rstrip())
+
+
+def _close_browser(config: ZhihuRunnerConfig, process: subprocess.Popen[str]) -> None:
+    """Ask Chrome to exit through CDP; never force-kill an owned browser."""
+
+    if process.poll() is not None:
+        return
+    try:
+        metadata = _http_json(
+            f"http://{config.cdp_host}:{config.cdp_port}/json/version"
+        )
+        debug_socket = websocket.create_connection(
+            metadata["webSocketDebuggerUrl"],
+            timeout=5,
+            suppress_origin=True,
+        )
+        try:
+            debug_socket.send(json.dumps({"id": 1, "method": "Browser.close"}))
+        finally:
+            debug_socket.close()
+    except (KeyError, OSError, ValueError, websocket.WebSocketException) as error:
+        raise RuntimeError(
+            "Chrome graceful CDP shutdown could not be requested; "
+            "the process was left running for manual recovery"
+        ) from error
+    try:
+        process.wait(timeout=15)
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(
+            "Chrome did not stop after Browser.close; it was left running for manual recovery"
+        ) from error
+
+
 @contextmanager
 def browser_session(config: ZhihuRunnerConfig) -> Iterator[dict[str, Any]]:
     """Start one owned browser process and stop it gracefully on exit."""
@@ -402,30 +463,41 @@ def browser_session(config: ZhihuRunnerConfig) -> Iterator[dict[str, Any]]:
         browser="chromium",
         home=config.playwright_home,
     )
+    browser = {
+        "browser_version": installation.browser_version,
+        "browser_revision": installation.browser_revision,
+        "playwright_version": installation.playwright_version,
+    }
     process = subprocess.Popen(
         _browser_command(config, installation),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
         text=True,
     )
+    diagnostics: deque[str] = deque(maxlen=80)
+    diagnostic_thread = None
+    diagnostic_stream = getattr(process, "stderr", None)
+    if diagnostic_stream is not None:
+        diagnostic_thread = Thread(
+            target=_drain_browser_diagnostics,
+            args=(diagnostic_stream, diagnostics),
+            daemon=True,
+        )
+        diagnostic_thread.start()
     try:
-        _wait_for_cdp(config, process)
+        _wait_for_cdp(config, process, diagnostics)
         _wait_for_extension(config)
-        yield {
-            "browser_version": installation.browser_version,
-            "browser_revision": installation.browser_revision,
-            "playwright_version": installation.playwright_version,
-        }
+        yield browser
     finally:
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=15)
-            except subprocess.TimeoutExpired as error:
-                raise RuntimeError(
-                    "Chrome did not stop after SIGTERM; it was left running for manual recovery"
-                ) from error
+        try:
+            _close_browser(config, process)
+            browser["cleanup_status"] = "CLOSED"
+        except RuntimeError as error:
+            browser["cleanup_status"] = "MANUAL_RECOVERY_REQUIRED"
+            browser["cleanup_error"] = str(error)
+        if diagnostic_thread is not None:
+            diagnostic_thread.join(timeout=1)
 
 
 def _adapter_environment(config: ZhihuRunnerConfig) -> tuple[dict[str, str], list[str]]:
@@ -639,7 +711,12 @@ def execute_task(
         result = adapter_runner(config, source_path, mode)
         if result.returncode != 0:
             raise RuntimeError((result.stderr or result.stdout).strip() or "Dry-run failed")
-        return {"status": "DRY_RUN_OK", "source_sha256": _source_sha256(source_path)}
+        preview = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
+        return {
+            "status": "DRY_RUN_OK",
+            "source_sha256": _source_sha256(source_path),
+            "preview": preview[:8000],
+        }
 
     with browser_session_factory(config) as browser:
         result = adapter_runner(config, source_path, mode)

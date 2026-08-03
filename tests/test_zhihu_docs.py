@@ -30,3 +30,6 @@ def test_quick_start_keeps_create_update_and_publish_boundaries_explicit():
         assert "0073787cfbff0f7af4d1b427da3adbb16d92eeb8" in text
         assert "same-ID" in text
         assert "Cookie" in text or "cookie" in text
+        assert "`preview`" in text
+        assert "Browser.close" in text
+        assert "MANUAL_RECOVERY_REQUIRED" in text

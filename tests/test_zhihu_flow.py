@@ -156,6 +156,26 @@ def test_dry_run_does_not_start_browser(tmp_path):
 
     assert calls == [(source.resolve(), "dry-run")]
     assert result["status"] == "DRY_RUN_OK"
+    assert result["preview"] == "dry-run ok"
+
+
+def test_dry_run_preview_redacts_values_from_private_env(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# title\n\nmarker", encoding="utf-8")
+    monkeypatch.setattr(
+        zhihu.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            [], 0, "title secret-value marker", ""
+        ),
+    )
+
+    result = execute_task(config, source, mode="dry-run")
+
+    assert result["status"] == "DRY_RUN_OK"
+    assert result["preview"] == "title [REDACTED] marker"
+    assert "secret-value" not in json.dumps(result)
 
 
 def test_create_invokes_adapter_exactly_once_and_returns_review_receipt(tmp_path):
@@ -235,23 +255,110 @@ def test_browser_session_rechecks_preflight_before_process_start(monkeypatch, tm
         def poll(self):
             return None
 
-        def terminate(self):
-            order.append("terminate")
-
-        def wait(self, timeout):
-            order.append(("wait", timeout))
-            return 0
-
     monkeypatch.setattr(zhihu, "preflight", lambda _config: order.append("preflight"))
     monkeypatch.setattr(zhihu, "resolve", lambda *_args, **_kwargs: installation)
     monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
     monkeypatch.setattr(zhihu, "_wait_for_cdp", lambda *_args: order.append("cdp"))
     monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: order.append("extension"))
+    monkeypatch.setattr(
+        zhihu,
+        "_close_browser",
+        lambda _config, _process: order.append("browser-close"),
+    )
 
     with zhihu.browser_session(config):
         order.append("yield")
 
-    assert order == ["preflight", "cdp", "extension", "yield", "terminate", ("wait", 15)]
+    assert order == ["preflight", "cdp", "extension", "yield", "browser-close"]
+
+
+def test_cdp_startup_error_includes_bounded_redacted_diagnostics(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+
+    class Process:
+        returncode = 21
+
+        def poll(self):
+            return 21
+
+    private_line = f"profile in use: {config.profile_dir}"
+    with pytest.raises(RuntimeError) as captured:
+        zhihu._wait_for_cdp(config, Process(), zhihu.deque([private_line]))
+
+    message = str(captured.value)
+    assert "profile in use" in message
+    assert "[PROFILE]" in message
+    assert str(config.profile_dir) not in message
+
+
+def test_browser_close_uses_cdp_browser_close_without_process_signal(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    messages = []
+    waits = []
+
+    class Socket:
+        def send(self, message):
+            messages.append(json.loads(message))
+
+        def close(self):
+            messages.append({"closed": True})
+
+    class Process:
+        def poll(self):
+            return None
+
+        def wait(self, timeout):
+            waits.append(timeout)
+            return 0
+
+    monkeypatch.setattr(
+        zhihu,
+        "_http_json",
+        lambda _url: {"webSocketDebuggerUrl": "ws://127.0.0.1/devtools/browser/1"},
+    )
+    monkeypatch.setattr(
+        zhihu.websocket,
+        "create_connection",
+        lambda *_args, **_kwargs: Socket(),
+    )
+
+    zhihu._close_browser(config, Process())
+
+    assert messages[0] == {"id": 1, "method": "Browser.close"}
+    assert messages[1] == {"closed": True}
+    assert waits == [15]
+
+
+def test_browser_cleanup_failure_is_reported_without_masking_completed_task(
+    monkeypatch, tmp_path
+):
+    config = load_runner_config(_config(tmp_path))
+    installation = _installation(tmp_path)
+
+    class Process:
+        returncode = None
+        stderr = None
+
+        def poll(self):
+            return None
+
+    monkeypatch.setattr(zhihu, "preflight", lambda _config: None)
+    monkeypatch.setattr(zhihu, "resolve", lambda *_args, **_kwargs: installation)
+    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
+    monkeypatch.setattr(zhihu, "_wait_for_cdp", lambda *_args: None)
+    monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: None)
+    monkeypatch.setattr(
+        zhihu,
+        "_close_browser",
+        lambda *_args: (_ for _ in ()).throw(RuntimeError("manual recovery required")),
+    )
+
+    with zhihu.browser_session(config) as browser:
+        browser["task_completed"] = True
+
+    assert browser["task_completed"] is True
+    assert browser["cleanup_status"] == "MANUAL_RECOVERY_REQUIRED"
+    assert browser["cleanup_error"] == "manual recovery required"
 
 
 def test_bridge_start_timeout_is_result_unknown_and_stops_adapter(monkeypatch, tmp_path):

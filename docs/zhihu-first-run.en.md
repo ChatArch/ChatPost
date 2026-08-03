@@ -177,7 +177,7 @@ ARTICLE=/absolute/path/to/article.md
   -I
 ```
 
-Confirm the title, body, asset references, and fixed marker. Dry-run starts no browser, connects no extension, and writes nothing to Zhihu.
+Confirm the title, body, asset references, and fixed marker from the JSON `preview` field. The preview is capped at 8,000 characters and redacts values resolved from the private env. Dry-run starts no browser, connects no extension, and writes nothing to Zhihu.
 
 ## 9. Create Exactly One Draft
 
@@ -191,6 +191,8 @@ RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
 ```
 
 Acceptance requires `DRAFT_CREATED`, a draft ID and `/edit` review URL, a mode-`0600` receipt, editor-page readback of the expected title and marker, and no final publish.
+
+Normal cleanup requests a graceful browser exit through CDP `Browser.close`; ChatPost sends no process termination signal. If the draft result is already definitive but cleanup fails, the receipt keeps `DRAFT_CREATED` and adds `cleanup_status=MANUAL_RECOVERY_REQUIRED`. Recover the process manually and do not run create again.
 
 Image-upload failure can coexist with successful draft creation. Report the actual editor content; exit code zero alone does not prove image completeness.
 
