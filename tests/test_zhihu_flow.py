@@ -258,12 +258,20 @@ def test_browser_session_rechecks_preflight_before_process_start(monkeypatch, tm
     monkeypatch.setattr(zhihu, "preflight", lambda _config: order.append("preflight"))
     monkeypatch.setattr(zhihu, "resolve", lambda *_args, **_kwargs: installation)
     monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
-    monkeypatch.setattr(zhihu, "_wait_for_cdp", lambda *_args: order.append("cdp"))
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+    )
+    monkeypatch.setattr(
+        zhihu,
+        "_wait_for_cdp",
+        lambda *_args: (order.append("cdp"), endpoint)[1],
+    )
     monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: order.append("extension"))
     monkeypatch.setattr(
         zhihu,
         "_close_browser",
-        lambda _config, _process: order.append("browser-close"),
+        lambda _endpoint, _process: order.append("browser-close"),
     )
 
     with zhihu.browser_session(config):
@@ -281,20 +289,90 @@ def test_cdp_startup_error_includes_bounded_redacted_diagnostics(tmp_path):
         def poll(self):
             return 21
 
-    private_line = f"profile in use: {config.profile_dir}"
+    diagnostics = zhihu.deque()
+
+    class DrainThread:
+        def join(self, timeout):
+            assert timeout == 1
+            diagnostics.append(
+                f"profile in use: {config.profile_dir}; token=secret-value"
+            )
+
     with pytest.raises(RuntimeError) as captured:
-        zhihu._wait_for_cdp(config, Process(), zhihu.deque([private_line]))
+        zhihu._wait_for_cdp(
+            config,
+            Process(),
+            "ownership-token",
+            diagnostics,
+            DrainThread(),
+        )
 
     message = str(captured.value)
     assert "profile in use" in message
     assert "[PROFILE]" in message
     assert str(config.profile_dir) not in message
+    assert "secret-value" not in message
+    assert "[REDACTED]" in message
+
+
+def test_browser_diagnostics_do_not_fail_if_private_env_disappears(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    config.env_file.unlink()
+
+    message = zhihu._sanitize_browser_diagnostics(
+        config,
+        [f"profile in use: {config.profile_dir}"],
+    )
+
+    assert message == "profile in use: [PROFILE]"
+
+
+def test_cdp_endpoint_requires_unique_startup_marker_and_loopback_websocket(
+    monkeypatch, tmp_path
+):
+    config = load_runner_config(_config(tmp_path))
+    token = "unique-run-token"
+    targets = [{"type": "page", "url": "about:blank#chatpost-run-other"}]
+    metadata = {
+        "webSocketDebuggerUrl": "ws://127.0.0.1:9227/devtools/browser/owned"
+    }
+
+    def http_json(url, **_kwargs):
+        return targets if url.endswith("/json/list") else metadata
+
+    monkeypatch.setattr(zhihu, "_http_json", http_json)
+    assert zhihu._discover_owned_cdp_endpoint(config, token) is None
+
+    targets[0]["url"] = "about:blank#chatpost-run-unique-run-token"
+    endpoint = zhihu._discover_owned_cdp_endpoint(config, token)
+    assert endpoint == zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+    )
+
+    metadata["webSocketDebuggerUrl"] = "ws://example.com/devtools/browser/not-owned"
+    with pytest.raises(ValueError, match="loopback"):
+        zhihu._discover_owned_cdp_endpoint(config, token)
+
+
+def test_browser_command_starts_with_unique_ownership_marker(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    installation = _installation(tmp_path)
+
+    command = zhihu._browser_command(config, installation, "unique-run-token")
+
+    assert command[-1] == "about:blank#chatpost-run-unique-run-token"
+    assert f"--remote-debugging-port={config.cdp_port}" in command
+    assert "https://www.zhihu.com/" not in command
 
 
 def test_browser_close_uses_cdp_browser_close_without_process_signal(monkeypatch, tmp_path):
-    config = load_runner_config(_config(tmp_path))
     messages = []
     waits = []
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+    )
 
     class Socket:
         def send(self, message):
@@ -312,17 +390,12 @@ def test_browser_close_uses_cdp_browser_close_without_process_signal(monkeypatch
             return 0
 
     monkeypatch.setattr(
-        zhihu,
-        "_http_json",
-        lambda _url: {"webSocketDebuggerUrl": "ws://127.0.0.1/devtools/browser/1"},
-    )
-    monkeypatch.setattr(
         zhihu.websocket,
         "create_connection",
         lambda *_args, **_kwargs: Socket(),
     )
 
-    zhihu._close_browser(config, Process())
+    zhihu._close_browser(endpoint, Process())
 
     assert messages[0] == {"id": 1, "method": "Browser.close"}
     assert messages[1] == {"closed": True}
@@ -345,7 +418,11 @@ def test_browser_cleanup_failure_is_reported_without_masking_completed_task(
     monkeypatch.setattr(zhihu, "preflight", lambda _config: None)
     monkeypatch.setattr(zhihu, "resolve", lambda *_args, **_kwargs: installation)
     monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
-    monkeypatch.setattr(zhihu, "_wait_for_cdp", lambda *_args: None)
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+    )
+    monkeypatch.setattr(zhihu, "_wait_for_cdp", lambda *_args: endpoint)
     monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: None)
     monkeypatch.setattr(
         zhihu,
@@ -359,6 +436,41 @@ def test_browser_cleanup_failure_is_reported_without_masking_completed_task(
     assert browser["task_completed"] is True
     assert browser["cleanup_status"] == "MANUAL_RECOVERY_REQUIRED"
     assert browser["cleanup_error"] == "manual recovery required"
+
+
+def test_cleanup_type_error_never_masks_active_result_unknown(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    installation = _installation(tmp_path)
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+    )
+
+    class Process:
+        returncode = None
+        stderr = None
+
+        def poll(self):
+            return None
+
+    monkeypatch.setattr(zhihu, "preflight", lambda _config: None)
+    monkeypatch.setattr(zhihu, "resolve", lambda *_args, **_kwargs: installation)
+    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
+    monkeypatch.setattr(zhihu, "_wait_for_cdp", lambda *_args: endpoint)
+    monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: None)
+    monkeypatch.setattr(
+        zhihu,
+        "_close_browser",
+        lambda *_args: (_ for _ in ()).throw(TypeError("malformed CDP metadata")),
+    )
+
+    expected = ResultUnknownError("adapter result is ambiguous")
+    with pytest.raises(ResultUnknownError) as captured, zhihu.browser_session(config):
+        raise expected
+
+    assert captured.value is expected
+    assert captured.value.receipt["cleanup_status"] == "MANUAL_RECOVERY_REQUIRED"
+    assert captured.value.receipt["cleanup_error"] == "malformed CDP metadata"
 
 
 def test_bridge_start_timeout_is_result_unknown_and_stops_adapter(monkeypatch, tmp_path):
@@ -416,7 +528,7 @@ def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, t
     monkeypatch.setattr(
         zhihu,
         "_extension_target",
-        lambda _config: {
+        lambda _config, _endpoint=None: {
             "url": f"chrome-extension://{config.extension_id}/src/popup/index.html",
             "webSocketDebuggerUrl": "ws://127.0.0.1/devtools/page/1",
         },

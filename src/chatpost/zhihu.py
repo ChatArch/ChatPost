@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import socket
 import stat
 import subprocess
@@ -64,6 +65,12 @@ class ZhihuRunnerConfig:
     extension_id: str
     headless: bool
     browser_args: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _CdpEndpoint:
+    base_url: str
+    browser_websocket_url: str
 
 
 class ResultUnknownError(RuntimeError):
@@ -241,6 +248,7 @@ def _http_json(url: str, *, method: str = "GET") -> Any:
 def _sanitize_browser_diagnostics(
     config: ZhihuRunnerConfig,
     diagnostics: Iterable[str],
+    extra_redactions: Iterable[str] = (),
 ) -> str:
     text = "\n".join(list(diagnostics)[-40:])
     for value, replacement in (
@@ -250,35 +258,106 @@ def _sanitize_browser_diagnostics(
         (str(Path.home()), "[HOME]"),
     ):
         text = text.replace(value, replacement)
-    return text[-2000:].strip()
+    try:
+        private_values = [
+            value for value in _read_env(config.env_file).values() if value
+        ]
+    except (OSError, UnicodeError):
+        private_values = []
+    private_values.extend(
+        value
+        for key, value in os.environ.items()
+        if value
+        and re.search(
+            r"(?:TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|PRIVATE_KEY|CREDENTIAL)",
+            key,
+            re.IGNORECASE,
+        )
+    )
+    private_values.extend(value for value in extra_redactions if value)
+    return _redact(text, private_values)[-2000:].strip()
+
+
+def _ownership_url(token: str) -> str:
+    return f"about:blank#chatpost-run-{token}"
+
+
+def _discover_owned_cdp_endpoint(
+    config: ZhihuRunnerConfig,
+    ownership_token: str,
+) -> _CdpEndpoint | None:
+    base_url = f"http://{config.cdp_host}:{config.cdp_port}"
+    metadata = _http_json(base_url + "/json/version")
+    targets = _http_json(base_url + "/json/list")
+    if not isinstance(metadata, dict) or not isinstance(targets, list):
+        raise TypeError("Malformed CDP metadata")
+    browser_websocket_url = metadata.get("webSocketDebuggerUrl")
+    if not isinstance(browser_websocket_url, str):
+        raise TypeError("CDP metadata has no browser websocket URL")
+    parsed = urllib.parse.urlparse(browser_websocket_url)
+    if (
+        parsed.scheme != "ws"
+        or parsed.hostname not in _LOOPBACK_HOSTS
+        or parsed.port != config.cdp_port
+        or not parsed.path.startswith("/devtools/browser/")
+    ):
+        raise ValueError("CDP browser websocket must use the configured loopback port")
+    expected_url = _ownership_url(ownership_token)
+    owned_target = any(
+        isinstance(target, dict)
+        and target.get("type") == "page"
+        and target.get("url") == expected_url
+        for target in targets
+    )
+    if not owned_target:
+        return None
+    return _CdpEndpoint(
+        base_url=base_url,
+        browser_websocket_url=browser_websocket_url,
+    )
 
 
 def _wait_for_cdp(
     config: ZhihuRunnerConfig,
     process: subprocess.Popen[str],
+    ownership_token: str,
     diagnostics: Iterable[str] = (),
-) -> None:
-    url = f"http://{config.cdp_host}:{config.cdp_port}/json/version"
+    diagnostic_thread: Thread | None = None,
+) -> _CdpEndpoint:
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
         if process.poll() is not None:
-            detail = _sanitize_browser_diagnostics(config, diagnostics)
+            if diagnostic_thread is not None:
+                diagnostic_thread.join(timeout=1)
+            detail = _sanitize_browser_diagnostics(
+                config,
+                diagnostics,
+                (ownership_token,),
+            )
             suffix = f": {detail}" if detail else ""
             raise RuntimeError(
                 f"Chrome exited before CDP became ready ({process.returncode}){suffix}"
             )
         try:
-            _http_json(url)
-            return
-        except (OSError, urllib.error.URLError, ValueError):
-            time.sleep(0.1)
-    raise RuntimeError("Chrome CDP did not become ready within 20 seconds")
+            endpoint = _discover_owned_cdp_endpoint(config, ownership_token)
+            if endpoint is not None:
+                return endpoint
+        except (OSError, TypeError, urllib.error.URLError, ValueError):
+            pass
+        time.sleep(0.1)
+    detail = _sanitize_browser_diagnostics(config, diagnostics, (ownership_token,))
+    suffix = f": {detail}" if detail else ""
+    raise RuntimeError(f"Owned Chrome CDP did not become ready within 20 seconds{suffix}")
 
 
-def _extension_target(config: ZhihuRunnerConfig) -> dict[str, Any] | None:
-    targets = _http_json(
-        f"http://{config.cdp_host}:{config.cdp_port}/json/list"
+def _extension_target(
+    config: ZhihuRunnerConfig,
+    endpoint: _CdpEndpoint | None = None,
+) -> dict[str, Any] | None:
+    base_url = endpoint.base_url if endpoint is not None else (
+        f"http://{config.cdp_host}:{config.cdp_port}"
     )
+    targets = _http_json(base_url + "/json/list")
     expected = f"chrome-extension://{config.extension_id}/"
     for target in targets:
         if str(target.get("url", "")).startswith(expected) and target.get(
@@ -288,8 +367,11 @@ def _extension_target(config: ZhihuRunnerConfig) -> dict[str, Any] | None:
     return None
 
 
-def _wait_for_extension(config: ZhihuRunnerConfig) -> None:
-    base = f"http://{config.cdp_host}:{config.cdp_port}"
+def _wait_for_extension(
+    config: ZhihuRunnerConfig,
+    endpoint: _CdpEndpoint,
+) -> None:
+    base = endpoint.base_url
     expected = f"chrome-extension://{config.extension_id}/"
     popup = expected + "src/popup/index.html"
     try:
@@ -301,7 +383,7 @@ def _wait_for_extension(config: ZhihuRunnerConfig) -> None:
         pass
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
-        if _extension_target(config) is not None:
+        if _extension_target(config, endpoint) is not None:
             return
         time.sleep(0.1)
     raise RuntimeError(f"Expected extension did not appear: {config.extension_id}")
@@ -337,13 +419,14 @@ def _cdp_evaluate(socket: Any, identifier: int, expression: str) -> Any:
 def _wake_extension(
     config: ZhihuRunnerConfig,
     environment: dict[str, str],
+    endpoint: _CdpEndpoint | None = None,
 ) -> dict[str, bool]:
     """Configure and enable the exact Wechatsync extension over loopback CDP."""
 
     token = environment.get("WECHATSYNC_TOKEN")
     if not token:
         raise RuntimeError("WECHATSYNC_TOKEN is missing")
-    target = _extension_target(config)
+    target = _extension_target(config, endpoint)
     if target is None:
         raise RuntimeError("Expected extension target is unavailable")
     debug_socket = websocket.create_connection(
@@ -393,6 +476,7 @@ def _wake_extension(
 def _browser_command(
     config: ZhihuRunnerConfig,
     installation: PlaywrightBrowserInstallation,
+    ownership_token: str,
 ) -> list[str]:
     command = [
         str(installation.binary_path),
@@ -413,7 +497,7 @@ def _browser_command(
     if config.headless:
         command.append("--headless=new")
     command.extend(config.browser_args)
-    command.append("https://www.zhihu.com/")
+    command.append(_ownership_url(ownership_token))
     return command
 
 
@@ -422,17 +506,14 @@ def _drain_browser_diagnostics(stream: Any, diagnostics: deque[str]) -> None:
         diagnostics.append(line.rstrip())
 
 
-def _close_browser(config: ZhihuRunnerConfig, process: subprocess.Popen[str]) -> None:
+def _close_browser(endpoint: _CdpEndpoint, process: subprocess.Popen[str]) -> None:
     """Ask Chrome to exit through CDP; never force-kill an owned browser."""
 
     if process.poll() is not None:
         return
     try:
-        metadata = _http_json(
-            f"http://{config.cdp_host}:{config.cdp_port}/json/version"
-        )
         debug_socket = websocket.create_connection(
-            metadata["webSocketDebuggerUrl"],
+            endpoint.browser_websocket_url,
             timeout=5,
             suppress_origin=True,
         )
@@ -440,7 +521,7 @@ def _close_browser(config: ZhihuRunnerConfig, process: subprocess.Popen[str]) ->
             debug_socket.send(json.dumps({"id": 1, "method": "Browser.close"}))
         finally:
             debug_socket.close()
-    except (KeyError, OSError, ValueError, websocket.WebSocketException) as error:
+    except (OSError, TypeError, ValueError, websocket.WebSocketException) as error:
         raise RuntimeError(
             "Chrome graceful CDP shutdown could not be requested; "
             "the process was left running for manual recovery"
@@ -468,8 +549,9 @@ def browser_session(config: ZhihuRunnerConfig) -> Iterator[dict[str, Any]]:
         "browser_revision": installation.browser_revision,
         "playwright_version": installation.playwright_version,
     }
+    ownership_token = secrets.token_urlsafe(24)
     process = subprocess.Popen(
-        _browser_command(config, installation),
+        _browser_command(config, installation, ownership_token),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
@@ -485,17 +567,49 @@ def browser_session(config: ZhihuRunnerConfig) -> Iterator[dict[str, Any]]:
             daemon=True,
         )
         diagnostic_thread.start()
+    endpoint: _CdpEndpoint | None = None
+    active_result_unknown: ResultUnknownError | None = None
     try:
-        _wait_for_cdp(config, process, diagnostics)
-        _wait_for_extension(config)
-        yield browser
-    finally:
+        endpoint = _wait_for_cdp(
+            config,
+            process,
+            ownership_token,
+            diagnostics,
+            diagnostic_thread,
+        )
+        _wait_for_extension(config, endpoint)
         try:
-            _close_browser(config, process)
+            yield browser
+        except ResultUnknownError as error:
+            active_result_unknown = error
+            raise
+    finally:
+        if process.poll() is not None:
             browser["cleanup_status"] = "CLOSED"
-        except RuntimeError as error:
+        elif endpoint is None:
             browser["cleanup_status"] = "MANUAL_RECOVERY_REQUIRED"
-            browser["cleanup_error"] = str(error)
+            browser["cleanup_error"] = (
+                "Owned CDP endpoint was not established; "
+                "the process was left running for manual recovery"
+            )
+        else:
+            try:
+                _close_browser(endpoint, process)
+                browser["cleanup_status"] = "CLOSED"
+            except (
+                KeyError,
+                OSError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+                websocket.WebSocketException,
+            ) as error:
+                browser["cleanup_status"] = "MANUAL_RECOVERY_REQUIRED"
+                browser["cleanup_error"] = str(error)
+        if active_result_unknown is not None:
+            active_result_unknown.receipt["cleanup_status"] = browser["cleanup_status"]
+            if "cleanup_error" in browser:
+                active_result_unknown.receipt["cleanup_error"] = browser["cleanup_error"]
         if diagnostic_thread is not None:
             diagnostic_thread.join(timeout=1)
 

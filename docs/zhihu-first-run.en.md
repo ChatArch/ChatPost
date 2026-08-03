@@ -192,7 +192,9 @@ RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
 
 Acceptance requires `DRAFT_CREATED`, a draft ID and `/edit` review URL, a mode-`0600` receipt, editor-page readback of the expected title and marker, and no final publish.
 
-Normal cleanup requests a graceful browser exit through CDP `Browser.close`; ChatPost sends no process termination signal. If the draft result is already definitive but cleanup fails, the receipt keeps `DRAFT_CREATED` and adds `cleanup_status=MANUAL_RECOVERY_REQUIRED`. Recover the process manually and do not run create again.
+Each browser startup creates a random `about:blank#chatpost-run-*` marker. ChatPost binds CDP to the spawned process only after the configured loopback port exposes both that marker and the corresponding browser WebSocket UUID.
+
+Normal cleanup sends CDP `Browser.close` to the browser WebSocket endpoint captured at startup. It does not rediscover whichever browser might later occupy the same port, and it sends no process termination signal. If the draft result is already definitive but cleanup fails, the receipt keeps `DRAFT_CREATED` and adds `cleanup_status=MANUAL_RECOVERY_REQUIRED`. Recover the process manually and do not run create again. For browser startup failures, ChatPost waits for stderr drain and returns only bounded diagnostics with Profile paths, private env values, and the run marker redacted.
 
 Image-upload failure can coexist with successful draft creation. Report the actual editor content; exit code zero alone does not prove image completeness.
 

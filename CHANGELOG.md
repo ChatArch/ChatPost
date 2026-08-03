@@ -21,6 +21,8 @@
 - Return a bounded, secret-redacted dry-run preview so the title and marker can be reviewed before a write.
 - Capture bounded, path-redacted Chrome startup diagnostics and close owned browsers through CDP `Browser.close` instead of a process signal.
 - Preserve a definitive draft result when browser cleanup needs manual recovery instead of masking it with a cleanup exception.
+- Bind browser ownership to a per-run startup marker and captured WebSocket UUID before extension wake or cleanup.
+- Drain startup stderr before reporting an exit and redact private env values from bounded diagnostics.
 
 ## 0.0.2 - 2026-08-03
 

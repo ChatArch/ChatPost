@@ -32,4 +32,6 @@ def test_quick_start_keeps_create_update_and_publish_boundaries_explicit():
         assert "Cookie" in text or "cookie" in text
         assert "`preview`" in text
         assert "Browser.close" in text
+        assert "chatpost-run-*" in text
+        assert "WebSocket UUID" in text
         assert "MANUAL_RECOVERY_REQUIRED" in text
