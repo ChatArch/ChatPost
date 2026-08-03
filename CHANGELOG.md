@@ -13,4 +13,6 @@
 
 ### Changed
 
+- Document the proposed CLI, Browser Runner, and multi-account isolation model.
+
 ### Fixed

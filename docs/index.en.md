@@ -9,6 +9,7 @@ Site entry: <https://arch.gh.wzhecnu.cn/ChatPost/en/>
 | Scenario | Document |
 | --- | --- |
 | Install the package, run the CLI, and confirm it works | [CLI Tree](cli-tree.md) |
+| Review the proposed CLI, Chrome runtime, and multi-account isolation | [Browser Runners and Account Isolation](browser-runners.md) |
 | Check first-class capabilities and current boundaries | [Capability Map](capability-map.md) |
 | Call package behavior directly from Python | [Python Interface Tree](interface-tree.md) |
 
@@ -17,6 +18,7 @@ Site entry: <https://arch.gh.wzhecnu.cn/ChatPost/en/>
 This template keeps only durable documentation entry points; it does not generate a plan placeholder:
 
 - **CLI tree**: the most direct command entry point, including the real command tree, status, and update checklist.
+- **Browser runners and account isolation**: host binaries, Docker, user-data-dir isolation, and bridge boundaries.
 - **Capability map**: first-class capabilities, boundaries, and out-of-scope areas.
 - **Interface tree**: importable Python APIs behind the CLI.
 
@@ -35,6 +37,12 @@ This template keeps only durable documentation entry points; it does not generat
     Review current package boundaries and avoid presenting planned work as implemented behavior.
 
     [Open Capability Map](capability-map.md)
+
+- **Browser Runners and Account Isolation**
+
+    Review whether Chrome requires Docker, how multiple accounts are isolated, and how runners relate to accounts.
+
+    [Open Browser Runner Design](browser-runners.md)
 
 - **Python Interface Tree**
 

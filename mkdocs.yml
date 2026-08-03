@@ -37,6 +37,7 @@ plugins:
             首页: Home
             命令与接口: Commands and APIs
             CLI 树: CLI Tree
+            Browser Runner 与账号隔离: Browser Runners and Account Isolation
             能力地图: Capability Map
             Python 接口树: Python Interface Tree
 markdown_extensions:
@@ -61,5 +62,6 @@ nav:
   - 首页: index.md
   - 命令与接口:
       - CLI 树: cli-tree.md
+      - Browser Runner 与账号隔离: browser-runners.md
       - 能力地图: capability-map.md
       - Python 接口树: interface-tree.md

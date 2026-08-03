@@ -27,6 +27,7 @@ Choose documentation by scenario:
 | Scenario | Document |
 | --- | --- |
 | Install the package, run the CLI, and confirm it works | `docs/cli-tree.en.md` |
+| Review the proposed CLI, Chrome runtime, and multi-account isolation | `docs/browser-runners.en.md` |
 | Check first-class capabilities and current boundaries | `docs/capability-map.en.md` |
 | Call package behavior directly from Python | `docs/interface-tree.md` |
 
