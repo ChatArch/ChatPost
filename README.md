@@ -26,6 +26,9 @@ ChatArch multi-platform content publishing infrastructure package.
 
 | 场景 | 文档 |
 | --- | --- |
+| 理解 ChatPost 总体资源和数据流 | [总体架构](docs/architecture.md) |
+| Review Chrome 安装、ChatEnv 与状态边界 | [配置、环境与状态](docs/configuration.md) |
+| 查看知乎首次登录和固定博客草稿验收 | [知乎首次设置与草稿验收](docs/zhihu-first-run.md) |
 | 第一次安装、运行命令行、确认包可用 | [CLI 树](docs/cli-tree.md) |
 | Review 预期 CLI、Chrome runtime 与多账号隔离 | [Browser Runner 与账号隔离](docs/browser-runners.md) |
 | 校对当前包有哪些一等能力和边界 | [能力地图](docs/capability-map.md) |

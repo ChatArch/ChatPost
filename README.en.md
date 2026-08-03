@@ -26,10 +26,13 @@ Choose documentation by scenario:
 
 | Scenario | Document |
 | --- | --- |
-| Install the package, run the CLI, and confirm it works | `docs/cli-tree.en.md` |
-| Review the proposed CLI, Chrome runtime, and multi-account isolation | `docs/browser-runners.en.md` |
-| Check first-class capabilities and current boundaries | `docs/capability-map.en.md` |
-| Call package behavior directly from Python | `docs/interface-tree.md` |
+| Understand ChatPost resources and data flow | [Overall Architecture](docs/architecture.en.md) |
+| Review Chrome installation, ChatEnv, and state ownership | [Configuration, Environment, and State](docs/configuration.en.md) |
+| Follow first Zhihu login and fixed-article draft acceptance | [Zhihu First Setup and Draft Acceptance](docs/zhihu-first-run.en.md) |
+| Install the package, run the CLI, and confirm it works | [CLI Tree](docs/cli-tree.en.md) |
+| Review the proposed CLI, Chrome runtime, and multi-account isolation | [Browser Runners and Account Isolation](docs/browser-runners.en.md) |
+| Check first-class capabilities and current boundaries | [Capability Map](docs/capability-map.en.md) |
+| Call package behavior directly from Python | [Python Interface Tree](docs/interface-tree.md) |
 
 ## Quick Start
 

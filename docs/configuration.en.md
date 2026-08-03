@@ -1,0 +1,287 @@
+# Configuration, Environment, and State Design
+
+!!! warning "Status: design proposal"
+    This page defines the first functional configuration schema and data boundaries. `ChatPost 0.0.2` still has a scaffold `config.py` with only a placeholder `CHATPOST_API_KEY`; the production fields and commands below are not implemented.
+
+## Decision
+
+ChatPost should not put every value in `.env`. Configuration has four classes:
+
+1. **Versioned artifacts**: Chrome for Testing and the extension;
+2. **Non-secret configuration**: runners, accounts, port policy, and path references;
+3. **Secrets**: per-bridge or remote-runner tokens in ChatEnv;
+4. **Runtime/business state**: process health and the publication ledger, persisted separately.
+
+Cookies, local storage, passwords, and verification codes belong to none of these ChatPost configuration layers.
+
+## Filesystem Layout
+
+### User-Level ChatArch Home
+
+```text
+~/.chatarch/chatpost/
+├── config.toml
+├── browsers/
+│   └── chrome-for-testing/<build-id>/<platform>/...
+├── extensions/
+│   └── wechatsync/<version>/...
+├── runners/
+│   └── <runner>/
+│       ├── runner.toml
+│       ├── chrome-data/          # mode 0700; contains browser session
+│       ├── state.json            # non-secret runtime state
+│       ├── run/
+│       └── logs/
+├── accounts.toml
+└── logs/
+```
+
+### Content Workspace
+
+```text
+<workspace>/.chatpost/
+├── config.toml                   # optional source/target defaults
+└── publications.sqlite3          # source-to-target ledger
+```
+
+Browser artifacts and profiles are machine-level resources. Article mappings are workspace state. Keeping them separate prevents a portable content repository from owning a machine's login session.
+
+## Direct Chrome Binary Installation
+
+Proposed first-release command:
+
+```bash
+chatpost browser install chrome
+```
+
+It is responsible for:
+
+1. resolving the operating system and architecture;
+2. choosing a tested Chrome for Testing build from a ChatPost compatibility manifest;
+3. downloading and recording provenance, version, and digest;
+4. extracting under `~/.chatarch/chatpost/browsers/`;
+5. verifying the binary version;
+6. leaving system Chrome, the daily profile, and Docker untouched.
+
+Chrome is not bundled in the Python wheel. Multiple builds may coexist, and a runner binds to one browser reference. Upgrades install a new build side by side, then stop the runner, switch the reference, and run compatibility checks. A live Chrome binary is never replaced in place.
+
+## Non-Secret Configuration Example
+
+The following TOML is an expected schema, not currently readable configuration:
+
+```toml
+schema_version = 1
+
+[browsers."chrome@tested"]
+kind = "chrome-for-testing"
+build = "tested"
+managed = true
+
+[runners.zhihu-personal]
+runtime = "host"
+browser = "chrome@tested"
+visible = true
+profile_mode = "managed"
+
+[runners.zhihu-personal.cdp]
+bind = "127.0.0.1"
+port = "auto"
+
+[runners.zhihu-personal.bridge]
+mode = "managed"
+ws_bind = "127.0.0.1"
+ws_port = "auto"
+control_transport = "stdio"
+token_profile = "zhihu-personal"
+
+[accounts."zhihu@personal"]
+platform = "zhihu"
+runner = "zhihu-personal"
+```
+
+ChatPost can derive `binary_path`, `user_data_dir`, and allocated ports from its resource directories. Explicit paths or URLs are needed only when adopting an existing profile or connecting an external runner.
+
+## ChatEnv Stores Secrets Only
+
+Each runner uses a separate ChatEnv profile. Proposed production fields:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `CHATPOST_BRIDGE_TOKEN` | sensitive | Authenticates the ChatPost client to that runner's extension bridge. |
+| `CHATPOST_REMOTE_RUNNER_TOKEN` | sensitive / later | Future remote-runner registration or transport authentication. |
+
+The scaffold `CHATPOST_API_KEY` is not a Zhihu or bridge credential. Implementation should remove or replace that placeholder with fields that have product semantics.
+
+Non-secret runner configuration stores only the profile name:
+
+```toml
+[runners.zhihu-personal.bridge]
+token_profile = "zhihu-personal"
+```
+
+ChatEnv is the canonical token source. After proving exact extension identity, the runner writes the same runner-scoped token into that extension's own `chrome.storage.local` so it can validate RPC messages. This profile-local copy remains secret but is not a Zhihu cookie. Rotation updates ChatEnv and the extension copy together; failure on either side removes runner READY state.
+
+Resolution follows the ChatArch convention:
+
+```text
+explicit CLI/Python argument
+  > explicit -e/--env-profile
+  > active ChatEnv profile
+  > non-secret config default
+```
+
+`config show` may display profile/key names and configured booleans. It must never display values or masked token suffixes.
+
+## URLs and Ports
+
+### Managed Local Runner
+
+The user enters no URL. ChatPost allocates ports and derives:
+
+```text
+cdp_url       = http://127.0.0.1:<debug-port>
+bridge_ws_url = ws://127.0.0.1:<bridge-port>
+control       = stdio
+```
+
+- `cdp_url` belongs to the runner manager;
+- `bridge_ws_url` is provisioned into the exact extension, which initiates the connection to the bridge server;
+- the ChatPost adapter calls the bridge process in-process or through stdio by default;
+- optional companion HTTP uses a separate port and requires both loopback binding and control authentication; localhost alone is not authentication;
+- port leases live in runtime state, not the publication ledger.
+
+Runner provisioning may write only extension-owned bridge URL, token, and enable fields. It first proves exact extension identity and never reads or modifies Zhihu page cookies/local storage. If safe automatic provisioning is unavailable, the runner enters `NEEDS_EXTENSION_SETUP` and opens the extension settings page for the user.
+
+### Adopt an Existing Profile
+
+A previously authenticated profile can be bound by reference:
+
+```text
+profile_mode = adopt
+user_data_dir = <existing path>
+```
+
+ChatPost does not copy, archive, or inspect cookie contents. Before first start it proves that no other Chrome process owns the directory and checks ownership/permissions in `doctor`.
+
+### External Runner
+
+A future external runner exposes a separate control API, not its extension WebSocket:
+
+```toml
+[runners.remote-brand.control]
+transport = "https"
+url = "https://runner.example.invalid/v1"
+token_profile = "remote-brand"
+```
+
+External control endpoints require a controlled tunnel/VPN or TLS plus authentication. The local extension WebSocket, CDP, and companion HTTP are never mapped directly to the public internet.
+
+## Runtime State
+
+`runners/<name>/state.json` contains only rebuildable, non-secret state:
+
+```json
+{
+  "state": "READY",
+  "pid": 12345,
+  "browser_ref": "chrome@tested",
+  "browser_version": "<resolved>",
+  "cdp_port": 9227,
+  "bridge_port": 9527,
+  "control_transport": "stdio",
+  "extension_id": "<verified-id>",
+  "extension_protocol": "<version>",
+  "started_at": "<timestamp>",
+  "last_heartbeat_at": "<timestamp>"
+}
+```
+
+A PID alone never proves identity. `runner stop` also matches the user-data-dir, binary, owner marker, or service unit.
+
+## Account Registry
+
+`accounts.toml` stores logical bindings and the latest read-only check:
+
+```toml
+[accounts."zhihu@personal"]
+platform = "zhihu"
+runner = "zhihu-personal"
+auth_state = "READY"
+last_auth_check = "<timestamp>"
+```
+
+It stores no username, phone, password, cookies, or verification codes. A public display name returned by the platform is diagnostic data, not the target key.
+
+## Publication Ledger
+
+SQLite is the recommended first implementation. Minimum fields:
+
+```text
+source_ref
+source_sha256
+target                 # platform@alias
+runner
+operation              # create_draft / update_draft
+draft_id / article_id
+review_url / public_url
+adapter_version
+browser_version
+extension_protocol
+status
+receipt_json_redacted
+created_at / updated_at
+```
+
+The unique constraint is equivalent to:
+
+```text
+UNIQUE(workspace, source_ref, target)
+```
+
+Tokens, cookies, headers, profile content, and one-time login material never enter the ledger.
+
+## Configuration Precedence
+
+```text
+command options
+  > workspace .chatpost/config.toml
+  > user ~/.chatarch/chatpost/config.toml
+  > built-in safe defaults
+```
+
+Secrets do not participate in this ordinary merge. They resolve through an explicit ChatEnv profile, allowing `config validate` to check references without reading or printing values.
+
+## Migration From the Existing Wechatsync Practice
+
+| Existing value/state | ChatPost resource |
+|---|---|
+| `WECHATSYNC_CHROME_BIN` | Browser artifact `binary_path`; derived for a managed install. |
+| `WECHATSYNC_CHROME_PROFILE` | Runner `user_data_dir`; managed by default or adopted by reference. |
+| `WECHATSYNC_DEBUG_PORT` | Runner CDP lease; auto by default. |
+| extension `serverUrl` / `SYNC_WS_PORT` | Runner `bridge_ws_url` / WebSocket lease; the extension initiates the connection. |
+| `SYNC_HTTP_PORT` | Optional companion control endpoint; managed local ChatPost defaults to stdio. |
+| `WECHATSYNC_TOKEN` | `CHATPOST_BRIDGE_TOKEN` in the runner's ChatEnv profile. |
+| Login-assistance data in `.env` | Not migrated; login remains a visible human browser checkpoint. |
+| `state/publication-state.json` | Workspace publication ledger. |
+
+Migration does not copy `.env` or a profile. It establishes browser, runner, account, and publication resource mappings.
+
+## Permissions and Backups
+
+- `chrome-data/`: mode `0700`; no automatic backup and never committed.
+- ChatEnv profile: ChatEnv owns safe writes, permissions, and redaction.
+- `state.json`: contains no secrets and uses atomic replacement.
+- `publications.sqlite3`: contains sensitive draft URLs/IDs and should be protected as user data.
+- Logs: remove URL queries, headers, cookies, tokens, and QR payloads by default.
+
+## Schema Validation
+
+Proposed `config validate` / `doctor` checks at least:
+
+1. browser reference exists and the binary is executable;
+2. runner names, profile paths, and port leases are unique;
+3. CDP/bridge listeners bind to loopback and local control defaults to stdio;
+4. token profile references exist without reading/printing values;
+5. accounts reference an existing runner and adapter;
+6. no user-data-dir is bound to two runners;
+7. the workspace ledger is migratable and healthy.

@@ -1,6 +1,6 @@
 # ChatPost Docs
 
-ChatPost is a ChatArch Python package. This documentation site should hold long-lived usage notes, a command map, a capability map, and Python interface entry points. After scaffolding, replace placeholders with behavior that is actually implemented, explored, or planned for this package.
+ChatPost is ChatArch's multi-platform content publishing control plane. This site keeps the verified Zhihu browser path, first functional design, and currently implemented behavior visibly separate.
 
 Site entry: <https://arch.gh.wzhecnu.cn/ChatPost/en/>
 
@@ -8,6 +8,9 @@ Site entry: <https://arch.gh.wzhecnu.cn/ChatPost/en/>
 
 | Scenario | Document |
 | --- | --- |
+| Understand the control plane, Browser Runner, Account, and Publication model | [Overall Architecture](architecture.md) |
+| Review Chrome installation, ChatEnv, URLs, profiles, and ledger | [Configuration, Environment, and State](configuration.md) |
+| Follow first Zhihu login/draft acceptance with the fixed MkDocs article | [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md) |
 | Install the package, run the CLI, and confirm it works | [CLI Tree](cli-tree.md) |
 | Review the proposed CLI, Chrome runtime, and multi-account isolation | [Browser Runners and Account Isolation](browser-runners.md) |
 | Check first-class capabilities and current boundaries | [Capability Map](capability-map.md) |
@@ -15,8 +18,11 @@ Site entry: <https://arch.gh.wzhecnu.cn/ChatPost/en/>
 
 ## Documentation Organization
 
-This template keeps only durable documentation entry points; it does not generate a plan placeholder:
+This site keeps durable documentation entry points instead of a generic roadmap:
 
+- **Overall architecture**: control-plane, execution-plane, and core-resource ownership.
+- **Configuration, environment, and state**: Chrome installation, ChatEnv secrets, runner state, and publication ledger.
+- **Zhihu first setup and acceptance**: a fixed article defines visible login and one draft-create acceptance.
 - **CLI tree**: the most direct command entry point, including the real command tree, status, and update checklist.
 - **Browser runners and account isolation**: host binaries, Docker, user-data-dir isolation, and bridge boundaries.
 - **Capability map**: first-class capabilities, boundaries, and out-of-scope areas.
@@ -25,6 +31,24 @@ This template keeps only durable documentation entry points; it does not generat
 ## Primary Entry Points
 
 <div class="grid cards" markdown>
+
+- **Overall Architecture**
+
+    Start with how Browser, Runner, Account, and Publication form the control and execution planes.
+
+    [Open Architecture](architecture.md)
+
+- **Configuration, Environment, and State**
+
+    Review ChatArch-managed Chrome, the three connection surfaces, ChatEnv secrets, and filesystem ownership.
+
+    [Open Configuration Design](configuration.md)
+
+- **Zhihu First Setup and Draft Acceptance**
+
+    Follow visible login, planning, one draft create, and readback using the fixed MkDocs article.
+
+    [Open Zhihu Task Flow](zhihu-first-run.md)
 
 - **CLI Tree**
 

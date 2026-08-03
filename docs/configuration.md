@@ -1,0 +1,287 @@
+# 配置、环境与状态设计
+
+!!! warning "状态：设计提案"
+    这里定义 ChatPost 首个功能版本的 schema 与数据边界。`ChatPost 0.0.2` 的 `config.py` 仍是脚手架，只有 `CHATPOST_API_KEY` 占位字段；本页中的生产字段和命令尚未实现。
+
+## 设计结论
+
+ChatPost 不应该把所有内容塞进 `.env`。配置分成四类：
+
+1. **版本化制品**：Chrome for Testing 和扩展；
+2. **非秘密配置**：Runner、Account、端口策略和路径引用；
+3. **秘密**：每个 bridge/远端 Runner 的 token，放 ChatEnv；
+4. **运行状态与业务台账**：进程健康状态和 publication ledger，分别持久化。
+
+Cookie、Local Storage、密码和验证码不属于任何 ChatPost 配置层。
+
+## 文件布局
+
+### 用户级 ChatArch Home
+
+```text
+~/.chatarch/chatpost/
+├── config.toml
+├── browsers/
+│   └── chrome-for-testing/<build-id>/<platform>/...
+├── extensions/
+│   └── wechatsync/<version>/...
+├── runners/
+│   └── <runner>/
+│       ├── runner.toml
+│       ├── chrome-data/          # mode 0700，包含浏览器登录态
+│       ├── state.json            # 非秘密 runtime state
+│       ├── run/
+│       └── logs/
+├── accounts.toml
+└── logs/
+```
+
+### 内容 workspace
+
+```text
+<workspace>/.chatpost/
+├── config.toml                   # source/target 默认值，可选
+└── publications.sqlite3          # source-to-target ledger
+```
+
+浏览器制品和 Profile 是机器级资源；文章映射是 workspace 级状态。二者分开，避免把一个可移动的内容仓库与一台机器上的登录态绑定。
+
+## Chrome 直接二进制安装
+
+首版默认命令提案：
+
+```bash
+chatpost browser install chrome
+```
+
+它的职责是：
+
+1. 识别操作系统与 CPU 架构；
+2. 根据 ChatPost compatibility manifest 解析一个已测试 Chrome for Testing build；
+3. 下载并记录来源、版本和 digest；
+4. 解压到 `~/.chatarch/chatpost/browsers/`；
+5. 验证二进制版本；
+6. 不修改系统 Chrome，不使用日常 Profile，不安装 Docker。
+
+Chrome 不应打进 Python wheel。不同 build 可以并存；Runner 通过 browser ref 绑定一个版本。升级时先安装新版本，再停止 Runner、切换 ref 和做兼容性检查，不能在 Chrome 运行时替换二进制。
+
+## 非秘密配置示例
+
+以下 TOML 是预期 schema，不是当前可读配置：
+
+```toml
+schema_version = 1
+
+[browsers."chrome@tested"]
+kind = "chrome-for-testing"
+build = "tested"
+managed = true
+
+[runners.zhihu-personal]
+runtime = "host"
+browser = "chrome@tested"
+visible = true
+profile_mode = "managed"
+
+[runners.zhihu-personal.cdp]
+bind = "127.0.0.1"
+port = "auto"
+
+[runners.zhihu-personal.bridge]
+mode = "managed"
+ws_bind = "127.0.0.1"
+ws_port = "auto"
+control_transport = "stdio"
+token_profile = "zhihu-personal"
+
+[accounts."zhihu@personal"]
+platform = "zhihu"
+runner = "zhihu-personal"
+```
+
+`binary_path`、`user_data_dir` 和已分配端口可以由 ChatPost 根据资源目录派生。只有 adopt 现有 Profile 或接入外部 Runner 时才需要显式路径/URL。
+
+## ChatEnv 只存秘密
+
+每个 Runner 使用独立 ChatEnv profile。首版需要的生产字段：
+
+| 字段 | 类型 | 用途 |
+|---|---|---|
+| `CHATPOST_BRIDGE_TOKEN` | sensitive | ChatPost CLI 与该 Runner 扩展 bridge 的控制通道鉴权。 |
+| `CHATPOST_REMOTE_RUNNER_TOKEN` | sensitive / later | 未来远端 Runner 的注册或 transport 鉴权。 |
+
+当前脚手架的 `CHATPOST_API_KEY` 不代表知乎或 bridge 凭据；实现时应删除或替换这个没有业务语义的占位字段。
+
+Runner 非秘密配置只保存 profile 名称，例如：
+
+```toml
+[runners.zhihu-personal.bridge]
+token_profile = "zhihu-personal"
+```
+
+ChatEnv 是 token 的 canonical source。为了让扩展验证 RPC，Runner 在证明 exact extension identity 后，把同一个 runner-scoped token 写入该扩展自己的 `chrome.storage.local`。这个 Profile 内副本仍是秘密，但不是知乎 Cookie；轮换必须同时更新 ChatEnv 和扩展副本，任何一侧失败都让 Runner 退出 READY。
+
+读取优先级遵循 ChatArch 约定：
+
+```text
+显式 CLI/Python 参数
+  > 显式 -e/--env-profile
+  > 当前 ChatEnv profile
+  > 非秘密配置默认值
+```
+
+`config show` 只能显示 profile 名称、key 名称和是否已配置，不能显示 token 值或掩码尾部。
+
+## URL 与端口
+
+### Managed local Runner
+
+用户不应填写 URL。ChatPost 分配端口并在启动后派生：
+
+```text
+cdp_url       = http://127.0.0.1:<debug-port>
+bridge_ws_url = ws://127.0.0.1:<bridge-port>
+control       = stdio
+```
+
+- `cdp_url` 只给 Runner manager；
+- `bridge_ws_url` 写入 exact extension 配置，由扩展主动连接 bridge server；
+- ChatPost adapter 默认通过 in-process/stdio 调用 bridge process；
+- 如果需要 companion HTTP，它使用单独端口并同时满足 loopback 与 control authentication，不能只依赖“在本机”；
+- 端口租约写 runtime state，不写 publication ledger。
+
+Runner 配置扩展时只能写 bridge URL、token 和 enable flag 这些扩展自有字段。实现必须先证明 exact extension identity，不能读取或修改知乎页面的 Cookie/Local Storage。无法安全自动配置时，Runner 进入 `NEEDS_EXTENSION_SETUP` 并打开扩展设置页让用户处理。
+
+### Adopt existing Profile
+
+为了迁移已经登录的 Profile，Runner 可以按引用接管：
+
+```text
+profile_mode = adopt
+user_data_dir = <existing path>
+```
+
+ChatPost 不复制、不压缩、不检查 Cookie 内容。第一次 start 前必须确认该目录未被其他 Chrome 进程占用，并把目录权限与所有权纳入 doctor。
+
+### External Runner
+
+未来外部 Runner 暴露独立 control API，而不是 extension WebSocket：
+
+```toml
+[runners.remote-brand.control]
+transport = "https"
+url = "https://runner.example.invalid/v1"
+token_profile = "remote-brand"
+```
+
+外部 control URL 必须使用受控 tunnel/VPN 或 TLS+认证；不能把本地 extension WebSocket、CDP 或 companion HTTP 直接映射到公网。
+
+## Runtime state
+
+`runners/<name>/state.json` 只保存可重建、非秘密状态：
+
+```json
+{
+  "state": "READY",
+  "pid": 12345,
+  "browser_ref": "chrome@tested",
+  "browser_version": "<resolved>",
+  "cdp_port": 9227,
+  "bridge_port": 9527,
+  "control_transport": "stdio",
+  "extension_id": "<verified-id>",
+  "extension_protocol": "<version>",
+  "started_at": "<timestamp>",
+  "last_heartbeat_at": "<timestamp>"
+}
+```
+
+PID 不能单独证明身份。`runner stop` 还必须匹配 user-data-dir、binary、Runner owner marker 或服务单元。
+
+## Account registry
+
+`accounts.toml` 保存逻辑映射与最近只读验证结果：
+
+```toml
+[accounts."zhihu@personal"]
+platform = "zhihu"
+runner = "zhihu-personal"
+auth_state = "READY"
+last_auth_check = "<timestamp>"
+```
+
+它不保存用户名、手机号、密码、Cookie 或验证码。平台返回的公开 display name 只能作为诊断结果，不应成为目标主键。
+
+## Publication ledger
+
+建议首版使用 SQLite，至少包含：
+
+```text
+source_ref
+source_sha256
+target                 # platform@alias
+runner
+operation              # create_draft / update_draft
+draft_id / article_id
+review_url / public_url
+adapter_version
+browser_version
+extension_protocol
+status
+receipt_json_redacted
+created_at / updated_at
+```
+
+唯一约束应等价于：
+
+```text
+UNIQUE(workspace, source_ref, target)
+```
+
+Token、Cookie、请求头、Profile 内容和一次性登录材料永远不进入 ledger。
+
+## 配置优先级
+
+```text
+command options
+  > workspace .chatpost/config.toml
+  > user ~/.chatarch/chatpost/config.toml
+  > built-in safe defaults
+```
+
+秘密不参与这个普通配置合并，而是通过明确的 ChatEnv profile 解析。这样 `config validate` 可以在不读取秘密值的情况下检查引用是否存在。
+
+## 旧 Wechatsync 实践迁移表
+
+| 旧字段/状态 | ChatPost 资源 |
+|---|---|
+| `WECHATSYNC_CHROME_BIN` | Browser artifact 的 `binary_path`；managed install 时自动派生。 |
+| `WECHATSYNC_CHROME_PROFILE` | Runner `user_data_dir`；默认 managed，也可 adopt 现有目录。 |
+| `WECHATSYNC_DEBUG_PORT` | Runner CDP lease；默认 auto。 |
+| extension `serverUrl` / `SYNC_WS_PORT` | Runner `bridge_ws_url` / WebSocket port lease；扩展主动连接。 |
+| `SYNC_HTTP_PORT` | 可选 companion control endpoint；ChatPost managed local 默认改用 stdio。 |
+| `WECHATSYNC_TOKEN` | Runner 对应 ChatEnv profile 的 `CHATPOST_BRIDGE_TOKEN`。 |
+| `.env` 中的登录辅助信息 | 不迁移；平台登录由可见浏览器人工完成。 |
+| `state/publication-state.json` | workspace publication ledger。 |
+
+迁移不是复制 `.env` 或 Profile。它是建立 browser ref、Runner、Account 和 Publication 四种资源的映射。
+
+## 权限与备份
+
+- `chrome-data/`：目录权限 `0700`；不自动备份、不进入 Git。
+- ChatEnv secret profile：由 ChatEnv 负责文件权限、写入和脱敏。
+- `state.json`：不含秘密；写入采用原子替换。
+- `publications.sqlite3`：包含草稿 URL/ID 等敏感元数据，应按用户数据保护。
+- logs：默认过滤 URL query、headers、Cookie、Token 和二维码内容。
+
+## Schema 验证
+
+提案中的 `config validate` / `doctor` 至少检查：
+
+1. browser ref 存在且 binary 可执行；
+2. Runner 名称、Profile 路径和端口租约唯一；
+3. CDP/bridge bind address 为 loopback，本地 control transport 默认 stdio；
+4. token profile 引用存在但不读取/打印值；
+5. Account 指向存在的 Runner 和 adapter；
+6. 同一 user-data-dir 没有被两个 Runner 引用；
+7. workspace ledger schema 可迁移且未损坏。

@@ -11,8 +11,12 @@
 
 ### Added
 
+- Add bilingual architecture, configuration/state, and Zhihu first-run design pages.
+- Add a fixed MkDocs article and local image for future Zhihu draft acceptance.
+
 ### Changed
 
 - Document the proposed CLI, Browser Runner, and multi-account isolation model.
+- Add ChatArch-managed Chrome installation and the `browser` proposal to the CLI tree.
 
 ### Fixed

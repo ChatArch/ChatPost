@@ -3,6 +3,8 @@
 !!! warning "Status: architecture proposal"
     This page describes how the first ChatPost release should manage Chrome. `ChatPost 0.0.2` does not yet implement `runner` or `account` commands. "Verified" refers to the existing Zhihu/Wechatsync practice; "proposed" refers to future ChatPost work.
 
+See [Overall Architecture](architecture.md) for the resource model, [Configuration, Environment, and State](configuration.md) for persistence, and [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md) for the concrete task.
+
 ## Direct Answers
 
 ### Does Chrome require Docker?
@@ -114,6 +116,18 @@ The first ChatPost implementation should:
 
 A future broker can introduce `runner_id` multiplexing, but the current protocol must not be presented as multi-tenant.
 
+## Three Connection Surfaces
+
+The verified practice used separate CDP, extension WebSocket, and bridge-control surfaces:
+
+```text
+Runner manager -> http://127.0.0.1:<cdp-port> -> Chrome
+Browser extension -> ws://127.0.0.1:<bridge-port> -> bridge server
+ChatPost adapter -> stdio (or controlled companion HTTP) -> bridge process
+```
+
+CDP opens login pages, proves exact extension identity, and supports diagnostics. The extension initiates the WebSocket connection, while local ChatPost calls the bridge process in-process or over stdio by default. A managed runner provisions these connections automatically. CDP, the extension WebSocket, and unauthenticated companion HTTP are never exposed publicly.
+
 ## Host Binary Runtime
 
 This is the recommended default.
@@ -135,8 +149,20 @@ user-data-dir
 process identity/PID or service unit
 debug address/port
 bridge address/port/token reference
+control transport/endpoint
 runtime logs
 ```
+
+### ChatArch-Managed Chrome Installation
+
+The verified practice ran Chrome for Testing directly from a Playwright cache without Docker. ChatPost should turn that temporary dependency into an explicit resource:
+
+```text
+~/.chatarch/chatpost/browsers/
+└── chrome-for-testing/<build-id>/<platform>/...
+```
+
+Proposed `chatpost browser install chrome` resolves a tested build from the ChatPost compatibility manifest and records platform, architecture, provenance, and digest. Chrome stays outside the PyPI wheel and never overwrites system Chrome. A runner binds it through `--browser chrome@tested`; login state remains only in the runner's `chrome-data/`.
 
 ### Secure Defaults
 
@@ -190,53 +216,50 @@ Docker is optional, not required.
 
 ## Proposed Multi-Account Configuration
 
-This illustrates an expected schema; `0.0.2` does not support it:
+This illustrates an expected TOML schema; `0.0.2` does not support it:
 
-```yaml
-runners:
-  mac-personal:
-    runtime: host
-    browser:
-      kind: chrome-for-testing
-      binary: auto
-      user_data_dir: ${CHATPOST_DATA}/runners/mac-personal/chrome
-      visible: true
-      debug_bind: 127.0.0.1
-      debug_port: auto
-    bridge:
-      bind: 127.0.0.1
-      port: auto
-      token_ref: chatenv://chatpost/mac-personal-bridge
+```toml
+[browsers."chrome@tested"]
+kind = "chrome-for-testing"
+build = "tested"
+managed = true
 
-  mac-brand:
-    runtime: host
-    browser:
-      kind: chrome-for-testing
-      binary: auto
-      user_data_dir: ${CHATPOST_DATA}/runners/mac-brand/chrome
-      visible: true
-      debug_bind: 127.0.0.1
-      debug_port: auto
-    bridge:
-      bind: 127.0.0.1
-      port: auto
-      token_ref: chatenv://chatpost/mac-brand-bridge
+[runners.mac-personal]
+runtime = "host"
+browser = "chrome@tested"
+profile_mode = "managed"
 
-accounts:
-  zhihu@personal:
-    platform: zhihu
-    runner: mac-personal
+[runners.mac-personal.bridge]
+ws_bind = "127.0.0.1"
+ws_port = "auto"
+control_transport = "stdio"
+token_profile = "personal"
 
-  csdn@personal:
-    platform: csdn
-    runner: mac-personal
+[runners.mac-brand]
+runtime = "host"
+browser = "chrome@tested"
+profile_mode = "managed"
 
-  zhihu@brand:
-    platform: zhihu
-    runner: mac-brand
+[runners.mac-brand.bridge]
+ws_bind = "127.0.0.1"
+ws_port = "auto"
+control_transport = "stdio"
+token_profile = "brand"
+
+[accounts."zhihu@personal"]
+platform = "zhihu"
+runner = "mac-personal"
+
+[accounts."csdn@personal"]
+platform = "csdn"
+runner = "mac-personal"
+
+[accounts."zhihu@brand"]
+platform = "zhihu"
+runner = "mac-brand"
 ```
 
-`token_ref` points to a secret provider; the configuration file never stores the token value.
+`token_profile` references a ChatEnv profile; configuration contains no plaintext token. See [Configuration, Environment, and State](configuration.md) for the complete schema and Wechatsync migration map.
 
 ## Ports and Locks
 
@@ -246,7 +269,7 @@ Every runner needs independent leases:
 user_data_dir lock
 CDP port lease
 bridge WebSocket port lease
-bridge companion HTTP port lease
+optional companion control port lease
 job lock
 ```
 
@@ -321,12 +344,14 @@ ChatPost never stores:
 
 ```text
 default runtime       = host binary
+default browser       = ChatArch-managed Chrome for Testing
 Docker                = optional
 isolation unit        = browser persona / runner
 multiple same-platform accounts = separate user-data-dirs
 concurrent writes in one profile = forbidden
 concurrency across profiles      = allowed
 bridge                = one instance per runner
+local control         = prefer in-process / stdio
 network binding       = loopback only
 final publish         = human review checkpoint
 ```
@@ -335,4 +360,5 @@ final publish         = human review checkpoint
 
 - Chromium User Data Directory: <https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md>
 - Chrome Headless: <https://developer.chrome.com/docs/chromium/headless>
-- Local verified facts and source indexes are recorded in the project report `reports/browser-runner-facts.md`.
+- Wechatsync bridge server: <https://github.com/ChatArch/Wechatsync/blob/dev/packages/mcp-server/src/ws-bridge.ts>
+- Wechatsync extension WebSocket client: <https://github.com/ChatArch/Wechatsync/blob/dev/packages/extension/src/mcp/client.ts>

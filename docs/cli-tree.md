@@ -3,7 +3,7 @@
 !!! warning "状态：设计提案，不是当前可用命令"
     `ChatPost 0.0.2` 当前只实现 `chatpost --help` 和 `chatpost --version`。本页定义首个功能版本的预期命令边界，用于实现前 Review；示例现在不能直接执行。
 
-Browser Runner、Chrome 与多账号隔离见 [Browser Runner 与账号隔离](browser-runners.md)。
+总体分层见 [总体架构设计](architecture.md)，配置与 ChatEnv 边界见 [配置、环境与状态设计](configuration.md)，Chrome 与多账号隔离见 [Browser Runner 与账号隔离](browser-runners.md)。知乎任务流见 [知乎首次设置与草稿验收](zhihu-first-run.md)。
 
 ## 设计目标
 
@@ -35,16 +35,21 @@ chatpost
 ```text
 chatpost
 ├── init [PATH]                # 初始化 workspace、配置和 publication ledger
+├── browser
+│   ├── install chrome         # 下载已测试 Chrome for Testing 到 ChatArch Home
+│   ├── list                   # 列出 managed browser artifacts
+│   ├── show REF               # 查看 build、平台、binary path 和兼容信息
+│   └── doctor REF             # 验证二进制、版本、来源和扩展模式
 ├── platform
 │   ├── list                   # 列出已安装 adapter
 │   └── show PLATFORM          # 查看平台能力：draft/update/images/review 等
 ├── runner
-│   ├── add NAME               # 注册 host 或 docker Browser Runner
+│   ├── add NAME               # 注册 Browser persona，并绑定 browser ref/Profile
 │   ├── list                   # 列出 Runner 与健康状态
 │   ├── show NAME              # 查看 runtime、profile ref、端口和绑定账号
 │   ├── start NAME             # 启动 ChatPost 拥有的 Runner
 │   ├── stop NAME              # 优雅停止 ChatPost 拥有的 Runner
-│   ├── status NAME            # 检查进程、CDP、bridge 和扩展连接
+│   ├── status NAME            # 检查进程、CDP、扩展 WS、control transport
 │   ├── doctor NAME            # 检查二进制、目录权限、端口冲突和版本
 │   └── open NAME              # 打开可见浏览器，供登录或人工接管
 ├── account
@@ -97,25 +102,41 @@ xiaohongshu@brand
 # 1. 初始化控制面
 chatpost init
 
-# 2. 注册一个直接运行宿主机 Chrome 的 Browser Runner
-chatpost runner add mac-personal --runtime host --browser auto
+# 2. 安装 ChatArch 管理的 Chrome 二进制；不要求 Docker
+chatpost browser install chrome
+chatpost browser doctor chrome@tested
+
+# 3. 注册一个直接运行 host binary 的 Browser Runner
+chatpost runner add mac-personal --runtime host --browser chrome@tested
 chatpost runner doctor mac-personal
 chatpost runner start mac-personal --visible
 
-# 3. 注册逻辑账号；不把密码或 Cookie 交给 CLI
+# 4. 注册逻辑账号；不把密码或 Cookie 交给 CLI
 chatpost account add zhihu@personal --runner mac-personal
 chatpost account login zhihu@personal
 chatpost account status zhihu@personal
 
-# 4. 纯本地计划
-chatpost plan article.md --to zhihu@personal --output json
+# 5. 对固定博客测试稿生成纯本地计划
+chatpost plan examples/zhihu/mkdocs-quickstart.md --to zhihu@personal --output json
 
-# 5. 显式创建草稿
-chatpost draft create article.md --to zhihu@personal
+# 6. 显式且只执行一次草稿创建
+chatpost draft create examples/zhihu/mkdocs-quickstart.md --to zhihu@personal
 
-# 6. 打开草稿，让人 Review 和最终发布
-chatpost publication open article-slug@zhihu@personal
+# 7. 打开草稿，让人 Review 和最终发布
+chatpost publication open <publication-ref>
 ```
+
+## Browser 命令边界
+
+`browser install chrome` 只管理浏览器软件制品：
+
+- 根据平台和架构下载一个 ChatPost compatibility manifest 中已测试的 Chrome for Testing build；
+- 安装到 `~/.chatarch/chatpost/browsers/`，不修改系统 Chrome；
+- 记录 build、来源和 digest；
+- 不创建 Profile、不登录平台、不启动草稿写入；
+- Chrome 不打进 PyPI wheel，Docker 也不是安装要求。
+
+Browser artifact 与登录态完全分离。删除或升级 binary 不能被当作删除/迁移 Profile。
 
 ## Runner 命令边界
 
@@ -123,8 +144,9 @@ chatpost publication open article-slug@zhihu@personal
 
 ```text
 --runtime host|docker
---browser auto|chrome|chromium|chrome-for-testing
+--browser REF               # 例如 chrome@tested
 --binary PATH               # host runtime 可选
+--profile-mode managed|adopt
 --user-data-dir PATH        # 默认由 ChatPost 创建专属目录
 --visible / --headless
 ```
@@ -132,8 +154,11 @@ chatpost publication open article-slug@zhihu@personal
 安全默认值：
 
 - `host` 是默认 runtime；Docker 不是要求。
+- managed browser 默认位于 `~/.chatarch/chatpost/browsers/`。
 - CDP 与 bridge 只绑定 `127.0.0.1`。
 - 每个 Runner 使用独立 user-data-dir、debug port、bridge port 和 token。
+- 扩展主动连接 `bridge_ws_url`；ChatPost managed local 默认通过 in-process/stdio 控制 bridge process。
+- 只有证明 exact extension identity 后才能写入扩展自己的 URL/token 配置；否则进入 `NEEDS_EXTENSION_SETUP`。
 - bridge token 使用 secret reference，不出现在 `config show`、ledger 或日志中。
 - `runner stop` 只优雅停止由 ChatPost 启动且身份匹配的进程。
 
@@ -216,7 +241,10 @@ ledger 不记录：
 
 ```text
 PLANNED
+BROWSER_UNAVAILABLE
 RUNNER_UNAVAILABLE
+EXTENSION_UNAVAILABLE
+NEEDS_EXTENSION_SETUP
 NEEDS_LOGIN
 READY
 RUNNING
@@ -246,14 +274,14 @@ NEEDS_ACTION
 建议正式开发按以下顺序：
 
 1. `init`、config schema 与 ledger；
-2. `runner add/list/status/doctor` 的 host runtime；
-3. `account add/status/login checkpoint`；
-4. `platform list/show` 与 adapter protocol；
-5. `plan`；
-6. `draft create`；
-7. `draft update` 与 fail-closed contract；
-8. `publication open/status/reconcile`；
-9. Docker runtime；
-10. 远端 Runner 与更多平台 adapter。
+2. `browser install/list/show/doctor` 与版本兼容清单；
+3. `runner add/list/status/doctor` 的 host runtime；
+4. `account add/status/login checkpoint`；
+5. `platform list/show` 与 adapter protocol；
+6. `plan`；
+7. 用固定 MkDocs 稿验证 `draft create`；
+8. `draft update` 与 fail-closed contract；
+9. `publication open/status/reconcile`；
+10. Docker、远端 Runner 与更多平台 adapter。
 
 每个命令只有在代码、测试和帮助文本都存在后，才能从“提案”改成“已实现”。
