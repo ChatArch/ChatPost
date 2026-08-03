@@ -25,9 +25,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import tomllib
 import websocket
 from chatup.playwright import PlaywrightBrowserInstallation, resolve
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised on Python 3.10 CI
+    import tomli as tomllib
 
 RESULT_UNKNOWN = "RESULT_UNKNOWN"
 _REVIEW_URL = re.compile(r"https://zhuanlan\.zhihu\.com/p/(?P<id>[0-9]+)/edit")

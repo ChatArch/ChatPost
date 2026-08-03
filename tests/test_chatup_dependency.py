@@ -15,6 +15,7 @@ def test_chatpost_uses_bounded_published_chatup_and_chatstyle_dependencies():
 
     assert '"chatup>=0.2.4,<0.3.0"' in pyproject
     assert '"chatstyle>=0.1.1,<0.2.0"' in pyproject
+    assert '"tomli>=2.0; python_version < \'3.11\'"' in pyproject
     chatup_version = tuple(int(part) for part in version("chatup").split("."))
     chatstyle_version = tuple(int(part) for part in version("chatstyle").split("."))
     assert (0, 2, 4) <= chatup_version < (0, 3, 0)

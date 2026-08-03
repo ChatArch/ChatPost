@@ -15,6 +15,7 @@ dependencies = [
     "chatenv>=0.2.0,<0.3.0",
     "chatup>=0.2.4,<0.3.0",
     "websocket-client>=1.8,<2.0",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 authors = [{name = "ChatArch", email = "rex@chatarch.org"}]
 keywords = ["chatpost", "chatarch", "cli"]

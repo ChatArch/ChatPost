@@ -15,6 +15,10 @@
 - Require `chatup>=0.2.4,<0.3.0` and `websocket-client>=1.8,<2.0`.
 - Keep generic runner/account/publication and same-ID article update commands explicitly proposed rather than executable.
 
+### Fixed
+
+- Preserve the declared Python 3.10 support with a conditional `tomli` fallback for TOML parsing.
+
 ## 0.0.2 - 2026-08-03
 
 ### Changed
