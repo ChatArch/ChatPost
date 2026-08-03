@@ -37,6 +37,8 @@ ChatPost never reads platform cookies and does not treat a browser profile as or
 | Markdown to Zhihu draft | Verified | The existing Wechatsync practice created and read back a Zhihu draft without final publish. |
 | Chrome for Testing host binary | Verified | The successful path ran a local binary directly; Docker was not involved. |
 | Dedicated persistent profile | Verified | Zhihu authentication remained in a dedicated user-data-dir; cookies were not exported. |
+| Zhihu QR-scan login | Verified | The visible isolated browser completed QR login and the profile retained the session. |
+| Zhihu SMS-code login | Needs separate acceptance | This is a standard manual alternative, but current end-to-end evidence must not claim it has passed. |
 | Loopback bridge and token | Verified | The extension and CLI communicated over local WebSocket; the token was not a Zhihu credential. |
 | ChatUp Chrome environment | Released dependency | `chatup 0.2.2` provides `chatup chrome` and `chatup.chrome.resolve_chrome`; ChatPost does not duplicate downloads. |
 | ChatPost runner/account CLI | Proposed | Commands, schemas, and Python services are not implemented. |

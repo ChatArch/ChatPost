@@ -37,6 +37,8 @@ ChatPost 不读取平台 Cookie，也不把浏览器 Profile 当作普通配置�
 | Markdown 到知乎草稿 | 已验证 | 现有 Wechatsync 实践已创建并回读知乎草稿，未点击最终发布。 |
 | Chrome for Testing host binary | 已验证 | 成功链路直接运行本地二进制，没有使用 Docker。 |
 | 独立持久化 Profile | 已验证 | 知乎登录态保留在专用 `user-data-dir`，未导出 Cookie。 |
+| 知乎二维码扫码登录 | 已验证 | 在可见隔离浏览器中完成扫码，Profile 随后保持登录态。 |
+| 知乎短信验证码登录 | 待单独验收 | 这是标准人工备选路径，但现有端到端证据不应宣称它已经走通。 |
 | loopback bridge + token | 已验证 | 扩展与 CLI 通过本机 WebSocket 通讯，Token 不是知乎凭据。 |
 | ChatUp Chrome environment | 已发布依赖 | `chatup 0.2.2` 已提供 `chatup chrome` 与 `chatup.chrome.resolve_chrome`；ChatPost 不重复实现下载。 |
 | ChatPost runner/account CLI | 提案 | 命令、schema 和 Python service 尚未实现。 |

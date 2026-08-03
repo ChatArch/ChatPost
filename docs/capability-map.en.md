@@ -38,7 +38,7 @@ Use this page to check which first-class capabilities `ChatPost` currently owns,
 | CLI structure design | Proposed | Runner/account/plan/draft/publication boundaries are documented; ChatPost no longer proposes browser-install commands. |
 | ChatUp Chrome dependency | Declared and verified | `pyproject.toml` bounds released `chatup 0.2.2`; tests verify the public `chatup.chrome` API. |
 | Runner isolation | Proposed | Host binary by default and one user-data-dir/bridge per runner; ChatPost resolves a ChatUp descriptor and never installs Chrome. |
-| Historical Zhihu draft path | Verified | The Wechatsync practice created and read back a draft using a direct binary, dedicated profile, and loopback bridge. |
+| Historical Zhihu draft path | Verified | The Wechatsync practice created and read back a draft using a direct binary, QR-scan login, dedicated profile, and loopback bridge; SMS remains separately unverified. |
 | MkDocs Zhihu fixture | Added | `examples/zhihu/mkdocs-quickstart.md` and its PNG exist; no draft has been created through ChatPost commands yet. |
 | Business commands | Not implemented | Add these from the real package domain; do not fake future commands in the template. |
 

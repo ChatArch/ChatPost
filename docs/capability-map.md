@@ -38,7 +38,7 @@
 | CLI 结构设计 | 提案 | 已定义 runner/account/plan/draft/publication 边界；ChatPost 不再设计 browser install 命令。 |
 | ChatUp Chrome dependency | 已声明并验证 | `pyproject.toml` 有界依赖已发布 `chatup 0.2.2`，测试验证 `chatup.chrome` public API。 |
 | Runner 隔离 | 提案 | 默认 host binary、每 Runner 独立 user-data-dir/bridge；ChatPost 只解析 ChatUp descriptor，不安装 Chrome。 |
-| 历史知乎草稿链路 | 已验证 | Wechatsync 实践已用直接二进制、独立 Profile 和 loopback bridge 创建并回读草稿。 |
+| 历史知乎草稿链路 | 已验证 | Wechatsync 实践已用直接二进制、二维码扫码登录、独立 Profile 和 loopback bridge 创建并回读草稿；短信路线尚未单独验收。 |
 | MkDocs 知乎测试稿 | 已加入 | `examples/zhihu/mkdocs-quickstart.md` 与本地 PNG 已存在；尚未通过 ChatPost 命令创建草稿。 |
 | 业务命令 | 未实现 | 按当前包真实需求补充，不能在模板里伪造未来命令。 |
 

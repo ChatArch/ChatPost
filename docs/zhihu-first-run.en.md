@@ -19,7 +19,8 @@ The existing Wechatsync practice proved that:
 
 - Chrome for Testing runs directly as a host binary without Docker;
 - visible Chrome can load an unpacked extension;
-- Zhihu QR/SMS authentication remains inside a dedicated user-data-dir;
+- Zhihu QR-scan login passed in a visible isolated browser and the session remains in its dedicated user-data-dir;
+- SMS code is a standard manual alternative but has not passed a separate end-to-end acceptance in this path;
 - a loopback WebSocket bridge connects the extension and CLI;
 - read-only auth can gate a draft create/readback operation;
 - cookies never need to be exported to the CLI.
@@ -102,12 +103,19 @@ This creates a binding only. It accepts no Zhihu password, phone number, cookies
 chatpost account login zhihu@personal
 ```
 
+Track the two login routes separately:
+
+| Route | Current evidence |
+|---|---|
+| Image QR scan | Verified; the default route for the first real acceptance. |
+| Phone SMS code | Standard manual alternative; not yet accepted end to end. |
+
 Expected flow:
 
 1. start or wake the correct runner;
 2. navigate to the official Zhihu sign-in page;
 3. keep the browser visible;
-4. let the user complete QR, SMS, or platform checkpoints;
+4. let the user complete the selected manual route; the first acceptance uses the verified QR scan;
 5. wait until the page leaves the login state;
 6. run a read-only adapter auth check;
 7. set the account state to `READY`.
@@ -255,6 +263,8 @@ ChatPost must:
 |---|---:|---:|---:|
 | ChatUp descriptor contract | Required | Required | Indirect |
 | Profile lock/port leases | Required | Required | Required |
+| QR-scan login | Contract | Required | Verified |
+| SMS-code login | Contract | Optional | Needs separate acceptance |
 | Exact extension identity | Fake contract | Required | Required |
 | Bridge token redaction | Required | Required | Required |
 | Account auth check | Fake | Required | Required |

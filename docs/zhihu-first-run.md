@@ -19,7 +19,8 @@ examples/zhihu/mkdocs-quickstart.md
 
 - Chrome for Testing 可以直接作为 host binary 运行，不需要 Docker；
 - 可见 Chrome 能加载 unpacked 扩展；
-- 知乎扫码/短信登录态可以留在独立 `user-data-dir`；
+- 知乎二维码扫码登录已在可见隔离浏览器中走通，登录态保留在独立 `user-data-dir`；
+- 手机短信验证码是标准人工备选路径，但尚未在这条端到端链路中单独验收；
 - bridge 通过 loopback WebSocket 与 CLI 通讯；
 - CLI 可先只读验证 auth，再创建并回读草稿；
 - Cookie 不需要也不应该导出给 CLI。
@@ -102,12 +103,19 @@ chatpost account show zhihu@personal
 chatpost account login zhihu@personal
 ```
 
+登录路线必须分开记录：
+
+| 路线 | 当前证据 |
+|---|---|
+| 图片二维码扫码 | 已验证；作为首个真实验收默认路线。 |
+| 手机短信验证码 | 标准人工备选；尚未单独做端到端验收。 |
+
 预期行为：
 
 1. 启动或唤醒正确 Runner；
 2. 打开知乎官方登录页；
 3. 保持可见浏览器；
-4. 用户自行扫码、短信验证或完成平台要求；
+4. 用户自行完成所选人工路线；首个验收使用已验证的二维码扫码；
 5. ChatPost 等待页面离开登录状态；
 6. adapter 执行只读 auth check；
 7. Account 状态更新为 `READY`。
@@ -256,6 +264,8 @@ RUNNING -> RESULT_UNKNOWN
 |---|---:|---:|---:|
 | ChatUp descriptor contract | 必需 | 必需 | 间接 |
 | Profile lock与端口租约 | 必需 | 必需 | 必需 |
+| 二维码扫码登录 | contract | 必需 | 已验证 |
+| 短信验证码登录 | contract | 可选 | 待单独验收 |
 | exact extension identity | fake + contract | 必需 | 必需 |
 | bridge token redaction | 必需 | 必需 | 必需 |
 | account auth check | fake | 必需 | 必需 |

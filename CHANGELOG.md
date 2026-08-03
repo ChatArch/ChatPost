@@ -22,3 +22,4 @@
 ### Fixed
 
 - Add the missing English Python interface page and clarify which token/protocol behaviors are proposals rather than verified Wechatsync capabilities.
+- Mark QR-scan login as verified while keeping SMS-code login as a separate unverified acceptance path.
