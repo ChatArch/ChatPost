@@ -12,9 +12,20 @@ from chatpost import __version__
 
 ```text
 chatpost
-├── cli.py          # Click 入口，只做参数解析和输出
-└── <service>.py    # 放包的核心可调用能力
+├── cli.py           # Click 入口，只做参数解析和输出
+├── dependencies.py  # 只读解析 ChatUp Chrome descriptor；不安装
+├── runner.py        # Profile/process/CDP/bridge 生命周期
+├── account.py       # platform@alias 与登录 checkpoint
+└── publication.py   # plan/draft/ledger/reconcile
 ```
+
+Chrome 环境 contract 直接消费 ChatUp 已发布 public API：
+
+```python
+from chatup.chrome import ChromeInstallation, resolve_chrome
+```
+
+ChatPost dependency adapter 只能封装 `resolve_chrome(...)` 和领域错误；不能复制 downloader/extractor，也不能在 `runner start` 中调用 `ensure_chrome(...)` 隐式安装。
 
 ## 更新清单
 

@@ -7,7 +7,7 @@
 
 ChatPost 不应该把所有内容塞进 `.env`。配置分成四类：
 
-1. **版本化制品**：Chrome for Testing 和扩展；
+1. **机器依赖与版本化制品**：Chrome for Testing 由 ChatUp 管理，扩展由 ChatPost/adapter 管理；
 2. **非秘密配置**：Runner、Account、端口策略和路径引用；
 3. **秘密**：每个 bridge/远端 Runner 的 token，放 ChatEnv；
 4. **运行状态与业务台账**：进程健康状态和 publication ledger，分别持久化。
@@ -19,21 +19,22 @@ Cookie、Local Storage、密码和验证码不属于任何 ChatPost 配置层。
 ### 用户级 ChatArch Home
 
 ```text
-~/.chatarch/chatpost/
-├── config.toml
-├── browsers/
-│   └── chrome-for-testing/<build-id>/<platform>/...
-├── extensions/
-│   └── wechatsync/<version>/...
-├── runners/
-│   └── <runner>/
-│       ├── runner.toml
-│       ├── chrome-data/          # mode 0700，包含浏览器登录态
-│       ├── state.json            # 非秘密 runtime state
-│       ├── run/
-│       └── logs/
-├── accounts.toml
-└── logs/
+~/.chatarch/
+├── chrome/                       # ChatUp-owned machine dependency
+│   └── chrome-for-testing/<version>/<platform>/...
+└── chatpost/
+    ├── config.toml
+    ├── extensions/
+    │   └── wechatsync/<version>/...
+    ├── runners/
+    │   └── <runner>/
+    │       ├── runner.toml
+    │       ├── chrome-data/      # mode 0700，包含浏览器登录态
+    │       ├── state.json        # 非秘密 runtime state
+    │       ├── run/
+    │       └── logs/
+    ├── accounts.toml
+    └── logs/
 ```
 
 ### 内容 workspace
@@ -44,26 +45,23 @@ Cookie、Local Storage、密码和验证码不属于任何 ChatPost 配置层。
 └── publications.sqlite3          # source-to-target ledger
 ```
 
-浏览器制品和 Profile 是机器级资源；文章映射是 workspace 级状态。二者分开，避免把一个可移动的内容仓库与一台机器上的登录态绑定。
+Chrome installation 是 ChatUp 机器级资源；Profile 是 ChatPost Runner 状态；文章映射是 workspace 级状态。三者分开，避免把可移动内容仓库与某台机器或登录态绑定。
 
-## Chrome 直接二进制安装
+## ChatUp Chrome dependency
 
-首版默认命令提案：
+ChatPost 通过已发布的有界依赖消费 ChatUp：
 
-```bash
-chatpost browser install chrome
+```toml
+dependencies = ["chatup>=0.2.2,<0.3.0"]
 ```
 
-它的职责是：
+环境准备由 ChatUp 独立完成：
 
-1. 识别操作系统与 CPU 架构；
-2. 根据 ChatPost compatibility manifest 解析一个已测试 Chrome for Testing build；
-3. 下载并记录来源、版本和 digest；
-4. 解压到 `~/.chatarch/chatpost/browsers/`；
-5. 验证二进制版本；
-6. 不修改系统 Chrome，不使用日常 Profile，不安装 Docker。
+```bash
+chatup chrome --version <chatpost-tested-version> --output json -I
+```
 
-Chrome 不应打进 Python wheel。不同 build 可以并存；Runner 通过 browser ref 绑定一个版本。升级时先安装新版本，再停止 Runner、切换 ref 和做兼容性检查，不能在 Chrome 运行时替换二进制。
+ChatPost 启动 Runner 时只调用 `chatup.chrome.resolve_chrome(...)`：读取 binary path、exact version、platform、runtime root 和 digest。它不调用安装 API，不保存一份 browser registry，也不下载/解压 Chrome。descriptor 缺失或版本不兼容时进入 `CHROME_DEPENDENCY_MISSING` 并打印可执行的 `chatup chrome` 修复命令。
 
 ## 非秘密配置示例
 
@@ -72,14 +70,8 @@ Chrome 不应打进 Python wheel。不同 build 可以并存；Runner 通过 bro
 ```toml
 schema_version = 1
 
-[browsers."chrome@tested"]
-kind = "chrome-for-testing"
-build = "tested"
-managed = true
-
 [runners.zhihu-personal]
 runtime = "host"
-browser = "chrome@tested"
 visible = true
 profile_mode = "managed"
 
@@ -99,7 +91,7 @@ platform = "zhihu"
 runner = "zhihu-personal"
 ```
 
-`binary_path`、`user_data_dir` 和已分配端口可以由 ChatPost 根据资源目录派生。只有 adopt 现有 Profile 或接入外部 Runner 时才需要显式路径/URL。
+`binary_path`/Chrome version 来自 ChatUp descriptor；`user_data_dir` 和已分配端口由 ChatPost Runner 目录派生。只有 adopt 现有 Profile 或接入外部 Runner 时才需要显式路径/URL。
 
 ## ChatEnv 只存秘密
 
@@ -186,8 +178,9 @@ token_profile = "remote-brand"
 {
   "state": "READY",
   "pid": 12345,
-  "browser_ref": "chrome@tested",
-  "browser_version": "<resolved>",
+  "chrome_provider": "chatup",
+  "chrome_ref": "chrome-for-testing@<resolved-version>",
+  "chrome_binary_path": "<resolved-path>",
   "cdp_port": 9227,
   "bridge_port": 9527,
   "control_transport": "stdio",
@@ -259,7 +252,7 @@ command options
 
 | 旧字段/状态 | ChatPost 资源 |
 |---|---|
-| `WECHATSYNC_CHROME_BIN` | Browser artifact 的 `binary_path`；managed install 时自动派生。 |
+| `WECHATSYNC_CHROME_BIN` | ChatUp `ChromeInstallation.binary_path`；Runner 启动时只读解析。 |
 | `WECHATSYNC_CHROME_PROFILE` | Runner `user_data_dir`；默认 managed，也可 adopt 现有目录。 |
 | `WECHATSYNC_DEBUG_PORT` | Runner CDP lease；默认 auto。 |
 | extension `serverUrl` / `SYNC_WS_PORT` | Runner `bridge_ws_url` / WebSocket port lease；扩展主动连接。 |
@@ -268,7 +261,7 @@ command options
 | `.env` 中的登录辅助信息 | 不迁移；平台登录由可见浏览器人工完成。 |
 | `state/publication-state.json` | workspace publication ledger。 |
 
-迁移不是复制 `.env` 或 Profile。它是建立 browser ref、Runner、Account 和 Publication 四种资源的映射。
+迁移不是复制 `.env` 或 Profile。它是先由 ChatUp 提供 Chrome dependency，再建立 Runner、Account 和 Publication 三种 ChatPost 资源的映射。
 
 ## 权限与备份
 
@@ -282,7 +275,7 @@ command options
 
 提案中的 `config validate` / `doctor` 至少检查：
 
-1. browser ref 存在且 binary 可执行；
+1. 已安装 `chatup>=0.2.2,<0.3.0`，且 ChatPost 兼容版本可由 `chatup.chrome.resolve_chrome` 解析并执行；验证过程不触发安装；
 2. Runner 名称、Profile 路径和端口租约唯一；
 3. CDP/bridge bind address 为 loopback，本地 control transport 默认 stdio；
 4. token profile 引用存在但不读取/打印值；

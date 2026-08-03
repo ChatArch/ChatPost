@@ -34,7 +34,7 @@ This site keeps durable documentation entry points instead of a generic roadmap:
 
 - **Overall Architecture**
 
-    Start with how Browser, Runner, Account, and Publication form the control and execution planes.
+    Start with how the ChatUp dependency plus Runner, Account, and Publication form the control and execution planes.
 
     [Open Architecture](architecture.md)
 

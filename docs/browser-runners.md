@@ -143,7 +143,7 @@ CDP 用于打开登录页、确认 exact extension identity 和诊断。扩展�
 ### 必需资源
 
 ```text
-browser binary
+ChatUp ChromeInstallation descriptor
 extension directory/version
 user-data-dir
 process identity/PID or service unit
@@ -153,16 +153,16 @@ control transport/endpoint
 runtime logs
 ```
 
-### ChatArch 管理的 Chrome 安装
+### ChatUp 管理的 Chrome dependency
 
-已验证实践使用 Playwright 缓存中的 Chrome for Testing 二进制直接运行，没有 Docker。ChatPost 应把这个临时依赖变成显式资源：
+已验证实践使用 Playwright 缓存中的 Chrome for Testing 二进制直接运行，没有 Docker。现在由已发布 `chatup 0.2.2` 把这个临时依赖提升为可复用机器环境：
 
 ```text
-~/.chatarch/chatpost/browsers/
-└── chrome-for-testing/<build-id>/<platform>/...
+~/.chatarch/chrome/
+└── chrome-for-testing/<version>/<platform>/...
 ```
 
-提案命令 `chatpost browser install chrome` 根据 ChatPost compatibility manifest 安装已测试 build，并记录平台、架构、来源和 digest。Chrome 不打进 PyPI wheel，也不覆盖系统 Chrome。Runner 通过 `--browser chrome@tested` 绑定制品；登录态仍只在 Runner 的 `chrome-data/` 中。
+用户通过 `chatup chrome --version <chatpost-tested-version>` 安装；ChatPost Runner 只通过 `chatup.chrome.resolve_chrome(...)` 解析 descriptor，不拥有下载、解压、升级或 browser registry。Chrome 不打进 ChatPost wheel，也不覆盖系统 Chrome；登录态仍只在 Runner 的 `chrome-data/` 中。
 
 ### 安全默认值
 
@@ -206,7 +206,7 @@ Docker 是可选 runtime，而不是要求。
 | 维度 | Host binary | Docker |
 | --- | --- | --- |
 | 首版默认 | 是 | 否 |
-| Chrome 安装 | 本机二进制或 Chrome for Testing | 镜像内固定版本 |
+| Chrome 安装 | ChatUp-managed Chrome for Testing | 镜像内固定版本（后续 backend） |
 | 登录与人工接管 | 最简单 | 需要显示/VNC/受控入口 |
 | Profile 持久化 | 普通目录 | 持久卷 |
 | 扩展加载 | 本地目录 | 镜像内或只读挂载 |
@@ -219,14 +219,8 @@ Docker 是可选 runtime，而不是要求。
 以下只是预期 TOML schema，不是 `0.0.2` 已支持配置：
 
 ```toml
-[browsers."chrome@tested"]
-kind = "chrome-for-testing"
-build = "tested"
-managed = true
-
 [runners.mac-personal]
 runtime = "host"
-browser = "chrome@tested"
 profile_mode = "managed"
 
 [runners.mac-personal.bridge]
@@ -237,7 +231,6 @@ token_profile = "personal"
 
 [runners.mac-brand]
 runtime = "host"
-browser = "chrome@tested"
 profile_mode = "managed"
 
 [runners.mac-brand.bridge]
@@ -279,7 +272,7 @@ job lock
 
 1. user-data-dir 没有被其他 Runner 占用；
 2. CDP/bridge 端口未被占用；
-3. Chrome binary 和扩展版本存在；
+3. ChatUp descriptor 可只读解析到 exact、可执行的 Chrome binary，且扩展版本存在；
 4. 目录权限符合要求；
 5. bridge 只绑定 loopback；
 6. Runner identity 与已有进程匹配。
@@ -346,7 +339,8 @@ ChatPost 不保存：
 
 ```text
 默认 runtime       = host binary
-默认 browser       = ChatArch-managed Chrome for Testing
+Chrome owner        = ChatUp (`~/.chatarch/chrome/`)
+ChatPost resolution = read-only `chatup.chrome.resolve_chrome`
 Docker             = optional
 隔离单位           = browser persona / runner
 同平台多个账号     = 多个独立 user-data-dir
@@ -362,5 +356,6 @@ bridge              = 每 runner 一个实例
 
 - Chromium User Data Directory: <https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md>
 - Chrome Headless: <https://developer.chrome.com/docs/chromium/headless>
+- ChatUp Chrome CLI: <https://arch.gh.wzhecnu.cn/ChatUp/cli-tree/>
 - Wechatsync bridge server: <https://github.com/ChatArch/Wechatsync/blob/dev/packages/mcp-server/src/ws-bridge.ts>
 - Wechatsync extension WebSocket client: <https://github.com/ChatArch/Wechatsync/blob/dev/packages/extension/src/mcp/client.ts>

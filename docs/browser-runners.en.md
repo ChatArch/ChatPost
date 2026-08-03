@@ -143,7 +143,7 @@ This is the recommended default.
 ### Required Resources
 
 ```text
-browser binary
+ChatUp ChromeInstallation descriptor
 extension directory/version
 user-data-dir
 process identity/PID or service unit
@@ -153,16 +153,16 @@ control transport/endpoint
 runtime logs
 ```
 
-### ChatArch-Managed Chrome Installation
+### ChatUp-Managed Chrome Dependency
 
-The verified practice ran Chrome for Testing directly from a Playwright cache without Docker. ChatPost should turn that temporary dependency into an explicit resource:
+The verified practice ran Chrome for Testing directly from a Playwright cache without Docker. Released `chatup 0.2.2` now turns that temporary dependency into a reusable machine environment:
 
 ```text
-~/.chatarch/chatpost/browsers/
-└── chrome-for-testing/<build-id>/<platform>/...
+~/.chatarch/chrome/
+└── chrome-for-testing/<version>/<platform>/...
 ```
 
-Proposed `chatpost browser install chrome` resolves a tested build from the ChatPost compatibility manifest and records platform, architecture, provenance, and digest. Chrome stays outside the PyPI wheel and never overwrites system Chrome. A runner binds it through `--browser chrome@tested`; login state remains only in the runner's `chrome-data/`.
+The user installs it with `chatup chrome --version <chatpost-tested-version>`. A ChatPost runner only resolves the descriptor through `chatup.chrome.resolve_chrome(...)`; it owns no download, extraction, upgrade, or browser registry. Chrome stays outside the ChatPost wheel and never overwrites system Chrome. Login state remains only in the runner's `chrome-data/`.
 
 ### Secure Defaults
 
@@ -206,7 +206,7 @@ Docker is optional, not required.
 | Dimension | Host binary | Docker |
 | --- | --- | --- |
 | First-release default | Yes | No |
-| Chrome installation | Host binary or Chrome for Testing | Pinned image version |
+| Chrome installation | ChatUp-managed Chrome for Testing | Pinned image version (later backend) |
 | Login / takeover | Simplest | Needs display, VNC, or controlled entry |
 | Profile persistence | Normal directory | Persistent volume |
 | Extension loading | Local directory | Image layer or read-only mount |
@@ -219,14 +219,8 @@ Docker is optional, not required.
 This illustrates an expected TOML schema; `0.0.2` does not support it:
 
 ```toml
-[browsers."chrome@tested"]
-kind = "chrome-for-testing"
-build = "tested"
-managed = true
-
 [runners.mac-personal]
 runtime = "host"
-browser = "chrome@tested"
 profile_mode = "managed"
 
 [runners.mac-personal.bridge]
@@ -237,7 +231,6 @@ token_profile = "personal"
 
 [runners.mac-brand]
 runtime = "host"
-browser = "chrome@tested"
 profile_mode = "managed"
 
 [runners.mac-brand.bridge]
@@ -279,7 +272,7 @@ Before start, it checks:
 
 1. no other runner owns the user-data-dir;
 2. CDP and bridge ports are available;
-3. the Chrome binary and extension version exist;
+3. the ChatUp descriptor resolves read-only to an exact executable Chrome binary and the extension version exists;
 4. directory permissions are safe;
 5. the bridge binds to loopback;
 6. the runner identity matches any existing process.
@@ -344,7 +337,8 @@ ChatPost never stores:
 
 ```text
 default runtime       = host binary
-default browser       = ChatArch-managed Chrome for Testing
+Chrome owner          = ChatUp (`~/.chatarch/chrome/`)
+ChatPost resolution   = read-only `chatup.chrome.resolve_chrome`
 Docker                = optional
 isolation unit        = browser persona / runner
 multiple same-platform accounts = separate user-data-dirs
@@ -360,5 +354,6 @@ final publish         = human review checkpoint
 
 - Chromium User Data Directory: <https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md>
 - Chrome Headless: <https://developer.chrome.com/docs/chromium/headless>
+- ChatUp Chrome CLI: <https://arch.gh.wzhecnu.cn/ChatUp/en/cli-tree/>
 - Wechatsync bridge server: <https://github.com/ChatArch/Wechatsync/blob/dev/packages/mcp-server/src/ws-bridge.ts>
 - Wechatsync extension WebSocket client: <https://github.com/ChatArch/Wechatsync/blob/dev/packages/extension/src/mcp/client.ts>

@@ -5,7 +5,7 @@
 
 ## 一句话模型
 
-ChatPost 是控制面；带持久浏览器 Profile 的 Browser Runner 是执行面；平台账号只是绑定到 Runner 的逻辑发布目标。
+ChatPost 是控制面；ChatUp 提供可复用的 Chrome 环境；带持久浏览器 Profile 的 Browser Runner 是执行面；平台账号只是绑定到 Runner 的逻辑发布目标。
 
 ```text
 Markdown + local assets
@@ -38,27 +38,27 @@ ChatPost 不读取平台 Cookie，也不把浏览器 Profile 当作普通配置�
 | Chrome for Testing host binary | 已验证 | 成功链路直接运行本地二进制，没有使用 Docker。 |
 | 独立持久化 Profile | 已验证 | 知乎登录态保留在专用 `user-data-dir`，未导出 Cookie。 |
 | loopback bridge + token | 已验证 | 扩展与 CLI 通过本机 WebSocket 通讯，Token 不是知乎凭据。 |
-| ChatPost browser/runner/account CLI | 提案 | 命令、schema 和 Python service 尚未实现。 |
+| ChatUp Chrome environment | 已发布依赖 | `chatup 0.2.2` 已提供 `chatup chrome` 与 `chatup.chrome.resolve_chrome`；ChatPost 不重复实现下载。 |
+| ChatPost runner/account CLI | 提案 | 命令、schema 和 Python service 尚未实现。 |
 | 多账号调度与 publication ledger | 提案 | 本页定义资源和状态边界，后续按测试实现。 |
 
 ## 核心资源
 
-### Browser artifact
+### ChatUp Chrome dependency
 
-由 ChatPost 下载和管理的版本化 Chrome for Testing 二进制。它是可替换的软件制品，不保存登录态。
+Chrome for Testing 是 ChatUp 管理的机器级安装，不是 ChatPost Resource。ChatPost 只声明兼容版本并解析一个只读 descriptor：
 
 ```text
-BrowserArtifact
-├── id
+ChatUp ChromeInstallation
 ├── kind = chrome-for-testing
-├── version / build_id
-├── platform / architecture
+├── exact version
+├── platform
 ├── binary_path
-├── provenance / digest
-└── compatibility metadata
+├── runtime root
+└── provenance / digest
 ```
 
-Chrome 不打进 PyPI wheel。`browser install` 在运行时下载到 ChatArch Home，Docker 不是必需条件。
+`chatup chrome --version <tested-version>` 安装到 `~/.chatarch/chrome/`。ChatPost 通过 `chatup.chrome.resolve_chrome(...)` 解析已有安装；缺失时 fail closed 并提示运行 ChatUp，不自行下载、解压或修改系统 Chrome。
 
 ### Runner
 
@@ -66,7 +66,7 @@ Runner 是一个 Browser persona 的执行边界：
 
 ```text
 Runner
-├── one browser artifact
+├── one ChatUp-resolved Chrome descriptor
 ├── one Chrome process
 ├── one isolated user-data-dir
 ├── one CDP endpoint
@@ -139,9 +139,9 @@ platform account + draft/article ID
 ## 从安装到草稿的生命周期
 
 ```text
-BROWSER_ABSENT
-  -> browser install
-BROWSER_READY
+CHROME_DEPENDENCY_MISSING
+  -> user runs chatup chrome --version <tested-version>
+CHROME_DEPENDENCY_READY
   -> runner add/start
 RUNNER_STARTING
   -> process + CDP + exact extension + bridge checks
@@ -167,7 +167,7 @@ RUNNING
 
 | 数据 | 所有者 | 是否秘密 | 是否进入 ledger |
 |---|---|---:|---:|
-| Chrome 二进制与版本 | Browser registry | 否 | 否 |
+| Chrome 二进制、版本与 digest | ChatUp `~/.chatarch/chrome/` | 否 | 否 |
 | user-data-dir 路径引用 | Runner config | 否 | 否 |
 | Profile 内 Cookie/Local Storage | Chrome Profile | 是 | 否 |
 | bridge URL、端口 | Runner config/state | 否 | 否 |
@@ -201,7 +201,7 @@ examples/zhihu/mkdocs-quickstart.md
 
 首个功能版本包含：
 
-- ChatArch Home 内的 Chrome for Testing 安装；
+- 对已发布 `chatup>=0.2.2,<0.3.0` 的有界依赖，以及只读 Chrome descriptor 解析；
 - host Runner 生命周期与健康检查；
 - 一个 Runner 一个独立 user-data-dir；
 - ChatEnv bridge secret reference；

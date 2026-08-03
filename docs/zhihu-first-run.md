@@ -24,7 +24,7 @@ examples/zhihu/mkdocs-quickstart.md
 - CLI 可先只读验证 auth，再创建并回读草稿；
 - Cookie 不需要也不应该导出给 CLI。
 
-ChatPost 要做的是把这组脚本和环境变量提升为 Browser、Runner、Account 和 Publication 四种稳定资源。
+ChatUp 把 Chrome 二进制提升为可复用机器依赖；ChatPost 把其余脚本和状态提升为 Runner、Account 和 Publication 三种稳定资源。
 
 ## 预期首次运行
 
@@ -37,28 +37,29 @@ chatpost config validate
 
 预期创建用户级配置和 workspace `.chatpost/` ledger，不创建平台草稿。
 
-### 2. 安装 ChatArch 管理的 Chrome
+### 2. 使用 ChatUp 准备 Chrome dependency
 
 ```bash
-chatpost browser install chrome
-chatpost browser list
-chatpost browser doctor chrome@tested
+chatup chrome \
+  --version <chatpost-tested-version> \
+  --output json \
+  --doctor \
+  -I
 ```
 
 预期：
 
-- Chrome for Testing 下载到 `~/.chatarch/chatpost/browsers/`；
-- 记录 build、platform、architecture 和 digest；
+- ChatUp 把 Chrome for Testing 安装到 `~/.chatarch/chrome/`；
+- ChatUp 的 `runtime.json` 记录 exact version、platform、binary path、来源和 digest；
 - 不修改系统 Chrome；
 - 不要求 Docker；
-- `doctor` 验证二进制和扩展模式兼容性。
+- ChatPost 后续只调用 `chatup.chrome.resolve_chrome(...)`，不下载或升级 Chrome。
 
 ### 3. 创建隔离 Runner
 
 ```bash
 chatpost runner add zhihu-personal \
-  --runtime host \
-  --browser chrome@tested
+  --runtime host
 
 chatpost runner start zhihu-personal --visible
 chatpost runner status zhihu-personal
@@ -73,6 +74,7 @@ chatpost runner status zhihu-personal
 `status` 必须分别报告：
 
 ```text
+chrome        CHATUP_RESOLVED + exact version
 process       READY
 cdp           READY
 extension     READY + exact identity
@@ -199,7 +201,6 @@ chatpost publication open <publication-ref>
 ```bash
 chatpost runner add zhihu-personal \
   --runtime host \
-  --browser chrome@tested \
   --profile-mode adopt \
   --user-data-dir <existing-isolated-profile>
 ```
@@ -253,7 +254,7 @@ RUNNING -> RESULT_UNKNOWN
 
 | 能力 | 离线测试 | 本地 Runner | 真实知乎草稿 |
 |---|---:|---:|---:|
-| Browser install/layout | 必需 | 必需 | 间接 |
+| ChatUp descriptor contract | 必需 | 必需 | 间接 |
 | Profile lock与端口租约 | 必需 | 必需 | 必需 |
 | exact extension identity | fake + contract | 必需 | 必需 |
 | bridge token redaction | 必需 | 必需 | 必需 |
@@ -266,7 +267,7 @@ RUNNING -> RESULT_UNKNOWN
 
 ## 常见失败
 
-- **Browser 不存在**：运行 `browser install/doctor`，不回退到未知系统浏览器。
+- **Chrome dependency 不存在**：状态为 `CHROME_DEPENDENCY_MISSING`，运行报错中给出的 exact `chatup chrome --version ...`；ChatPost 不回退到未知系统浏览器，也不隐式安装。
 - **Profile 被占用**：停止并报告 owner，不强杀日常 Chrome。
 - **扩展不匹配**：状态为 `EXTENSION_UNAVAILABLE`，不把任意 service worker 当目标扩展。
 - **扩展 URL/token 未配置**：状态为 `NEEDS_EXTENSION_SETUP`，打开 exact extension 设置页，不写入平台 storage。

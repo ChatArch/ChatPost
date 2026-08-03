@@ -34,7 +34,7 @@ ChatPost 是 ChatArch 的多平台内容发布控制面。这个文档站把已�
 
 - **总体架构**
 
-    先看 Browser、Runner、Account、Publication 如何组成控制面与执行面。
+    先看 ChatUp dependency 与 Runner、Account、Publication 如何组成控制面与执行面。
 
     [查看总体架构](architecture.md)
 

@@ -27,10 +27,10 @@ ChatArch multi-platform content publishing infrastructure package.
 | 场景 | 文档 |
 | --- | --- |
 | 理解 ChatPost 总体资源和数据流 | [总体架构](docs/architecture.md) |
-| Review Chrome 安装、ChatEnv 与状态边界 | [配置、环境与状态](docs/configuration.md) |
+| Review ChatUp Chrome dependency、ChatEnv 与状态边界 | [配置、环境与状态](docs/configuration.md) |
 | 查看知乎首次登录和固定博客草稿验收 | [知乎首次设置与草稿验收](docs/zhihu-first-run.md) |
 | 第一次安装、运行命令行、确认包可用 | [CLI 树](docs/cli-tree.md) |
-| Review 预期 CLI、Chrome runtime 与多账号隔离 | [Browser Runner 与账号隔离](docs/browser-runners.md) |
+| Review 预期 CLI、ChatUp runtime dependency 与多账号隔离 | [Browser Runner 与账号隔离](docs/browser-runners.md) |
 | 校对当前包有哪些一等能力和边界 | [能力地图](docs/capability-map.md) |
 | 从 Python 代码调用包能力 | [接口树](docs/interface-tree.md) |
 
@@ -46,7 +46,7 @@ python -m build
 
 ## 命令行规范
 
-这个模板默认依赖 `chatstyle>=0.1.0,<0.2.0` 和 `chatenv>=0.2.0,<0.3.0`，新增命令应优先使用：
+这个包依赖 `chatstyle>=0.1.0,<0.2.0`、`chatenv>=0.2.0,<0.3.0` 和 `chatup>=0.2.2,<0.3.0`。Chrome 安装由 ChatUp 负责；ChatPost 后续 Runner 只解析 ChatUp descriptor。新增命令应优先使用：
 
 - `CommandSchema` / `CommandField` 描述输入。
 - `add_interactive_option()` 提供统一 `-i/-I`。

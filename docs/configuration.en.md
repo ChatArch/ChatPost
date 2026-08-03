@@ -7,7 +7,7 @@
 
 ChatPost should not put every value in `.env`. Configuration has four classes:
 
-1. **Versioned artifacts**: Chrome for Testing and the extension;
+1. **Machine dependencies and versioned artifacts**: ChatUp owns Chrome for Testing; ChatPost/the adapter owns the extension;
 2. **Non-secret configuration**: runners, accounts, port policy, and path references;
 3. **Secrets**: per-bridge or remote-runner tokens in ChatEnv;
 4. **Runtime/business state**: process health and the publication ledger, persisted separately.
@@ -19,21 +19,22 @@ Cookies, local storage, passwords, and verification codes belong to none of thes
 ### User-Level ChatArch Home
 
 ```text
-~/.chatarch/chatpost/
-├── config.toml
-├── browsers/
-│   └── chrome-for-testing/<build-id>/<platform>/...
-├── extensions/
-│   └── wechatsync/<version>/...
-├── runners/
-│   └── <runner>/
-│       ├── runner.toml
-│       ├── chrome-data/          # mode 0700; contains browser session
-│       ├── state.json            # non-secret runtime state
-│       ├── run/
-│       └── logs/
-├── accounts.toml
-└── logs/
+~/.chatarch/
+├── chrome/                       # ChatUp-owned machine dependency
+│   └── chrome-for-testing/<version>/<platform>/...
+└── chatpost/
+    ├── config.toml
+    ├── extensions/
+    │   └── wechatsync/<version>/...
+    ├── runners/
+    │   └── <runner>/
+    │       ├── runner.toml
+    │       ├── chrome-data/      # mode 0700; contains browser session
+    │       ├── state.json        # non-secret runtime state
+    │       ├── run/
+    │       └── logs/
+    ├── accounts.toml
+    └── logs/
 ```
 
 ### Content Workspace
@@ -44,26 +45,23 @@ Cookies, local storage, passwords, and verification codes belong to none of thes
 └── publications.sqlite3          # source-to-target ledger
 ```
 
-Browser artifacts and profiles are machine-level resources. Article mappings are workspace state. Keeping them separate prevents a portable content repository from owning a machine's login session.
+The Chrome installation is a ChatUp machine resource. A profile is ChatPost runner state. Article mappings are workspace state. Keeping all three separate avoids binding a portable content repository to one machine or login state.
 
-## Direct Chrome Binary Installation
+## ChatUp Chrome Dependency
 
-Proposed first-release command:
+ChatPost consumes a bounded released ChatUp dependency:
 
-```bash
-chatpost browser install chrome
+```toml
+dependencies = ["chatup>=0.2.2,<0.3.0"]
 ```
 
-It is responsible for:
+Environment preparation is an independent ChatUp command:
 
-1. resolving the operating system and architecture;
-2. choosing a tested Chrome for Testing build from a ChatPost compatibility manifest;
-3. downloading and recording provenance, version, and digest;
-4. extracting under `~/.chatarch/chatpost/browsers/`;
-5. verifying the binary version;
-6. leaving system Chrome, the daily profile, and Docker untouched.
+```bash
+chatup chrome --version <chatpost-tested-version> --output json -I
+```
 
-Chrome is not bundled in the Python wheel. Multiple builds may coexist, and a runner binds to one browser reference. Upgrades install a new build side by side, then stop the runner, switch the reference, and run compatibility checks. A live Chrome binary is never replaced in place.
+When starting a runner, ChatPost only calls `chatup.chrome.resolve_chrome(...)` to read binary path, exact version, platform, runtime root, and digest. It does not call an install API, store a browser registry, or download/extract Chrome. A missing or incompatible descriptor enters `CHROME_DEPENDENCY_MISSING` and prints an actionable `chatup chrome` repair command.
 
 ## Non-Secret Configuration Example
 
@@ -72,14 +70,8 @@ The following TOML is an expected schema, not currently readable configuration:
 ```toml
 schema_version = 1
 
-[browsers."chrome@tested"]
-kind = "chrome-for-testing"
-build = "tested"
-managed = true
-
 [runners.zhihu-personal]
 runtime = "host"
-browser = "chrome@tested"
 visible = true
 profile_mode = "managed"
 
@@ -99,7 +91,7 @@ platform = "zhihu"
 runner = "zhihu-personal"
 ```
 
-ChatPost can derive `binary_path`, `user_data_dir`, and allocated ports from its resource directories. Explicit paths or URLs are needed only when adopting an existing profile or connecting an external runner.
+`binary_path`/Chrome version come from the ChatUp descriptor. `user_data_dir` and allocated ports derive from ChatPost runner directories. Explicit paths or URLs are needed only for adopted profiles or external runners.
 
 ## ChatEnv Stores Secrets Only
 
@@ -186,8 +178,9 @@ External control endpoints require a controlled tunnel/VPN or TLS plus authentic
 {
   "state": "READY",
   "pid": 12345,
-  "browser_ref": "chrome@tested",
-  "browser_version": "<resolved>",
+  "chrome_provider": "chatup",
+  "chrome_ref": "chrome-for-testing@<resolved-version>",
+  "chrome_binary_path": "<resolved-path>",
   "cdp_port": 9227,
   "bridge_port": 9527,
   "control_transport": "stdio",
@@ -259,7 +252,7 @@ Secrets do not participate in this ordinary merge. They resolve through an expli
 
 | Existing value/state | ChatPost resource |
 |---|---|
-| `WECHATSYNC_CHROME_BIN` | Browser artifact `binary_path`; derived for a managed install. |
+| `WECHATSYNC_CHROME_BIN` | ChatUp `ChromeInstallation.binary_path`, resolved read-only at runner start. |
 | `WECHATSYNC_CHROME_PROFILE` | Runner `user_data_dir`; managed by default or adopted by reference. |
 | `WECHATSYNC_DEBUG_PORT` | Runner CDP lease; auto by default. |
 | extension `serverUrl` / `SYNC_WS_PORT` | Runner `bridge_ws_url` / WebSocket lease; the extension initiates the connection. |
@@ -268,7 +261,7 @@ Secrets do not participate in this ordinary merge. They resolve through an expli
 | Login-assistance data in `.env` | Not migrated; login remains a visible human browser checkpoint. |
 | `state/publication-state.json` | Workspace publication ledger. |
 
-Migration does not copy `.env` or a profile. It establishes browser, runner, account, and publication resource mappings.
+Migration does not copy `.env` or a profile. ChatUp first supplies the Chrome dependency; ChatPost then maps Runner, Account, and Publication resources.
 
 ## Permissions and Backups
 
@@ -282,7 +275,7 @@ Migration does not copy `.env` or a profile. It establishes browser, runner, acc
 
 Proposed `config validate` / `doctor` checks at least:
 
-1. browser reference exists and the binary is executable;
+1. `chatup>=0.2.2,<0.3.0` is installed and the ChatPost-compatible version resolves through `chatup.chrome.resolve_chrome` to an executable; validation never installs it;
 2. runner names, profile paths, and port leases are unique;
 3. CDP/bridge listeners bind to loopback and local control defaults to stdio;
 4. token profile references exist without reading/printing values;

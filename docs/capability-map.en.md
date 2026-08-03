@@ -16,11 +16,11 @@ Use this page to check which first-class capabilities `ChatPost` currently owns,
 
 - **Config and Environment**
 
-    A ChatEnv provider scaffold exists. The production proposal separates non-secret TOML, ChatEnv secret profiles, runtime state, and the ledger.
+    A released bounded `chatup>=0.2.2,<0.3.0` machine-environment dependency is declared. A ChatEnv provider scaffold exists; the production proposal separates non-secret TOML, secret profiles, runtime state, and the ledger.
 
 - **Browser Runner Design**
 
-    A ChatArch-managed Chrome, host-binary, Docker, multi-account user-data-dir, and bridge isolation proposal exists; browser/runner commands are not implemented.
+    ChatUp owns Chrome installation. ChatPost designs host/Docker runners, multiple user-data-dirs, and bridge isolation; runner commands are not implemented.
 
 - **Task-Oriented Zhihu Acceptance**
 
@@ -34,9 +34,10 @@ Use this page to check which first-class capabilities `ChatPost` currently owns,
 | --- | --- | --- |
 | CLI base entry | Implemented | The template generates a Click group, `--version`, and a base test. |
 | ChatEnv provider | Scaffold implemented | `config.py` and `chatenv.configs` exist, but `CHATPOST_API_KEY` is a placeholder and the production bridge schema is not implemented. |
-| Overall architecture/config model | Proposed | Browser/Runner/Account/Publication, ChatArch Home, ChatEnv, and ledger boundaries are documented. |
-| CLI structure design | Proposed | Browser/runner/account/plan/draft/publication boundaries are documented, but the commands do not exist. |
-| Browser installation/runner isolation | Proposed | ChatArch-managed Chrome for Testing, host binary by default, and one user-data-dir/bridge per runner; not implemented. |
+| Overall architecture/config model | Proposed | The ChatUp dependency and Runner/Account/Publication, ChatEnv, and ledger boundaries are documented. |
+| CLI structure design | Proposed | Runner/account/plan/draft/publication boundaries are documented; ChatPost no longer proposes browser-install commands. |
+| ChatUp Chrome dependency | Declared and verified | `pyproject.toml` bounds released `chatup 0.2.2`; tests verify the public `chatup.chrome` API. |
+| Runner isolation | Proposed | Host binary by default and one user-data-dir/bridge per runner; ChatPost resolves a ChatUp descriptor and never installs Chrome. |
 | Historical Zhihu draft path | Verified | The Wechatsync practice created and read back a draft using a direct binary, dedicated profile, and loopback bridge. |
 | MkDocs Zhihu fixture | Added | `examples/zhihu/mkdocs-quickstart.md` and its PNG exist; no draft has been created through ChatPost commands yet. |
 | Business commands | Not implemented | Add these from the real package domain; do not fake future commands in the template. |

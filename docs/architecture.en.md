@@ -5,7 +5,7 @@
 
 ## One-Sentence Model
 
-ChatPost is the control plane. A Browser Runner with a persistent profile is the execution plane. A platform account is a logical destination bound to that runner.
+ChatPost is the control plane. ChatUp supplies the reusable Chrome environment. A Browser Runner with a persistent profile is the execution plane. A platform account is a logical destination bound to that runner.
 
 ```text
 Markdown + local assets
@@ -38,27 +38,27 @@ ChatPost never reads platform cookies and does not treat a browser profile as or
 | Chrome for Testing host binary | Verified | The successful path ran a local binary directly; Docker was not involved. |
 | Dedicated persistent profile | Verified | Zhihu authentication remained in a dedicated user-data-dir; cookies were not exported. |
 | Loopback bridge and token | Verified | The extension and CLI communicated over local WebSocket; the token was not a Zhihu credential. |
-| ChatPost browser/runner/account CLI | Proposed | Commands, schemas, and Python services are not implemented. |
+| ChatUp Chrome environment | Released dependency | `chatup 0.2.2` provides `chatup chrome` and `chatup.chrome.resolve_chrome`; ChatPost does not duplicate downloads. |
+| ChatPost runner/account CLI | Proposed | Commands, schemas, and Python services are not implemented. |
 | Multi-account scheduling and publication ledger | Proposed | This page defines the resource and state boundaries for later implementation. |
 
 ## Core Resources
 
-### Browser Artifact
+### ChatUp Chrome Dependency
 
-A versioned Chrome for Testing binary downloaded and managed by ChatPost. It is replaceable software and holds no login state.
+Chrome for Testing is a machine-level ChatUp installation, not a ChatPost resource. ChatPost declares compatibility and resolves a read-only descriptor:
 
 ```text
-BrowserArtifact
-├── id
+ChatUp ChromeInstallation
 ├── kind = chrome-for-testing
-├── version / build_id
-├── platform / architecture
+├── exact version
+├── platform
 ├── binary_path
-├── provenance / digest
-└── compatibility metadata
+├── runtime root
+└── provenance / digest
 ```
 
-Chrome is not bundled in the PyPI wheel. `browser install` downloads it into ChatArch Home at runtime. Docker is not required.
+`chatup chrome --version <tested-version>` installs under `~/.chatarch/chrome/`. ChatPost calls `chatup.chrome.resolve_chrome(...)` for an existing installation. A missing dependency fails closed with a ChatUp command; ChatPost never downloads, extracts, or modifies system Chrome.
 
 ### Runner
 
@@ -66,7 +66,7 @@ A runner is the execution boundary for one browser persona:
 
 ```text
 Runner
-├── one browser artifact
+├── one ChatUp-resolved Chrome descriptor
 ├── one Chrome process
 ├── one isolated user-data-dir
 ├── one CDP endpoint
@@ -139,9 +139,9 @@ A remote runner exposes a separate authenticated control API. It never maps the 
 ## Lifecycle From Installation to Draft
 
 ```text
-BROWSER_ABSENT
-  -> browser install
-BROWSER_READY
+CHROME_DEPENDENCY_MISSING
+  -> user runs chatup chrome --version <tested-version>
+CHROME_DEPENDENCY_READY
   -> runner add/start
 RUNNER_STARTING
   -> process + CDP + exact extension + bridge checks
@@ -167,7 +167,7 @@ Any write that may have reached the platform without returning a receipt enters 
 
 | Data | Owner | Secret | In ledger |
 |---|---|---:|---:|
-| Chrome binary and version | Browser registry | No | No |
+| Chrome binary, version, and digest | ChatUp `~/.chatarch/chrome/` | No | No |
 | user-data-dir path reference | Runner config | No | No |
 | Cookies/local storage inside profile | Chrome profile | Yes | No |
 | Bridge URL and ports | Runner config/state | No | No |
@@ -201,7 +201,7 @@ See [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md).
 
 The first release includes:
 
-- Chrome for Testing installation under ChatArch Home;
+- a bounded dependency on released `chatup>=0.2.2,<0.3.0` plus read-only Chrome descriptor resolution;
 - host runner lifecycle and health checks;
 - one dedicated user-data-dir per runner;
 - ChatEnv bridge secret references;

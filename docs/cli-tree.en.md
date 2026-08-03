@@ -3,7 +3,7 @@
 !!! warning "Status: design proposal, not an available command set"
     `ChatPost 0.0.2` currently implements only `chatpost --help` and `chatpost --version`. This page defines the proposed boundary for the first functional release so it can be reviewed before implementation. The examples are not executable yet.
 
-See [Overall Architecture](architecture.md) for the system boundary, [Configuration, Environment, and State](configuration.md) for ChatEnv ownership, [Browser Runners and Account Isolation](browser-runners.md) for Chrome isolation, and [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md) for the concrete task flow.
+See [Overall Architecture](architecture.md), [Configuration, Environment, and State](configuration.md) for the ChatUp dependency and ChatEnv boundary, [Browser Runners and Account Isolation](browser-runners.md), and [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md).
 
 ## Goals
 
@@ -35,16 +35,11 @@ Every command below is proposed:
 ```text
 chatpost
 ├── init [PATH]                # Initialize workspace, config, and publication ledger
-├── browser
-│   ├── install chrome         # Download a tested Chrome for Testing build into ChatArch Home
-│   ├── list                   # List managed browser artifacts
-│   ├── show REF               # Show build, platform, binary path, and compatibility
-│   └── doctor REF             # Verify binary, version, provenance, and extension mode
 ├── platform
 │   ├── list                   # List installed adapters
 │   └── show PLATFORM          # Show draft/update/image/review capabilities
 ├── runner
-│   ├── add NAME               # Register a browser persona bound to a browser ref/profile
+│   ├── add NAME               # Register persona/profile; ChatUp resolves Chrome
 │   ├── list                   # List runners and health state
 │   ├── show NAME              # Show runtime, profile ref, ports, and accounts
 │   ├── start NAME             # Start a runner owned by ChatPost
@@ -99,44 +94,47 @@ The alias is a local logical name. It is not the platform username and should no
 These examples describe the intended interaction and are not implemented in `0.0.2`:
 
 ```bash
+# 0. Prepare the machine Chrome environment outside ChatPost
+chatup chrome \
+  --version <chatpost-tested-version> \
+  --output json \
+  -I
+
 # 1. Initialize the control plane
 chatpost init
 
-# 2. Install ChatArch-managed Chrome without Docker
-chatpost browser install chrome
-chatpost browser doctor chrome@tested
-
-# 3. Register a Browser Runner using the host binary
-chatpost runner add mac-personal --runtime host --browser chrome@tested
+# 2. Register a runner; startup resolves the binary descriptor read-only through ChatUp
+chatpost runner add mac-personal --runtime host
 chatpost runner doctor mac-personal
 chatpost runner start mac-personal --visible
 
-# 4. Register a logical account without handing credentials to the CLI
+# 3. Register a logical account without giving the CLI a password or cookies
 chatpost account add zhihu@personal --runner mac-personal
 chatpost account login zhihu@personal
 chatpost account status zhihu@personal
 
-# 5. Build a local-only plan for the fixed article fixture
-chatpost plan examples/zhihu/mkdocs-quickstart.md --to zhihu@personal --output json
+# 4. Produce a local-only plan for the fixed article fixture
+chatpost plan examples/zhihu/mkdocs-quickstart.md \
+  --to zhihu@personal \
+  --output json
 
-# 6. Explicitly issue exactly one draft create
-chatpost draft create examples/zhihu/mkdocs-quickstart.md --to zhihu@personal
+# 5. Explicitly create exactly one draft
+chatpost draft create examples/zhihu/mkdocs-quickstart.md \
+  --to zhihu@personal
 
-# 7. Open the draft for human review and final publish
+# 6. Open the draft for human review and final publication
 chatpost publication open <publication-ref>
 ```
 
-## Browser Boundary
+## ChatUp Dependency Boundary
 
-`browser install chrome` manages only the browser software artifact:
+Chrome installation belongs to independent `chatup chrome` and is absent from the ChatPost command tree. ChatPost depends on `chatup>=0.2.2,<0.3.0` and only calls `chatup.chrome.resolve_chrome(...)`:
 
-- resolve a tested Chrome for Testing build from the ChatPost compatibility manifest;
-- install under `~/.chatarch/chatpost/browsers/` without modifying system Chrome;
-- record build, provenance, and digest;
-- create no profile, perform no platform login, and issue no draft write;
-- keep Chrome outside the PyPI wheel and require no Docker.
-
-Browser artifacts and login state are independent. Replacing a binary is not profile migration or deletion.
+- a ChatPost release defines the compatibility pin;
+- binary/version/platform/root/digest come from the ChatUp descriptor;
+- a missing install enters `CHROME_DEPENDENCY_MISSING` and prints the exact `chatup chrome --version ...` command;
+- `config validate`, `runner doctor`, and `runner start` never download or upgrade Chrome implicitly;
+- profiles, login state, extension, and drafts remain in the ChatPost runner boundary.
 
 ## Runner Boundary
 
@@ -144,8 +142,6 @@ Browser artifacts and login state are independent. Replacing a binary is not pro
 
 ```text
 --runtime host|docker
---browser REF               # for example chrome@tested
---binary PATH               # optional for host runtime
 --profile-mode managed|adopt
 --user-data-dir PATH        # otherwise allocated by ChatPost
 --visible / --headless
@@ -154,7 +150,7 @@ Browser artifacts and login state are independent. Replacing a binary is not pro
 Secure defaults:
 
 - `host` is the default runtime; Docker is optional.
-- Managed browsers live under `~/.chatarch/chatpost/browsers/` by default.
+- The Chrome installation lives under ChatUp's `~/.chatarch/chrome/`; ChatPost only reads its descriptor.
 - CDP and bridge listeners bind to `127.0.0.1` only.
 - Every runner gets a unique user-data-dir, debug port, bridge port, and token.
 - The extension initiates `bridge_ws_url`; managed local ChatPost controls the bridge process in-process or through stdio by default.
@@ -241,7 +237,7 @@ Proposed state names:
 
 ```text
 PLANNED
-BROWSER_UNAVAILABLE
+CHROME_DEPENDENCY_MISSING
 RUNNER_UNAVAILABLE
 EXTENSION_UNAVAILABLE
 NEEDS_EXTENSION_SETUP
@@ -268,7 +264,7 @@ Any future `publish` capability must be designed independently and require expli
 ## Suggested Implementation Order
 
 1. `init`, config schema, and ledger;
-2. `browser install/list/show/doctor` plus a compatibility manifest;
+2. a ChatUp `resolve_chrome` dependency adapter plus a ChatPost compatibility pin;
 3. host `runner add/list/status/doctor`;
 4. `account add/status/login` checkpoint;
 5. `platform list/show` and adapter protocol;

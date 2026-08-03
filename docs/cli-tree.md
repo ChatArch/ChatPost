@@ -3,7 +3,7 @@
 !!! warning "状态：设计提案，不是当前可用命令"
     `ChatPost 0.0.2` 当前只实现 `chatpost --help` 和 `chatpost --version`。本页定义首个功能版本的预期命令边界，用于实现前 Review；示例现在不能直接执行。
 
-总体分层见 [总体架构设计](architecture.md)，配置与 ChatEnv 边界见 [配置、环境与状态设计](configuration.md)，Chrome 与多账号隔离见 [Browser Runner 与账号隔离](browser-runners.md)。知乎任务流见 [知乎首次设置与草稿验收](zhihu-first-run.md)。
+总体分层见 [总体架构设计](architecture.md)，ChatUp dependency 与 ChatEnv 边界见 [配置、环境与状态设计](configuration.md)，Runner/Profile 多账号隔离见 [Browser Runner 与账号隔离](browser-runners.md)。知乎任务流见 [知乎首次设置与草稿验收](zhihu-first-run.md)。
 
 ## 设计目标
 
@@ -35,16 +35,11 @@ chatpost
 ```text
 chatpost
 ├── init [PATH]                # 初始化 workspace、配置和 publication ledger
-├── browser
-│   ├── install chrome         # 下载已测试 Chrome for Testing 到 ChatArch Home
-│   ├── list                   # 列出 managed browser artifacts
-│   ├── show REF               # 查看 build、平台、binary path 和兼容信息
-│   └── doctor REF             # 验证二进制、版本、来源和扩展模式
 ├── platform
 │   ├── list                   # 列出已安装 adapter
 │   └── show PLATFORM          # 查看平台能力：draft/update/images/review 等
 ├── runner
-│   ├── add NAME               # 注册 Browser persona，并绑定 browser ref/Profile
+│   ├── add NAME               # 注册 persona/Profile；ChatUp 解析 Chrome
 │   ├── list                   # 列出 Runner 与健康状态
 │   ├── show NAME              # 查看 runtime、profile ref、端口和绑定账号
 │   ├── start NAME             # 启动 ChatPost 拥有的 Runner
@@ -99,44 +94,47 @@ xiaohongshu@brand
 以下展示预期交互，不代表当前已经实现：
 
 ```bash
+# 0. 在 ChatPost 之外准备机器 Chrome 环境
+chatup chrome \
+  --version <chatpost-tested-version> \
+  --output json \
+  -I
+
 # 1. 初始化控制面
 chatpost init
 
-# 2. 安装 ChatArch 管理的 Chrome 二进制；不要求 Docker
-chatpost browser install chrome
-chatpost browser doctor chrome@tested
-
-# 3. 注册一个直接运行 host binary 的 Browser Runner
-chatpost runner add mac-personal --runtime host --browser chrome@tested
+# 2. 注册 Runner；启动时通过 ChatUp 只读解析 binary descriptor
+chatpost runner add mac-personal --runtime host
 chatpost runner doctor mac-personal
 chatpost runner start mac-personal --visible
 
-# 4. 注册逻辑账号；不把密码或 Cookie 交给 CLI
+# 3. 注册逻辑账号；不把密码或 Cookie 交给 CLI
 chatpost account add zhihu@personal --runner mac-personal
 chatpost account login zhihu@personal
 chatpost account status zhihu@personal
 
-# 5. 对固定博客测试稿生成纯本地计划
-chatpost plan examples/zhihu/mkdocs-quickstart.md --to zhihu@personal --output json
+# 4. 对固定博客测试稿生成纯本地计划
+chatpost plan examples/zhihu/mkdocs-quickstart.md \
+  --to zhihu@personal \
+  --output json
 
-# 6. 显式且只执行一次草稿创建
-chatpost draft create examples/zhihu/mkdocs-quickstart.md --to zhihu@personal
+# 5. 显式且只执行一次草稿创建
+chatpost draft create examples/zhihu/mkdocs-quickstart.md \
+  --to zhihu@personal
 
-# 7. 打开草稿，让人 Review 和最终发布
+# 6. 打开草稿，让人 Review 和最终发布
 chatpost publication open <publication-ref>
 ```
 
-## Browser 命令边界
+## ChatUp dependency 边界
 
-`browser install chrome` 只管理浏览器软件制品：
+Chrome 安装属于独立 `chatup chrome`，不进入 ChatPost 命令树。ChatPost 依赖 `chatup>=0.2.2,<0.3.0`，并只调用 `chatup.chrome.resolve_chrome(...)`：
 
-- 根据平台和架构下载一个 ChatPost compatibility manifest 中已测试的 Chrome for Testing build；
-- 安装到 `~/.chatarch/chatpost/browsers/`，不修改系统 Chrome；
-- 记录 build、来源和 digest；
-- 不创建 Profile、不登录平台、不启动草稿写入；
-- Chrome 不打进 PyPI wheel，Docker 也不是安装要求。
-
-Browser artifact 与登录态完全分离。删除或升级 binary 不能被当作删除/迁移 Profile。
+- compatibility pin 由 ChatPost release 定义；
+- binary/version/platform/root/digest 来自 ChatUp descriptor；
+- 缺失时进入 `CHROME_DEPENDENCY_MISSING` 并提示用户运行 exact `chatup chrome --version ...`；
+- `config validate`、`runner doctor/start` 都不能隐式下载或升级 Chrome；
+- Profile、登录态、扩展和草稿仍由 ChatPost Runner 边界管理。
 
 ## Runner 命令边界
 
@@ -144,8 +142,6 @@ Browser artifact 与登录态完全分离。删除或升级 binary 不能被当�
 
 ```text
 --runtime host|docker
---browser REF               # 例如 chrome@tested
---binary PATH               # host runtime 可选
 --profile-mode managed|adopt
 --user-data-dir PATH        # 默认由 ChatPost 创建专属目录
 --visible / --headless
@@ -154,7 +150,7 @@ Browser artifact 与登录态完全分离。删除或升级 binary 不能被当�
 安全默认值：
 
 - `host` 是默认 runtime；Docker 不是要求。
-- managed browser 默认位于 `~/.chatarch/chatpost/browsers/`。
+- Chrome installation 位于 ChatUp 的 `~/.chatarch/chrome/`；ChatPost 只读取 descriptor。
 - CDP 与 bridge 只绑定 `127.0.0.1`。
 - 每个 Runner 使用独立 user-data-dir、debug port、bridge port 和 token。
 - 扩展主动连接 `bridge_ws_url`；ChatPost managed local 默认通过 in-process/stdio 控制 bridge process。
@@ -241,7 +237,7 @@ ledger 不记录：
 
 ```text
 PLANNED
-BROWSER_UNAVAILABLE
+CHROME_DEPENDENCY_MISSING
 RUNNER_UNAVAILABLE
 EXTENSION_UNAVAILABLE
 NEEDS_EXTENSION_SETUP
@@ -275,7 +271,7 @@ NEEDS_ACTION
 建议正式开发按以下顺序：
 
 1. `init`、config schema 与 ledger；
-2. `browser install/list/show/doctor` 与版本兼容清单；
+2. ChatUp `resolve_chrome` dependency adapter 与 ChatPost compatibility pin；
 3. `runner add/list/status/doctor` 的 host runtime；
 4. `account add/status/login checkpoint`；
 5. `platform list/show` 与 adapter protocol；

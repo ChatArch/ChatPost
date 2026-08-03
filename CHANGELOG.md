@@ -17,7 +17,7 @@
 ### Changed
 
 - Document the proposed CLI, Browser Runner, and multi-account isolation model.
-- Add ChatArch-managed Chrome installation and the `browser` proposal to the CLI tree.
+- Depend on released `chatup>=0.2.2,<0.3.0` for managed Chrome and remove duplicate ChatPost browser-install ownership from the design.
 
 ### Fixed
 

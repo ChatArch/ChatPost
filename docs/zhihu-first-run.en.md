@@ -24,7 +24,7 @@ The existing Wechatsync practice proved that:
 - read-only auth can gate a draft create/readback operation;
 - cookies never need to be exported to the CLI.
 
-ChatPost turns those scripts and environment variables into stable Browser, Runner, Account, and Publication resources.
+ChatUp turns the Chrome binary into a reusable machine dependency. ChatPost turns the remaining scripts and state into stable Runner, Account, and Publication resources.
 
 ## Proposed First Run
 
@@ -37,28 +37,29 @@ chatpost config validate
 
 This creates user configuration and the workspace `.chatpost/` ledger without a platform write.
 
-### 2. Install ChatArch-Managed Chrome
+### 2. Prepare the Chrome Dependency With ChatUp
 
 ```bash
-chatpost browser install chrome
-chatpost browser list
-chatpost browser doctor chrome@tested
+chatup chrome \
+  --version <chatpost-tested-version> \
+  --output json \
+  --doctor \
+  -I
 ```
 
 Expected behavior:
 
-- download Chrome for Testing under `~/.chatarch/chatpost/browsers/`;
-- record build, platform, architecture, and digest;
+- ChatUp installs Chrome for Testing under `~/.chatarch/chrome/`;
+- ChatUp `runtime.json` records exact version, platform, binary path, provenance, and digest;
 - leave system Chrome unchanged;
 - require no Docker;
-- verify binary and extension-mode compatibility.
+- later ChatPost calls only `chatup.chrome.resolve_chrome(...)`; it never downloads or upgrades Chrome.
 
 ### 3. Create an Isolated Runner
 
 ```bash
 chatpost runner add zhihu-personal \
-  --runtime host \
-  --browser chrome@tested
+  --runtime host
 
 chatpost runner start zhihu-personal --visible
 chatpost runner status zhihu-personal
@@ -73,6 +74,7 @@ Default profile path:
 `status` reports each layer independently:
 
 ```text
+chrome        CHATUP_RESOLVED + exact version
 process       READY
 cdp           READY
 extension     READY + exact identity
@@ -198,7 +200,6 @@ Internal acceptance may bind the previously isolated profile by reference:
 ```bash
 chatpost runner add zhihu-personal \
   --runtime host \
-  --browser chrome@tested \
   --profile-mode adopt \
   --user-data-dir <existing-isolated-profile>
 ```
@@ -252,7 +253,7 @@ ChatPost must:
 
 | Capability | Offline | Local runner | Real Zhihu draft |
 |---|---:|---:|---:|
-| Browser install/layout | Required | Required | Indirect |
+| ChatUp descriptor contract | Required | Required | Indirect |
 | Profile lock/port leases | Required | Required | Required |
 | Exact extension identity | Fake contract | Required | Required |
 | Bridge token redaction | Required | Required | Required |
@@ -265,7 +266,7 @@ ChatPost must:
 
 ## Common Failures
 
-- **Browser absent**: run browser install/doctor; never fall back to an unknown system browser.
+- **Chrome dependency absent**: enter `CHROME_DEPENDENCY_MISSING` and run the exact `chatup chrome --version ...` command from the error. ChatPost neither falls back to an unknown system browser nor installs implicitly.
 - **Profile locked**: report the owner; never kill daily Chrome.
 - **Wrong extension**: enter `EXTENSION_UNAVAILABLE`; a random service worker is not proof.
 - **Extension URL/token absent**: enter `NEEDS_EXTENSION_SETUP`, open the exact extension settings, and never write platform storage.
