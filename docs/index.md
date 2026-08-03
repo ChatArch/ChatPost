@@ -9,6 +9,7 @@ ChatPost 是 ChatArch 系列 Python 包。这个文档站提供长期维护的�
 | 场景 | 文档 |
 | --- | --- |
 | 第一次安装、运行命令行、确认包可用 | [CLI 树](cli-tree.md) |
+| Review 预期 CLI、Chrome runtime 与多账号隔离 | [Browser Runner 与账号隔离](browser-runners.md) |
 | 校对当前包有哪些一等能力和边界 | [能力地图](capability-map.md) |
 | 从 Python 代码调用包能力 | [Python 接口树](interface-tree.md) |
 
@@ -17,6 +18,7 @@ ChatPost 是 ChatArch 系列 Python 包。这个文档站提供长期维护的�
 当前模板只保留长期有用的文档入口，不生成计划类占位页：
 
 - **CLI 树**：最直观的命令展示入口，包含真实命令树、状态和更新清单。
+- **Browser Runner 与账号隔离**：解释 host binary、Docker、多账号 user-data-dir 和 bridge 边界。
 - **能力地图**：当前一等能力、边界和不负责的范围。
 - **接口树**：命令行背后的可 import Python 接口。
 
@@ -35,6 +37,12 @@ ChatPost 是 ChatArch 系列 Python 包。这个文档站提供长期维护的�
     用于 review 当前包的能力边界，避免把规划写成已实现功能。
 
     [查看能力地图](capability-map.md)
+
+- **Browser Runner 与账号隔离**
+
+    Review Chrome 是否依赖 Docker、多个账号如何隔离，以及 Runner/Account 的资源关系。
+
+    [查看 Browser Runner 设计](browser-runners.md)
 
 - **Python 接口树**
 

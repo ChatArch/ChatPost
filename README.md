@@ -27,6 +27,7 @@ ChatArch multi-platform content publishing infrastructure package.
 | 场景 | 文档 |
 | --- | --- |
 | 第一次安装、运行命令行、确认包可用 | [CLI 树](docs/cli-tree.md) |
+| Review 预期 CLI、Chrome runtime 与多账号隔离 | [Browser Runner 与账号隔离](docs/browser-runners.md) |
 | 校对当前包有哪些一等能力和边界 | [能力地图](docs/capability-map.md) |
 | 从 Python 代码调用包能力 | [接口树](docs/interface-tree.md) |
 
