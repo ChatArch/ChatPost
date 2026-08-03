@@ -7,7 +7,7 @@
 - Validate the GitHub Trusted Publisher and PyPI OIDC release path.
 - Keep the registration placeholder behavior unchanged.
 
-## YYYY-MM-DD
+## 2026-08-04
 
 ### Added
 
@@ -17,7 +17,8 @@
 ### Changed
 
 - Document the proposed CLI, Browser Runner, and multi-account isolation model.
-- Depend on released `chatup>=0.2.2,<0.3.0` for managed Chrome and remove duplicate ChatPost browser-install ownership from the design.
+- Depend on released `chatup>=0.2.3,<0.3.0` for managed Chrome and remove duplicate ChatPost browser-install ownership from the design.
+- Consume only `chatup.chrome_for_testing.resolve`, align repair commands and storage metadata with the backend-specific ChatUp contract, and require `chatstyle>=0.1.1,<0.2.0`.
 
 ### Fixed
 

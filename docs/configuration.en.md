@@ -20,8 +20,8 @@ Cookies, local storage, passwords, and verification codes belong to none of thes
 
 ```text
 ~/.chatarch/
-├── chrome/                       # ChatUp-owned machine dependency
-│   └── chrome-for-testing/<version>/<platform>/...
+├── chrome-for-testing/           # ChatUp-owned CFT backend
+│   └── <version>/<platform>/...
 └── chatpost/
     ├── config.toml
     ├── extensions/
@@ -52,16 +52,16 @@ The Chrome installation is a ChatUp machine resource. A profile is ChatPost runn
 ChatPost consumes a bounded released ChatUp dependency:
 
 ```toml
-dependencies = ["chatup>=0.2.2,<0.3.0"]
+dependencies = ["chatup>=0.2.3,<0.3.0"]
 ```
 
 Environment preparation is an independent ChatUp command:
 
 ```bash
-chatup chrome --version <chatpost-tested-version> --output json -I
+chatup chrome-for-testing install --version <chatpost-tested-version> --output json -I
 ```
 
-When starting a runner, ChatPost only calls `chatup.chrome.resolve_chrome(...)` to read binary path, exact version, platform, runtime root, and digest. It does not call an install API, store a browser registry, or download/extract Chrome. A missing or incompatible descriptor enters `CHROME_DEPENDENCY_MISSING` and prints an actionable `chatup chrome` repair command.
+When starting a runner, ChatPost only calls `chatup.chrome_for_testing.resolve(...)` to read binary path, exact version, platform, installation root, and digest. It does not call an install API, store a browser registry, or download/extract Chrome. A missing or incompatible descriptor enters `CHROME_DEPENDENCY_MISSING` and prints an actionable `chatup chrome-for-testing install --version <chatpost-tested-version>` repair command.
 
 ## Non-Secret Configuration Example
 
@@ -252,7 +252,7 @@ Secrets do not participate in this ordinary merge. They resolve through an expli
 
 | Existing value/state | ChatPost resource |
 |---|---|
-| `WECHATSYNC_CHROME_BIN` | ChatUp `ChromeInstallation.binary_path`, resolved read-only at runner start. |
+| `WECHATSYNC_CHROME_BIN` | ChatUp `ChromeForTestingInstallation.binary_path`, resolved read-only at runner start. |
 | `WECHATSYNC_CHROME_PROFILE` | Runner `user_data_dir`; managed by default or adopted by reference. |
 | `WECHATSYNC_DEBUG_PORT` | Runner CDP lease; auto by default. |
 | extension `serverUrl` / `SYNC_WS_PORT` | Runner `bridge_ws_url` / WebSocket lease; the extension initiates the connection. |
@@ -275,7 +275,7 @@ Migration does not copy `.env` or a profile. ChatUp first supplies the Chrome de
 
 Proposed `config validate` / `doctor` checks at least:
 
-1. `chatup>=0.2.2,<0.3.0` is installed and the ChatPost-compatible version resolves through `chatup.chrome.resolve_chrome` to an executable; validation never installs it;
+1. `chatup>=0.2.3,<0.3.0` is installed and the ChatPost-compatible version resolves through `chatup.chrome_for_testing.resolve` to an executable; validation never installs it;
 2. runner names, profile paths, and port leases are unique;
 3. CDP/bridge listeners bind to loopback and local control defaults to stdio;
 4. token profile references exist without reading/printing values;

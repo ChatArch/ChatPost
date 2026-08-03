@@ -95,7 +95,7 @@ xiaohongshu@brand
 
 ```bash
 # 0. 在 ChatPost 之外准备机器 Chrome 环境
-chatup chrome \
+chatup chrome-for-testing install \
   --version <chatpost-tested-version> \
   --output json \
   -I
@@ -128,11 +128,11 @@ chatpost publication open <publication-ref>
 
 ## ChatUp dependency 边界
 
-Chrome 安装属于独立 `chatup chrome`，不进入 ChatPost 命令树。ChatPost 依赖 `chatup>=0.2.2,<0.3.0`，并只调用 `chatup.chrome.resolve_chrome(...)`：
+Chrome 安装属于独立 `chatup chrome-for-testing`，不进入 ChatPost 命令树。ChatPost 依赖 `chatup>=0.2.3,<0.3.0`，并只调用 `chatup.chrome_for_testing.resolve(...)`：
 
 - compatibility pin 由 ChatPost release 定义；
 - binary/version/platform/root/digest 来自 ChatUp descriptor；
-- 缺失时进入 `CHROME_DEPENDENCY_MISSING` 并提示用户运行 exact `chatup chrome --version ...`；
+- 缺失时进入 `CHROME_DEPENDENCY_MISSING` 并提示用户运行 exact `chatup chrome-for-testing install --version ...`；
 - `config validate`、`runner doctor/start` 都不能隐式下载或升级 Chrome；
 - Profile、登录态、扩展和草稿仍由 ChatPost Runner 边界管理。
 
@@ -150,7 +150,7 @@ Chrome 安装属于独立 `chatup chrome`，不进入 ChatPost 命令树。ChatP
 安全默认值：
 
 - `host` 是默认 runtime；Docker 不是要求。
-- Chrome installation 位于 ChatUp 的 `~/.chatarch/chrome/`；ChatPost 只读取 descriptor。
+- Chrome installation 位于 ChatUp 的 `~/.chatarch/chrome-for-testing/`；ChatPost 只读取 descriptor。
 - CDP 与 bridge 只绑定 `127.0.0.1`。
 - 每个 Runner 使用独立 user-data-dir、debug port、bridge port 和 token。
 - 扩展主动连接 `bridge_ws_url`；ChatPost managed local 默认通过 in-process/stdio 控制 bridge process。
@@ -271,7 +271,7 @@ NEEDS_ACTION
 建议正式开发按以下顺序：
 
 1. `init`、config schema 与 ledger；
-2. ChatUp `resolve_chrome` dependency adapter 与 ChatPost compatibility pin；
+2. ChatUp `chatup.chrome_for_testing.resolve` dependency adapter 与 ChatPost compatibility pin；
 3. `runner add/list/status/doctor` 的 host runtime；
 4. `account add/status/login checkpoint`；
 5. `platform list/show` 与 adapter protocol；

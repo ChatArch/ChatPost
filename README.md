@@ -46,7 +46,7 @@ python -m build
 
 ## 命令行规范
 
-这个包依赖 `chatstyle>=0.1.0,<0.2.0`、`chatenv>=0.2.0,<0.3.0` 和 `chatup>=0.2.2,<0.3.0`。Chrome 安装由 ChatUp 负责；ChatPost 后续 Runner 只解析 ChatUp descriptor。新增命令应优先使用：
+这个包依赖 `chatstyle>=0.1.1,<0.2.0`、`chatenv>=0.2.0,<0.3.0` 和 `chatup>=0.2.3,<0.3.0`。Chrome 安装由 ChatUp 负责；ChatPost 后续 Runner 只解析 ChatUp descriptor。新增命令应优先使用：
 
 - `CommandSchema` / `CommandField` 描述输入。
 - `add_interactive_option()` 提供统一 `-i/-I`。

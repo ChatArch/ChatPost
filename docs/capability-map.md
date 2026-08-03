@@ -16,7 +16,7 @@
 
 - **配置与环境**
 
-    已声明已发布 `chatup>=0.2.2,<0.3.0` 机器环境依赖；已有 ChatEnv provider 脚手架；生产 schema 把非秘密 TOML、secret profile、runtime state 和 ledger 分开。
+    已声明已发布 `chatup>=0.2.3,<0.3.0` 机器环境依赖；已有 ChatEnv provider 脚手架；生产 schema 把非秘密 TOML、secret profile、runtime state 和 ledger 分开。
 
 - **Browser Runner 设计**
 
@@ -36,7 +36,7 @@
 | ChatEnv 配置提供者 | 脚手架已实现 | `config.py` 与 `chatenv.configs` 存在，但当前 `CHATPOST_API_KEY` 只是占位，生产 bridge schema 尚未实现。 |
 | 总体架构与配置模型 | 提案 | 已定义 ChatUp dependency 与 Runner/Account/Publication、ChatEnv、ledger 边界。 |
 | CLI 结构设计 | 提案 | 已定义 runner/account/plan/draft/publication 边界；ChatPost 不再设计 browser install 命令。 |
-| ChatUp Chrome dependency | 已声明并验证 | `pyproject.toml` 有界依赖已发布 `chatup 0.2.2`，测试验证 `chatup.chrome` public API。 |
+| ChatUp Chrome for Testing backend | 已声明并验证 | `pyproject.toml` 有界依赖已发布 `chatup 0.2.3`，测试验证 `chatup.chrome_for_testing.resolve` 只读 public API。 |
 | Runner 隔离 | 提案 | 默认 host binary、每 Runner 独立 user-data-dir/bridge；ChatPost 只解析 ChatUp descriptor，不安装 Chrome。 |
 | 历史知乎草稿链路 | 已验证 | Wechatsync 实践已用直接二进制、二维码扫码登录、独立 Profile 和 loopback bridge 创建并回读草稿；短信路线尚未单独验收。 |
 | MkDocs 知乎测试稿 | 已加入 | `examples/zhihu/mkdocs-quickstart.md` 与本地 PNG 已存在；尚未通过 ChatPost 命令创建草稿。 |

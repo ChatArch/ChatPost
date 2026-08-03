@@ -16,7 +16,7 @@ Use this page to check which first-class capabilities `ChatPost` currently owns,
 
 - **Config and Environment**
 
-    A released bounded `chatup>=0.2.2,<0.3.0` machine-environment dependency is declared. A ChatEnv provider scaffold exists; the production proposal separates non-secret TOML, secret profiles, runtime state, and the ledger.
+    A released bounded `chatup>=0.2.3,<0.3.0` machine-environment dependency is declared. A ChatEnv provider scaffold exists; the production proposal separates non-secret TOML, secret profiles, runtime state, and the ledger.
 
 - **Browser Runner Design**
 
@@ -36,7 +36,7 @@ Use this page to check which first-class capabilities `ChatPost` currently owns,
 | ChatEnv provider | Scaffold implemented | `config.py` and `chatenv.configs` exist, but `CHATPOST_API_KEY` is a placeholder and the production bridge schema is not implemented. |
 | Overall architecture/config model | Proposed | The ChatUp dependency and Runner/Account/Publication, ChatEnv, and ledger boundaries are documented. |
 | CLI structure design | Proposed | Runner/account/plan/draft/publication boundaries are documented; ChatPost no longer proposes browser-install commands. |
-| ChatUp Chrome dependency | Declared and verified | `pyproject.toml` bounds released `chatup 0.2.2`; tests verify the public `chatup.chrome` API. |
+| ChatUp Chrome for Testing backend | Declared and verified | `pyproject.toml` bounds released `chatup 0.2.3`; tests verify the read-only public `chatup.chrome_for_testing.resolve` API. |
 | Runner isolation | Proposed | Host binary by default and one user-data-dir/bridge per runner; ChatPost resolves a ChatUp descriptor and never installs Chrome. |
 | Historical Zhihu draft path | Verified | The Wechatsync practice created and read back a draft using a direct binary, QR-scan login, dedicated profile, and loopback bridge; SMS remains separately unverified. |
 | MkDocs Zhihu fixture | Added | `examples/zhihu/mkdocs-quickstart.md` and its PNG exist; no draft has been created through ChatPost commands yet. |

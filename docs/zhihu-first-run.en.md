@@ -41,7 +41,7 @@ This creates user configuration and the workspace `.chatpost/` ledger without a 
 ### 2. Prepare the Chrome Dependency With ChatUp
 
 ```bash
-chatup chrome \
+chatup chrome-for-testing install \
   --version <chatpost-tested-version> \
   --output json \
   --doctor \
@@ -50,11 +50,11 @@ chatup chrome \
 
 Expected behavior:
 
-- ChatUp installs Chrome for Testing under `~/.chatarch/chrome/`;
-- ChatUp `runtime.json` records exact version, platform, binary path, provenance, and digest;
+- ChatUp installs Chrome for Testing under `~/.chatarch/chrome-for-testing/`;
+- ChatUp `installation.json` records exact version, platform, binary path, provenance, and digest;
 - leave system Chrome unchanged;
 - require no Docker;
-- later ChatPost calls only `chatup.chrome.resolve_chrome(...)`; it never downloads or upgrades Chrome.
+- later ChatPost calls only `chatup.chrome_for_testing.resolve(...)`; it never downloads or upgrades Chrome.
 
 ### 3. Create an Isolated Runner
 
@@ -276,7 +276,7 @@ ChatPost must:
 
 ## Common Failures
 
-- **Chrome dependency absent**: enter `CHROME_DEPENDENCY_MISSING` and run the exact `chatup chrome --version ...` command from the error. ChatPost neither falls back to an unknown system browser nor installs implicitly.
+- **Chrome dependency absent**: enter `CHROME_DEPENDENCY_MISSING` and run the exact `chatup chrome-for-testing install --version ...` command from the error. ChatPost neither falls back to an unknown system browser nor installs implicitly.
 - **Profile locked**: report the owner; never kill daily Chrome.
 - **Wrong extension**: enter `EXTENSION_UNAVAILABLE`; a random service worker is not proof.
 - **Extension URL/token absent**: enter `NEEDS_EXTENSION_SETUP`, open the exact extension settings, and never write platform storage.

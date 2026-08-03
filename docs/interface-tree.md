@@ -22,10 +22,10 @@ chatpost
 Chrome 环境 contract 直接消费 ChatUp 已发布 public API：
 
 ```python
-from chatup.chrome import ChromeInstallation, resolve_chrome
+from chatup.chrome_for_testing import ChromeForTestingInstallation, resolve
 ```
 
-ChatPost dependency adapter 只能封装 `resolve_chrome(...)` 和领域错误；不能复制 downloader/extractor，也不能在 `runner start` 中调用 `ensure_chrome(...)` 隐式安装。
+ChatPost dependency adapter 只能封装只读 `resolve(...)` 和领域错误；不能复制 downloader/extractor，也不能在 `runner start` 中调用 `install(...)` 隐式安装。
 
 ## 更新清单
 

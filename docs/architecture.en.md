@@ -40,7 +40,7 @@ ChatPost never reads platform cookies and does not treat a browser profile as or
 | Zhihu QR-scan login | Verified | The visible isolated browser completed QR login and the profile retained the session. |
 | Zhihu SMS-code login | Needs separate acceptance | This is a standard manual alternative, but current end-to-end evidence must not claim it has passed. |
 | Loopback bridge and token | Verified | The extension and CLI communicated over local WebSocket; the token was not a Zhihu credential. |
-| ChatUp Chrome environment | Released dependency | `chatup 0.2.2` provides `chatup chrome` and `chatup.chrome.resolve_chrome`; ChatPost does not duplicate downloads. |
+| ChatUp Chrome environment | Released dependency | `chatup 0.2.3` provides `chatup chrome-for-testing` and `chatup.chrome_for_testing.resolve`; ChatPost does not duplicate downloads. |
 | ChatPost runner/account CLI | Proposed | Commands, schemas, and Python services are not implemented. |
 | Multi-account scheduling and publication ledger | Proposed | This page defines the resource and state boundaries for later implementation. |
 
@@ -51,16 +51,16 @@ ChatPost never reads platform cookies and does not treat a browser profile as or
 Chrome for Testing is a machine-level ChatUp installation, not a ChatPost resource. ChatPost declares compatibility and resolves a read-only descriptor:
 
 ```text
-ChatUp ChromeInstallation
+ChatUp ChromeForTestingInstallation
 ├── kind = chrome-for-testing
 ├── exact version
 ├── platform
 ├── binary_path
-├── runtime root
+├── root_dir = installation root
 └── provenance / digest
 ```
 
-`chatup chrome --version <tested-version>` installs under `~/.chatarch/chrome/`. ChatPost calls `chatup.chrome.resolve_chrome(...)` for an existing installation. A missing dependency fails closed with a ChatUp command; ChatPost never downloads, extracts, or modifies system Chrome.
+`chatup chrome-for-testing install --version <tested-version>` installs under `~/.chatarch/chrome-for-testing/`. ChatPost calls `chatup.chrome_for_testing.resolve(...)` for an existing installation. A missing dependency fails closed with a ChatUp command; ChatPost never downloads, extracts, or modifies system Chrome.
 
 ### Runner
 
@@ -142,7 +142,7 @@ A remote runner exposes a separate authenticated control API. It never maps the 
 
 ```text
 CHROME_DEPENDENCY_MISSING
-  -> user runs chatup chrome --version <tested-version>
+  -> user runs chatup chrome-for-testing install --version <tested-version>
 CHROME_DEPENDENCY_READY
   -> runner add/start
 RUNNER_STARTING
@@ -169,7 +169,7 @@ Any write that may have reached the platform without returning a receipt enters 
 
 | Data | Owner | Secret | In ledger |
 |---|---|---:|---:|
-| Chrome binary, version, and digest | ChatUp `~/.chatarch/chrome/` | No | No |
+| Chrome binary, version, and digest | ChatUp `~/.chatarch/chrome-for-testing/` | No | No |
 | user-data-dir path reference | Runner config | No | No |
 | Cookies/local storage inside profile | Chrome profile | Yes | No |
 | Bridge URL and ports | Runner config/state | No | No |
@@ -203,7 +203,7 @@ See [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md).
 
 The first release includes:
 
-- a bounded dependency on released `chatup>=0.2.2,<0.3.0` plus read-only Chrome descriptor resolution;
+- a bounded dependency on released `chatup>=0.2.3,<0.3.0` plus read-only Chrome descriptor resolution;
 - host runner lifecycle and health checks;
 - one dedicated user-data-dir per runner;
 - ChatEnv bridge secret references;

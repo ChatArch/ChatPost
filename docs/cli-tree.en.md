@@ -95,7 +95,7 @@ These examples describe the intended interaction and are not implemented in `0.0
 
 ```bash
 # 0. Prepare the machine Chrome environment outside ChatPost
-chatup chrome \
+chatup chrome-for-testing install \
   --version <chatpost-tested-version> \
   --output json \
   -I
@@ -128,11 +128,11 @@ chatpost publication open <publication-ref>
 
 ## ChatUp Dependency Boundary
 
-Chrome installation belongs to independent `chatup chrome` and is absent from the ChatPost command tree. ChatPost depends on `chatup>=0.2.2,<0.3.0` and only calls `chatup.chrome.resolve_chrome(...)`:
+Chrome installation belongs to independent `chatup chrome-for-testing` and is absent from the ChatPost command tree. ChatPost depends on `chatup>=0.2.3,<0.3.0` and only calls `chatup.chrome_for_testing.resolve(...)`:
 
 - a ChatPost release defines the compatibility pin;
 - binary/version/platform/root/digest come from the ChatUp descriptor;
-- a missing install enters `CHROME_DEPENDENCY_MISSING` and prints the exact `chatup chrome --version ...` command;
+- a missing install enters `CHROME_DEPENDENCY_MISSING` and prints the exact `chatup chrome-for-testing install --version ...` command;
 - `config validate`, `runner doctor`, and `runner start` never download or upgrade Chrome implicitly;
 - profiles, login state, extension, and drafts remain in the ChatPost runner boundary.
 
@@ -150,7 +150,7 @@ Chrome installation belongs to independent `chatup chrome` and is absent from th
 Secure defaults:
 
 - `host` is the default runtime; Docker is optional.
-- The Chrome installation lives under ChatUp's `~/.chatarch/chrome/`; ChatPost only reads its descriptor.
+- The Chrome installation lives under ChatUp's `~/.chatarch/chrome-for-testing/`; ChatPost only reads its descriptor.
 - CDP and bridge listeners bind to `127.0.0.1` only.
 - Every runner gets a unique user-data-dir, debug port, bridge port, and token.
 - The extension initiates `bridge_ws_url`; managed local ChatPost controls the bridge process in-process or through stdio by default.
@@ -264,7 +264,7 @@ Any future `publish` capability must be designed independently and require expli
 ## Suggested Implementation Order
 
 1. `init`, config schema, and ledger;
-2. a ChatUp `resolve_chrome` dependency adapter plus a ChatPost compatibility pin;
+2. a `chatup.chrome_for_testing.resolve` dependency adapter plus a ChatPost compatibility pin;
 3. host `runner add/list/status/doctor`;
 4. `account add/status/login` checkpoint;
 5. `platform list/show` and adapter protocol;

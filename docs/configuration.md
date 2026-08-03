@@ -20,8 +20,8 @@ Cookie、Local Storage、密码和验证码不属于任何 ChatPost 配置层。
 
 ```text
 ~/.chatarch/
-├── chrome/                       # ChatUp-owned machine dependency
-│   └── chrome-for-testing/<version>/<platform>/...
+├── chrome-for-testing/           # ChatUp-owned CFT backend
+│   └── <version>/<platform>/...
 └── chatpost/
     ├── config.toml
     ├── extensions/
@@ -52,16 +52,16 @@ Chrome installation 是 ChatUp 机器级资源；Profile 是 ChatPost Runner 状
 ChatPost 通过已发布的有界依赖消费 ChatUp：
 
 ```toml
-dependencies = ["chatup>=0.2.2,<0.3.0"]
+dependencies = ["chatup>=0.2.3,<0.3.0"]
 ```
 
 环境准备由 ChatUp 独立完成：
 
 ```bash
-chatup chrome --version <chatpost-tested-version> --output json -I
+chatup chrome-for-testing install --version <chatpost-tested-version> --output json -I
 ```
 
-ChatPost 启动 Runner 时只调用 `chatup.chrome.resolve_chrome(...)`：读取 binary path、exact version、platform、runtime root 和 digest。它不调用安装 API，不保存一份 browser registry，也不下载/解压 Chrome。descriptor 缺失或版本不兼容时进入 `CHROME_DEPENDENCY_MISSING` 并打印可执行的 `chatup chrome` 修复命令。
+ChatPost 启动 Runner 时只调用 `chatup.chrome_for_testing.resolve(...)`：读取 binary path、exact version、platform、installation root 和 digest。它不调用安装 API，不保存一份 browser registry，也不下载/解压 Chrome。descriptor 缺失或版本不兼容时进入 `CHROME_DEPENDENCY_MISSING` 并打印可执行的 `chatup chrome-for-testing install --version <chatpost-tested-version>` 修复命令。
 
 ## 非秘密配置示例
 
@@ -252,7 +252,7 @@ command options
 
 | 旧字段/状态 | ChatPost 资源 |
 |---|---|
-| `WECHATSYNC_CHROME_BIN` | ChatUp `ChromeInstallation.binary_path`；Runner 启动时只读解析。 |
+| `WECHATSYNC_CHROME_BIN` | ChatUp `ChromeForTestingInstallation.binary_path`；Runner 启动时只读解析。 |
 | `WECHATSYNC_CHROME_PROFILE` | Runner `user_data_dir`；默认 managed，也可 adopt 现有目录。 |
 | `WECHATSYNC_DEBUG_PORT` | Runner CDP lease；默认 auto。 |
 | extension `serverUrl` / `SYNC_WS_PORT` | Runner `bridge_ws_url` / WebSocket port lease；扩展主动连接。 |
@@ -275,7 +275,7 @@ command options
 
 提案中的 `config validate` / `doctor` 至少检查：
 
-1. 已安装 `chatup>=0.2.2,<0.3.0`，且 ChatPost 兼容版本可由 `chatup.chrome.resolve_chrome` 解析并执行；验证过程不触发安装；
+1. 已安装 `chatup>=0.2.3,<0.3.0`，且 ChatPost 兼容版本可由 `chatup.chrome_for_testing.resolve` 解析并执行；验证过程不触发安装；
 2. Runner 名称、Profile 路径和端口租约唯一；
 3. CDP/bridge bind address 为 loopback，本地 control transport 默认 stdio；
 4. token profile 引用存在但不读取/打印值；

@@ -41,7 +41,7 @@ chatpost config validate
 ### 2. 使用 ChatUp 准备 Chrome dependency
 
 ```bash
-chatup chrome \
+chatup chrome-for-testing install \
   --version <chatpost-tested-version> \
   --output json \
   --doctor \
@@ -50,11 +50,11 @@ chatup chrome \
 
 预期：
 
-- ChatUp 把 Chrome for Testing 安装到 `~/.chatarch/chrome/`；
-- ChatUp 的 `runtime.json` 记录 exact version、platform、binary path、来源和 digest；
+- ChatUp 把 Chrome for Testing 安装到 `~/.chatarch/chrome-for-testing/`；
+- ChatUp 的 `installation.json` 记录 exact version、platform、binary path、来源和 digest；
 - 不修改系统 Chrome；
 - 不要求 Docker；
-- ChatPost 后续只调用 `chatup.chrome.resolve_chrome(...)`，不下载或升级 Chrome。
+- ChatPost 后续只调用 `chatup.chrome_for_testing.resolve(...)`，不下载或升级 Chrome。
 
 ### 3. 创建隔离 Runner
 
@@ -277,7 +277,7 @@ RUNNING -> RESULT_UNKNOWN
 
 ## 常见失败
 
-- **Chrome dependency 不存在**：状态为 `CHROME_DEPENDENCY_MISSING`，运行报错中给出的 exact `chatup chrome --version ...`；ChatPost 不回退到未知系统浏览器，也不隐式安装。
+- **Chrome dependency 不存在**：状态为 `CHROME_DEPENDENCY_MISSING`，运行报错中给出的 exact `chatup chrome-for-testing install --version ...`；ChatPost 不回退到未知系统浏览器，也不隐式安装。
 - **Profile 被占用**：停止并报告 owner，不强杀日常 Chrome。
 - **扩展不匹配**：状态为 `EXTENSION_UNAVAILABLE`，不把任意 service worker 当目标扩展。
 - **扩展 URL/token 未配置**：状态为 `NEEDS_EXTENSION_SETUP`，打开 exact extension 设置页，不写入平台 storage。

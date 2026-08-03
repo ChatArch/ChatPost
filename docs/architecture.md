@@ -40,7 +40,7 @@ ChatPost 不读取平台 Cookie，也不把浏览器 Profile 当作普通配置�
 | 知乎二维码扫码登录 | 已验证 | 在可见隔离浏览器中完成扫码，Profile 随后保持登录态。 |
 | 知乎短信验证码登录 | 待单独验收 | 这是标准人工备选路径，但现有端到端证据不应宣称它已经走通。 |
 | loopback bridge + token | 已验证 | 扩展与 CLI 通过本机 WebSocket 通讯，Token 不是知乎凭据。 |
-| ChatUp Chrome environment | 已发布依赖 | `chatup 0.2.2` 已提供 `chatup chrome` 与 `chatup.chrome.resolve_chrome`；ChatPost 不重复实现下载。 |
+| ChatUp Chrome environment | 已发布依赖 | `chatup 0.2.3` 已提供 `chatup chrome-for-testing` 与 `chatup.chrome_for_testing.resolve`；ChatPost 不重复实现下载。 |
 | ChatPost runner/account CLI | 提案 | 命令、schema 和 Python service 尚未实现。 |
 | 多账号调度与 publication ledger | 提案 | 本页定义资源和状态边界，后续按测试实现。 |
 
@@ -51,16 +51,16 @@ ChatPost 不读取平台 Cookie，也不把浏览器 Profile 当作普通配置�
 Chrome for Testing 是 ChatUp 管理的机器级安装，不是 ChatPost Resource。ChatPost 只声明兼容版本并解析一个只读 descriptor：
 
 ```text
-ChatUp ChromeInstallation
+ChatUp ChromeForTestingInstallation
 ├── kind = chrome-for-testing
 ├── exact version
 ├── platform
 ├── binary_path
-├── runtime root
+├── root_dir = installation root
 └── provenance / digest
 ```
 
-`chatup chrome --version <tested-version>` 安装到 `~/.chatarch/chrome/`。ChatPost 通过 `chatup.chrome.resolve_chrome(...)` 解析已有安装；缺失时 fail closed 并提示运行 ChatUp，不自行下载、解压或修改系统 Chrome。
+`chatup chrome-for-testing install --version <tested-version>` 安装到 `~/.chatarch/chrome-for-testing/`。ChatPost 通过 `chatup.chrome_for_testing.resolve(...)` 解析已有安装；缺失时 fail closed 并提示运行 ChatUp，不自行下载、解压或修改系统 Chrome。
 
 ### Runner
 
@@ -142,7 +142,7 @@ platform account + draft/article ID
 
 ```text
 CHROME_DEPENDENCY_MISSING
-  -> user runs chatup chrome --version <tested-version>
+  -> user runs chatup chrome-for-testing install --version <tested-version>
 CHROME_DEPENDENCY_READY
   -> runner add/start
 RUNNER_STARTING
@@ -169,7 +169,7 @@ RUNNING
 
 | 数据 | 所有者 | 是否秘密 | 是否进入 ledger |
 |---|---|---:|---:|
-| Chrome 二进制、版本与 digest | ChatUp `~/.chatarch/chrome/` | 否 | 否 |
+| Chrome 二进制、版本与 digest | ChatUp `~/.chatarch/chrome-for-testing/` | 否 | 否 |
 | user-data-dir 路径引用 | Runner config | 否 | 否 |
 | Profile 内 Cookie/Local Storage | Chrome Profile | 是 | 否 |
 | bridge URL、端口 | Runner config/state | 否 | 否 |
@@ -203,7 +203,7 @@ examples/zhihu/mkdocs-quickstart.md
 
 首个功能版本包含：
 
-- 对已发布 `chatup>=0.2.2,<0.3.0` 的有界依赖，以及只读 Chrome descriptor 解析；
+- 对已发布 `chatup>=0.2.3,<0.3.0` 的有界依赖，以及只读 Chrome descriptor 解析；
 - host Runner 生命周期与健康检查；
 - 一个 Runner 一个独立 user-data-dir；
 - ChatEnv bridge secret reference；

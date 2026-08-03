@@ -143,7 +143,7 @@ This is the recommended default.
 ### Required Resources
 
 ```text
-ChatUp ChromeInstallation descriptor
+ChatUp ChromeForTestingInstallation descriptor
 extension directory/version
 user-data-dir
 process identity/PID or service unit
@@ -155,14 +155,14 @@ runtime logs
 
 ### ChatUp-Managed Chrome Dependency
 
-The verified practice ran Chrome for Testing directly from a Playwright cache without Docker. Released `chatup 0.2.2` now turns that temporary dependency into a reusable machine environment:
+The verified practice ran Chrome for Testing directly from a Playwright cache without Docker. Released `chatup 0.2.3` now turns that temporary dependency into a reusable machine environment:
 
 ```text
-~/.chatarch/chrome/
-└── chrome-for-testing/<version>/<platform>/...
+~/.chatarch/chrome-for-testing/
+└── <version>/<platform>/...
 ```
 
-The user installs it with `chatup chrome --version <chatpost-tested-version>`. A ChatPost runner only resolves the descriptor through `chatup.chrome.resolve_chrome(...)`; it owns no download, extraction, upgrade, or browser registry. Chrome stays outside the ChatPost wheel and never overwrites system Chrome. Login state remains only in the runner's `chrome-data/`.
+The user installs it with `chatup chrome-for-testing install --version <chatpost-tested-version>`. A ChatPost runner only resolves the descriptor through `chatup.chrome_for_testing.resolve(...)`; it owns no download, extraction, upgrade, or browser registry. Chrome stays outside the ChatPost wheel and never overwrites system Chrome. Login state remains only in the runner's `chrome-data/`.
 
 ### Secure Defaults
 
@@ -337,8 +337,8 @@ ChatPost never stores:
 
 ```text
 default runtime       = host binary
-Chrome owner          = ChatUp (`~/.chatarch/chrome/`)
-ChatPost resolution   = read-only `chatup.chrome.resolve_chrome`
+Chrome owner          = ChatUp (`~/.chatarch/chrome-for-testing/`)
+ChatPost resolution   = read-only `chatup.chrome_for_testing.resolve`
 Docker                = optional
 isolation unit        = browser persona / runner
 multiple same-platform accounts = separate user-data-dirs

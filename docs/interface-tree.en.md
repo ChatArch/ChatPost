@@ -22,10 +22,10 @@ chatpost
 The Chrome environment contract consumes ChatUp's released public API directly:
 
 ```python
-from chatup.chrome import ChromeInstallation, resolve_chrome
+from chatup.chrome_for_testing import ChromeForTestingInstallation, resolve
 ```
 
-The ChatPost dependency adapter may only wrap `resolve_chrome(...)` and domain errors. It never copies the downloader/extractor and never calls `ensure_chrome(...)` implicitly from `runner start`.
+The ChatPost dependency adapter may only wrap read-only `resolve(...)` and domain errors. It never copies the downloader/extractor and never calls `install(...)` implicitly from `runner start`.
 
 ## Update Checklist
 

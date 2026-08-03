@@ -143,7 +143,7 @@ CDP 用于打开登录页、确认 exact extension identity 和诊断。扩展�
 ### 必需资源
 
 ```text
-ChatUp ChromeInstallation descriptor
+ChatUp ChromeForTestingInstallation descriptor
 extension directory/version
 user-data-dir
 process identity/PID or service unit
@@ -155,14 +155,14 @@ runtime logs
 
 ### ChatUp 管理的 Chrome dependency
 
-已验证实践使用 Playwright 缓存中的 Chrome for Testing 二进制直接运行，没有 Docker。现在由已发布 `chatup 0.2.2` 把这个临时依赖提升为可复用机器环境：
+已验证实践使用 Playwright 缓存中的 Chrome for Testing 二进制直接运行，没有 Docker。现在由已发布 `chatup 0.2.3` 把这个临时依赖提升为可复用机器环境：
 
 ```text
-~/.chatarch/chrome/
-└── chrome-for-testing/<version>/<platform>/...
+~/.chatarch/chrome-for-testing/
+└── <version>/<platform>/...
 ```
 
-用户通过 `chatup chrome --version <chatpost-tested-version>` 安装；ChatPost Runner 只通过 `chatup.chrome.resolve_chrome(...)` 解析 descriptor，不拥有下载、解压、升级或 browser registry。Chrome 不打进 ChatPost wheel，也不覆盖系统 Chrome；登录态仍只在 Runner 的 `chrome-data/` 中。
+用户通过 `chatup chrome-for-testing install --version <chatpost-tested-version>` 安装；ChatPost Runner 只通过 `chatup.chrome_for_testing.resolve(...)` 解析 descriptor，不拥有下载、解压、升级或 browser registry。Chrome 不打进 ChatPost wheel，也不覆盖系统 Chrome；登录态仍只在 Runner 的 `chrome-data/` 中。
 
 ### 安全默认值
 
@@ -339,8 +339,8 @@ ChatPost 不保存：
 
 ```text
 默认 runtime       = host binary
-Chrome owner        = ChatUp (`~/.chatarch/chrome/`)
-ChatPost resolution = read-only `chatup.chrome.resolve_chrome`
+Chrome owner        = ChatUp (`~/.chatarch/chrome-for-testing/`)
+ChatPost resolution = read-only `chatup.chrome_for_testing.resolve`
 Docker             = optional
 隔离单位           = browser persona / runner
 同平台多个账号     = 多个独立 user-data-dir
