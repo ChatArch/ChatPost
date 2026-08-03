@@ -279,7 +279,7 @@ def _sanitize_browser_diagnostics(
 
 
 def _ownership_url(token: str) -> str:
-    return f"about:blank#chatpost-run-{token}"
+    return f"data:text/plain,chatpost-run-{token}"
 
 
 def _discover_owned_cdp_endpoint(

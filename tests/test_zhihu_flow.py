@@ -343,7 +343,7 @@ def test_cdp_endpoint_requires_unique_startup_marker_and_loopback_websocket(
     monkeypatch.setattr(zhihu, "_http_json", http_json)
     assert zhihu._discover_owned_cdp_endpoint(config, token) is None
 
-    targets[0]["url"] = "about:blank#chatpost-run-unique-run-token"
+    targets[0]["url"] = "data:text/plain,chatpost-run-unique-run-token"
     endpoint = zhihu._discover_owned_cdp_endpoint(config, token)
     assert endpoint == zhihu._CdpEndpoint(
         base_url="http://127.0.0.1:9227",
@@ -361,7 +361,7 @@ def test_browser_command_starts_with_unique_ownership_marker(tmp_path):
 
     command = zhihu._browser_command(config, installation, "unique-run-token")
 
-    assert command[-1] == "about:blank#chatpost-run-unique-run-token"
+    assert command[-1] == "data:text/plain,chatpost-run-unique-run-token"
     assert f"--remote-debugging-port={config.cdp_port}" in command
     assert "https://www.zhihu.com/" not in command
 
