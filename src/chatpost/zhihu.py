@@ -347,7 +347,10 @@ def _wait_for_cdp(
         time.sleep(0.1)
     detail = _sanitize_browser_diagnostics(config, diagnostics, (ownership_token,))
     suffix = f": {detail}" if detail else ""
-    raise RuntimeError(f"Owned Chrome CDP did not become ready within 20 seconds{suffix}")
+    raise RuntimeError(
+        "Owned Chrome CDP did not become ready within 20 seconds; "
+        f"the process was left running for manual recovery{suffix}"
+    )
 
 
 def _extension_target(

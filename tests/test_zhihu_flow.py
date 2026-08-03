@@ -327,6 +327,22 @@ def test_browser_diagnostics_do_not_fail_if_private_env_disappears(tmp_path):
     assert message == "profile in use: [PROFILE]"
 
 
+def test_cdp_ownership_timeout_requires_manual_recovery(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+
+    class Process:
+        returncode = None
+
+        def poll(self):
+            return None
+
+    ticks = iter((0.0, 21.0))
+    monkeypatch.setattr(zhihu.time, "monotonic", lambda: next(ticks))
+
+    with pytest.raises(RuntimeError, match="left running for manual recovery"):
+        zhihu._wait_for_cdp(config, Process(), "ownership-token")
+
+
 def test_cdp_endpoint_requires_unique_startup_marker_and_loopback_websocket(
     monkeypatch, tmp_path
 ):
