@@ -1,288 +1,246 @@
 # 知乎首次设置与草稿验收
 
-!!! warning "状态：任务导向的设计提案"
-    `ChatPost 0.0.2` 尚未实现本页命令。固定博客稿和验收边界已经加入仓库，后续实现必须先通过代码/测试，再把本页升级为可执行教程。
+本页是 `ChatPost 0.1.0` 的可执行 Quick Start。它复刻已验证的 Playwright-cache + Profile + Wechatsync 路线，并把制品与任务责任拆到 ChatUp/ChatPost。
 
-## 目标任务
-
-使用一个隔离的知乎账号 Runner，把下面这篇文章写入知乎草稿：
+## 最终边界
 
 ```text
-examples/zhihu/mkdocs-quickstart.md
+ChatUp 0.2.4
+  -> 安装 exact Playwright package + browser revision
+  -> chatup.playwright.resolve(...)
+
+ChatPost 0.1.0
+  -> 持久 Profile + 浏览器生命周期
+  -> exact extension + loopback CDP/bridge
+  -> 登录 checkpoint / auth / dry-run / 单次 create / receipt
+
+Wechatsync
+  -> 知乎 adapter 与草稿写入
 ```
 
-验收停在草稿：回读标题、marker、代码块和本地图片，写入 publication ledger，然后由用户人工 Review。ChatPost 不点击最终发布。
+这条链路：
 
-## 已验证基线
+- user-level；
+- 不需要 Docker 或 root；
+- 不读取或导出 Cookie/LocalStorage；
+- 只创建草稿，不点击最终发布；
+- `RESULT_UNKNOWN` 后禁止自动重试；
+- 尚不支持 same-ID update。
 
-现有 Wechatsync 实践已经证明：
-
-- Chrome for Testing 可以直接作为 host binary 运行，不需要 Docker；
-- 可见 Chrome 能加载 unpacked 扩展；
-- 知乎二维码扫码登录已在可见隔离浏览器中走通，登录态保留在独立 `user-data-dir`；
-- 手机短信验证码是标准人工备选路径，但尚未在这条端到端链路中单独验收；
-- bridge 通过 loopback WebSocket 与 CLI 通讯；
-- CLI 可先只读验证 auth，再创建并回读草稿；
-- Cookie 不需要也不应该导出给 CLI。
-
-ChatUp 把 Chrome 二进制提升为可复用机器依赖；ChatPost 把其余脚本和状态提升为 Runner、Account 和 Publication 三种稳定资源。
-
-## 预期首次运行
-
-### 1. 初始化控制面
+## 1. 安装 Python 包
 
 ```bash
-chatpost init
-chatpost config validate
+python3 -m venv "$HOME/.chatarch/venvs/chatpost"
+"$HOME/.chatarch/venvs/chatpost/bin/python" -m pip install --upgrade pip
+"$HOME/.chatarch/venvs/chatpost/bin/python" -m pip install \
+  "chatup==0.2.4" \
+  "chatpost==0.1.0"
+
+CHATUP="$HOME/.chatarch/venvs/chatpost/bin/chatup"
+CHATPOST="$HOME/.chatarch/venvs/chatpost/bin/chatpost"
+"$CHATUP" --version
+"$CHATPOST" --version
 ```
 
-预期创建用户级配置和 workspace `.chatpost/` ledger，不创建平台草稿。
-
-### 2. 使用 ChatUp 准备 Chrome dependency
+## 2. 准备 Node.js 与 Playwright browser
 
 ```bash
-chatup chrome-for-testing install \
-  --version <chatpost-tested-version> \
+"$CHATUP" nodejs -I
+# 按 ChatUp 输出刷新当前 shell 后确认 node/npm 可用。
+node --version
+npm --version
+
+"$CHATUP" playwright install 1.61.1 \
+  --browser chromium \
   --output json \
-  --doctor \
+  -I
+
+"$CHATUP" playwright doctor 1.61.1 \
+  --browser chromium \
+  --output json \
   -I
 ```
 
-预期：
+ChatUp 将 package 与 browser 安装到 `~/.chatarch/playwright/1.61.1/`。ChatPost 只解析该安装，不隐式下载或升级。
 
-- ChatUp 把 Chrome for Testing 安装到 `~/.chatarch/chrome-for-testing/`；
-- ChatUp 的 `installation.json` 记录 exact version、platform、binary path、来源和 digest；
-- 不修改系统 Chrome；
-- 不要求 Docker；
-- ChatPost 后续只调用 `chatup.chrome_for_testing.resolve(...)`，不下载或升级 Chrome。
-
-### 3. 创建隔离 Runner
-
-```bash
-chatpost runner add zhihu-personal \
-  --runtime host
-
-chatpost runner start zhihu-personal --visible
-chatpost runner status zhihu-personal
-```
-
-默认创建：
+当前任务实测组合：
 
 ```text
-~/.chatarch/chatpost/runners/zhihu-personal/chrome-data/
+Playwright package  1.61.1
+browser             chromium
+revision            1228
+Chrome for Testing  149.0.7827.55
 ```
 
-`status` 必须分别报告：
+## 3. 准备 Wechatsync adapter
 
-```text
-chrome        CHATUP_RESOLVED + exact version
-process       READY
-cdp           READY
-extension     READY + exact identity
-bridge_ws     EXTENSION_CONNECTED + protocol version
-control       READY + stdio
-profile       LOCKED_BY_THIS_RUNNER
-```
-
-任一项不明确时，Runner 不能进入可写状态。
-
-当前 Wechatsync message schema 尚未协商 protocol version。因此这里的“protocol version”是实现要求，不是现有能力：首版必须新增 handshake，或使用 compatibility manifest 证明 exact bridge/extension artifact pair；否则状态为 `PROTOCOL_UNVERIFIED`，禁止真实写入。
-
-### 4. 注册逻辑账号
+当前打通版本来自 ChatArch 的知乎草稿 CLI 分支：
 
 ```bash
-chatpost account add zhihu@personal --runner zhihu-personal
-chatpost account show zhihu@personal
+git clone https://github.com/ChatArch/Wechatsync.git "$HOME/.chatarch/src/Wechatsync"
+cd "$HOME/.chatarch/src/Wechatsync"
+git checkout 0073787cfbff0f7af4d1b427da3adbb16d92eeb8
+corepack enable
+pnpm install --frozen-lockfile
+pnpm build
+
+test -f packages/cli/dist/index.js
+test -f packages/extension/dist/manifest.json
 ```
 
-这个命令只建立映射，不接收知乎密码、手机号、Cookie 或验证码。
+ChatPost 不复制 Wechatsync 的知乎业务逻辑，只编排其 CLI、扩展和回执。
 
-### 5. 人工首次登录
+## 4. 创建 Profile 与私密 bridge env
 
 ```bash
-chatpost account login zhihu@personal
+RUNNER_HOME="$HOME/.chatarch/chatpost/runners/zhihu-primary"
+install -d -m 700 "$RUNNER_HOME/profile"
+install -d -m 700 "$RUNNER_HOME/run"
 ```
 
-登录路线必须分开记录：
-
-| 路线 | 当前证据 |
-|---|---|
-| 图片二维码扫码 | 已验证；作为首个真实验收默认路线。 |
-| 手机短信验证码 | 标准人工备选；尚未单独做端到端验收。 |
-
-预期行为：
-
-1. 启动或唤醒正确 Runner；
-2. 打开知乎官方登录页；
-3. 保持可见浏览器；
-4. 用户自行完成所选人工路线；首个验收使用已验证的二维码扫码；
-5. ChatPost 等待页面离开登录状态；
-6. adapter 执行只读 auth check；
-7. Account 状态更新为 `READY`。
-
-登录超时、二维码过期、验证码或风控都进入 `NEEDS_LOGIN` / `NEEDS_ACTION`。ChatPost 不截取二维码 token、不记录验证码，也不绕过平台验证。
-
-### 6. 只读确认账号状态
+生成本地 bridge token，不在终端输出：
 
 ```bash
-chatpost account status zhihu@personal --output json
+RUNNER_HOME="$RUNNER_HOME" python3 - <<'PY'
+import os
+import secrets
+from pathlib import Path
+
+path = Path(os.environ["RUNNER_HOME"]) / "bridge.env"
+path.write_text(
+    "WECHATSYNC_TOKEN=" + secrets.token_urlsafe(32) + "\n",
+    encoding="utf-8",
+)
+path.chmod(0o600)
+PY
 ```
 
-至少返回：
+bridge token 只鉴权本机扩展与 CLI，不是知乎密码。不要把 env、Profile、Cookie、LocalStorage、二维码或验证码加入 Git、文档或日志。
+
+## 5. 写 Runner TOML
+
+从仓库示例复制：
+
+```bash
+cp examples/zhihu/runner.toml.example "$RUNNER_HOME/runner.toml"
+chmod 600 "$RUNNER_HOME/runner.toml"
+```
+
+把示例中的路径改成当前机器的绝对路径。核心字段：
+
+```toml
+[zhihu]
+playwright_version = "1.61.1"
+playwright_home = "/home/user/.chatarch/playwright"
+profile_dir = "/home/user/.chatarch/chatpost/runners/zhihu-primary/profile"
+extension_dir = "/home/user/.chatarch/src/Wechatsync/packages/extension/dist"
+node_bin = "/absolute/path/to/node"
+wechatsync_cli = "/home/user/.chatarch/src/Wechatsync/packages/cli/dist/index.js"
+env_file = "/home/user/.chatarch/chatpost/runners/zhihu-primary/bridge.env"
+cdp_host = "127.0.0.1"
+cdp_port = 9227
+bridge_host = "127.0.0.1"
+bridge_port = 9527
+extension_id = "dipgimoobbhdefncjomgehikkbaklgii"
+headless = true
+browser_args = ["--disable-dev-shm-usage"]
+```
+
+macOS 通常可把 `browser_args` 设为空数组。Linux 是否需要额外参数应以该机器真实 Chrome smoke 为准；不要默认公开端口或关闭安全边界。
+
+## 6. 运行静态 preflight
+
+```bash
+"$CHATPOST" zhihu preflight \
+  --config "$RUNNER_HOME/runner.toml" \
+  --output json \
+  -I
+```
+
+只有 `status=READY` 才继续。它会验证：
+
+- exact ChatUp Playwright installation；
+- Profile 存在且不向 group/other 开放；
+- Node、Wechatsync CLI 与扩展 manifest；
+- env 权限和 token 是否存在，但不显示值；
+- CDP/bridge 均为 loopback 且端口尚未被占用。
+
+## 7. 首次人工登录
+
+已有登录 Profile 可先做一次只读检查：
+
+```bash
+"$CHATPOST" zhihu auth \
+  --config "$RUNNER_HOME/runner.toml" \
+  --output json \
+  -I
+```
+
+若未登录，启动登录 checkpoint：
+
+```bash
+"$CHATPOST" zhihu login \
+  --config "$RUNNER_HOME/runner.toml" \
+  --timeout 900 \
+  --output json \
+  -I
+```
+
+`login` 保持同一浏览器/Profile，打开知乎登录页，并循环执行只读 auth；扫码或验证码成功后返回 `READY`。有桌面的机器可设置 `headless=false`。服务器必须使用经过授权的本机显示/隧道或受控截图流程；不得把 CDP、VNC 或 bridge 暴露到公网。
+
+登录后再运行一次 `auth`，确认同一 Profile 可复用。ChatPost 不读取 Profile 内的 Cookie。
+
+## 8. Dry-run
+
+```bash
+ARTICLE=/absolute/path/to/article.md
+"$CHATPOST" zhihu draft dry-run "$ARTICLE" \
+  --config "$RUNNER_HOME/runner.toml" \
+  --output json \
+  -I
+```
+
+确认标题、正文、图片引用和固定 marker 正确。dry-run 不启动浏览器、不连接扩展、不写知乎。
+
+## 9. 只创建一次草稿
+
+```bash
+RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
+"$CHATPOST" zhihu draft create "$ARTICLE" \
+  --config "$RUNNER_HOME/runner.toml" \
+  --receipt "$RECEIPT" \
+  --output json \
+  -I
+```
+
+成功条件：
+
+- `status=DRAFT_CREATED`；
+- 有知乎 draft ID 与 `/edit` review URL；
+- receipt 权限为 `0600`；
+- 打开编辑页能回读期望标题和 marker；
+- 停在草稿箱，未最终发布。
+
+图片上传失败可以与草稿创建成功同时发生；必须按编辑页实际内容报告，不能把 CLI exit 0 当成图片完整证明。
+
+## 10. 歧义恢复
+
+若 receipt 为：
 
 ```json
-{
-  "target": "zhihu@personal",
-  "runner": "zhihu-personal",
-  "state": "READY",
-  "checked_at": "<timestamp>"
-}
+{"status": "RESULT_UNKNOWN"}
 ```
 
-公开 display name 可以用于人工确认，但不能作为 Account 主键或写入包含隐私的日志。
+立即停止自动化：
 
-### 7. 为固定博客生成 plan
+1. 不重新运行 `draft create`；
+2. 在同一知乎账号草稿箱按标题、marker 与时间查找；
+3. 找到后补录唯一 draft ID/review URL；
+4. 确认不存在后也要人工决定是否重新创建。
 
-```bash
-chatpost plan examples/zhihu/mkdocs-quickstart.md \
-  --to zhihu@personal \
-  --output json \
-  --no-interactive
-```
+## 两仓协作结论
 
-Plan 必须检查：
-
-- 标题存在；
-- 正文非空；
-- marker 为 `CHATPOST-MKDOCS-SMOKE-V1`；
-- 本地图片 `assets/mkdocs-pipeline.png` 可读；
-- target、Runner、adapter 和 auth 均 READY；
-- ledger 中没有该 source/target 的 active draft；
-- 操作是 `create_draft`；
-- 本步骤没有远端上传或写入。
-
-### 8. 单次创建草稿
-
-```bash
-chatpost draft create examples/zhihu/mkdocs-quickstart.md \
-  --to zhihu@personal
-```
-
-写入前再次验证同一个 Runner、账号和 source hash。一个 invocation 只允许一个 create RPC，不在异常路径中自动重试。
-
-明确成功时保存：
-
-```text
-source_ref
-source_sha256
-target = zhihu@personal
-runner = zhihu-personal
-operation = create_draft
-draft_id
-review_url
-status = DRAFT_CREATED
-adapter/browser/protocol versions
-```
-
-### 9. 回读与人工 Review
-
-```bash
-chatpost publication status <publication-ref>
-chatpost publication open <publication-ref>
-```
-
-回读检查：
-
-| 项目 | 预期 |
-|---|---|
-| 标题 | `用 MkDocs 搭一个可维护的项目文档站` |
-| marker | `CHATPOST-MKDOCS-SMOKE-V1` 唯一存在 |
-| 代码 | 至少包含 `mkdocs serve` 与 `mkdocs build --strict` |
-| 表格 | 页面职责表存在 |
-| 图片 | 本地 PNG 上传并在编辑器可见 |
-| 最终发布 | 未点击 |
-
-## 复用已经登录的 Profile
-
-内部验收可以引用此前的隔离 Profile，而不是要求用户重新登录：
-
-```bash
-chatpost runner add zhihu-personal \
-  --runtime host \
-  --profile-mode adopt \
-  --user-data-dir <existing-isolated-profile>
-```
-
-Adopt 边界：
-
-- 只绑定目录引用，不复制 Profile；
-- 不读取 Cookie；
-- 不把路径写进公开文档或 ledger；
-- 启动前检查目录权限和进程锁；
-- 仍然执行 exact extension、bridge 和只读 auth preflight；
-- 如果登录已失效，回到可见人工登录 checkpoint。
-
-禁止 adopt 日常 Chrome 默认 Profile。
-
-## 连接面在首次运行中的角色
-
-```text
-CDP URL
-  ChatPost runner manager -> Chrome
-  打开登录页、扩展身份验证、诊断
-
-Bridge WebSocket URL
-  browser extension -> bridge server
-  扩展主动连接，任务与回执携带 bridge token
-
-Control transport
-  ChatPost adapter -> bridge process
-  managed local 默认 in-process/stdio；不要求 HTTP URL
-```
-
-Managed local Runner 自动分配端口并在证明 exact extension identity 后配置扩展自己的 URL/token 字段。普通用户无需输入 `9227`、`9527` 或 companion port。无法安全配置扩展时进入 `NEEDS_EXTENSION_SETUP`，由用户在扩展设置页完成；不能因此读取知乎 Cookie。
-
-## RESULT_UNKNOWN
-
-如果 create 请求已发出，但 WebSocket 断开、CLI 超时或回执无法验证：
-
-```text
-RUNNING -> RESULT_UNKNOWN
-```
-
-此时必须：
-
-1. 保留 source hash、target、Runner、开始时间和调用 ID；
-2. 释放页面前先保存可用诊断；
-3. 禁止再次执行 `draft create`；
-4. 通过 `publication status/reconcile` 和人工草稿箱检查恢复；
-5. 只有证明第一次没有创建后，才允许用户显式决定下一步。
-
-## 验收矩阵
-
-| 能力 | 离线测试 | 本地 Runner | 真实知乎草稿 |
-|---|---:|---:|---:|
-| ChatUp descriptor contract | 必需 | 必需 | 间接 |
-| Profile lock与端口租约 | 必需 | 必需 | 必需 |
-| 二维码扫码登录 | contract | 必需 | 已验证 |
-| 短信验证码登录 | contract | 可选 | 待单独验收 |
-| exact extension identity | fake + contract | 必需 | 必需 |
-| bridge token redaction | 必需 | 必需 | 必需 |
-| account auth check | fake | 必需 | 必需 |
-| plan 无副作用 | 必需 | 必需 | 不写入 |
-| draft create 单次 RPC | fake recorder | 必需 | 恰好一次 |
-| receipt/ledger | 必需 | 必需 | 必需 |
-| 标题/marker/代码/图片回读 | fixture | 可选 | 必需 |
-| 最终 publish 未触发 | contract | contract | 必需 |
-
-## 常见失败
-
-- **Chrome dependency 不存在**：状态为 `CHROME_DEPENDENCY_MISSING`，运行报错中给出的 exact `chatup chrome-for-testing install --version ...`；ChatPost 不回退到未知系统浏览器，也不隐式安装。
-- **Profile 被占用**：停止并报告 owner，不强杀日常 Chrome。
-- **扩展不匹配**：状态为 `EXTENSION_UNAVAILABLE`，不把任意 service worker 当目标扩展。
-- **扩展 URL/token 未配置**：状态为 `NEEDS_EXTENSION_SETUP`，打开 exact extension 设置页，不写入平台 storage。
-- **协议兼容性未证明**：状态为 `PROTOCOL_UNVERIFIED`，禁止 auth 之后的真实写入。
-- **Bridge 断开**：写操作前失败；写操作后则进入 `RESULT_UNKNOWN`。
-- **账号未登录**：打开可见浏览器，等待用户处理。
-- **图片不存在**：plan 失败，不创建残缺草稿。
-- **ledger 已有 draft ID**：`draft create` 失败，提示显式 `draft update` 或人工处理。
+- ChatUp 只向上提供 Playwright package/browser substrate；不创建 Profile、不启动浏览器、不懂知乎。
+- ChatPost 面向任务管理 Profile、进程、CDP、bridge、登录 checkpoint、单次写入和 receipt；不复制 Playwright 下载逻辑，也不读取登录数据库。
+- Wechatsync 是知乎 adapter；其协议变化应在 ChatPost adapter 边界显式兼容。
+- 文章 update 必须基于已保存的 draft/article ID 另开验收，不能用标题匹配或再次 create 冒充 update。

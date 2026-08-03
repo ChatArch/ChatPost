@@ -1,7 +1,7 @@
 # Browser Runner 与账号隔离
 
 !!! warning "状态：架构提案"
-    本页描述 ChatPost 首版应如何管理 Chrome。`ChatPost 0.0.2` 尚未实现 `runner` 或 `account` 命令。文中“已验证”指现有知乎/Wechatsync 实践，“提案”指后续 ChatPost 实现。
+    `ChatPost 0.1.0` 已实现 task-specific 知乎 Runner 生命周期，但尚未实现通用 `runner` 或 `account` registry 命令。文中其余多账号/远端模型仍是提案。
 
 总体资源关系见 [总体架构设计](architecture.md)，持久化 schema 见 [配置、环境与状态设计](configuration.md)，具体任务见 [知乎首次设置与草稿验收](zhihu-first-run.md)。
 
@@ -143,7 +143,7 @@ CDP 用于打开登录页、确认 exact extension identity 和诊断。扩展�
 ### 必需资源
 
 ```text
-ChatUp ChromeForTestingInstallation descriptor
+ChatUp PlaywrightBrowserInstallation descriptor
 extension directory/version
 user-data-dir
 process identity/PID or service unit
@@ -155,14 +155,14 @@ runtime logs
 
 ### ChatUp 管理的 Chrome dependency
 
-已验证实践使用 Playwright 缓存中的 Chrome for Testing 二进制直接运行，没有 Docker。现在由已发布 `chatup 0.2.3` 把这个临时依赖提升为可复用机器环境：
+已验证实践使用 Playwright 缓存中的 Chrome for Testing 二进制直接运行，没有 Docker。现在由已发布 `chatup 0.2.4` 把这个临时依赖提升为可复用机器环境：
 
 ```text
-~/.chatarch/chrome-for-testing/
-└── <version>/<platform>/...
+~/.chatarch/playwright/
+└── <playwright-version>/{package,browsers,installation.json}
 ```
 
-用户通过 `chatup chrome-for-testing install --version <chatpost-tested-version>` 安装；ChatPost Runner 只通过 `chatup.chrome_for_testing.resolve(...)` 解析 descriptor，不拥有下载、解压、升级或 browser registry。Chrome 不打进 ChatPost wheel，也不覆盖系统 Chrome；登录态仍只在 Runner 的 `chrome-data/` 中。
+用户通过 `chatup playwright install <chatpost-tested-version> --browser chromium` 安装；ChatPost Runner 只通过 `chatup.playwright.resolve(...)` 解析 descriptor，不拥有下载、解压、升级或 browser registry。Chrome 不打进 ChatPost wheel，也不覆盖系统 Chrome；登录态仍只在 Runner 的 `chrome-data/` 中。
 
 ### 安全默认值
 
@@ -216,7 +216,7 @@ Docker 是可选 runtime，而不是要求。
 
 ## 多账号配置示例
 
-以下只是预期 TOML schema，不是 `0.0.2` 已支持配置：
+以下只是预期的通用多账号 TOML schema，不是 `0.1.0` task-specific Runner 已支持配置：
 
 ```toml
 [runners.mac-personal]
@@ -339,8 +339,8 @@ ChatPost 不保存：
 
 ```text
 默认 runtime       = host binary
-Chrome owner        = ChatUp (`~/.chatarch/chrome-for-testing/`)
-ChatPost resolution = read-only `chatup.chrome_for_testing.resolve`
+Chrome owner        = ChatUp (`~/.chatarch/playwright/`)
+ChatPost resolution = read-only `chatup.playwright.resolve`
 Docker             = optional
 隔离单位           = browser persona / runner
 同平台多个账号     = 多个独立 user-data-dir

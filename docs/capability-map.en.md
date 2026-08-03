@@ -1,51 +1,43 @@
 # Capability Map
 
-Use this page to check which first-class capabilities `ChatPost` currently owns, which ones are verified, and what remains out of scope for this package.
+This page separates real `ChatPost 0.1.0` behavior, verified external evidence, and resource models that remain proposals.
 
-## Capability Groups
+## Implemented
 
-<div class="grid cards" markdown>
+| Capability | Status | Contract |
+|---|---|---|
+| CLI base | Implemented | `chatpost --help` and `--version`. |
+| Zhihu static preflight | Implemented | `chatpost zhihu preflight` checks the exact Playwright install, Profile/secret permissions, Node, extension, CLI, and loopback ports. |
+| First-login checkpoint | Implemented | `chatpost zhihu login` keeps one Profile alive and polls read-only auth for manual QR/code login; it writes no article. |
+| Zhihu auth check | Implemented | `chatpost zhihu auth` starts the controlled Runner, performs read-only Wechatsync auth, and stops gracefully. |
+| Article dry-run | Implemented | `chatpost zhihu draft dry-run` starts no browser and writes nothing to Zhihu. |
+| One-shot draft create | Implemented | `chatpost zhihu draft create` invokes the adapter once; success writes a mode-`0600` receipt and ambiguity writes `RESULT_UNKNOWN`. |
+| ChatUp Playwright dependency | Implemented | Bounded `chatup>=0.2.4,<0.3.0`; read-only `chatup.playwright.resolve`. |
+| Raw-CDP extension wake | Implemented | Connects only to the exact extension target and configures its loopback bridge URL/token. |
+| Secret redaction | Implemented | Environment secret values in adapter output become `[REDACTED]`; receipts contain no tokens, cookies, or local storage. |
 
-- **CLI Entry**
+## Verified Evidence
 
-    `chatpost --help` and `chatpost --version` are the default verification entry points.
+- The historical local-Mac Baseline used Playwright-cache CFT 149, a persistent Profile, the Wechatsync extension, and a loopback bridge to create and read back a Zhihu draft.
+- A real task-local ChatUp `1.61.1/chromium` install resolved revision `1228`, CFT `149.0.7827.55`, and a `READY` doctor result.
+- ChatPost unit tests lock loopback binding, exact resolution, one create invocation, no retry after ambiguity, and receipt boundaries.
+- The second Infra draft is complete only when the new command produces an editor URL that is read back; unit tests alone are not end-to-end evidence.
 
-- **Python API**
+## Ownership
 
-    Substantive behavior should live in importable Python functions, classes, or service layers rather than only in Click callbacks.
+| Owner | Owns | Does not own |
+|---|---|---|
+| ChatUp | Playwright package/browser install, version, revision, path, doctor | Profile, login, extension, draft |
+| ChatPost | Profile, browser lifecycle, CDP, bridge, task gates, receipt | Browser download, final Zhihu publish |
+| Wechatsync | Zhihu adapter, content conversion, draft write | Machine browser install, long-term ledger |
+| Human | First login, editor review, final publish | Automated secret export |
 
-- **Config and Environment**
+## Still Proposed
 
-    A released bounded `chatup>=0.2.3,<0.3.0` machine-environment dependency is declared. A ChatEnv provider scaffold exists; the production proposal separates non-secret TOML, secret profiles, runtime state, and the ledger.
+- generic `runner`, `account`, and `publication` commands;
+- multi-account scheduling and a long-term publication ledger;
+- same-ID article updates;
+- automatic final publishing;
+- Playwright Page/Locator automation.
 
-- **Browser Runner Design**
-
-    ChatUp owns Chrome installation. ChatPost designs host/Docker runners, multiple user-data-dirs, and bridge isolation; runner commands are not implemented.
-
-- **Task-Oriented Zhihu Acceptance**
-
-    The repository contains a fixed MkDocs article and local image. A future implementation uses one explicit draft create and never triggers final publish automatically.
-
-</div>
-
-## Current Boundary
-
-| Capability | Status | Notes |
-| --- | --- | --- |
-| CLI base entry | Implemented | The template generates a Click group, `--version`, and a base test. |
-| ChatEnv provider | Scaffold implemented | `config.py` and `chatenv.configs` exist, but `CHATPOST_API_KEY` is a placeholder and the production bridge schema is not implemented. |
-| Overall architecture/config model | Proposed | The ChatUp dependency and Runner/Account/Publication, ChatEnv, and ledger boundaries are documented. |
-| CLI structure design | Proposed | Runner/account/plan/draft/publication boundaries are documented; ChatPost no longer proposes browser-install commands. |
-| ChatUp Chrome for Testing backend | Declared and verified | `pyproject.toml` bounds released `chatup 0.2.3`; tests verify the read-only public `chatup.chrome_for_testing.resolve` API. |
-| Runner isolation | Proposed | Host binary by default and one user-data-dir/bridge per runner; ChatPost resolves a ChatUp descriptor and never installs Chrome. |
-| Historical Zhihu draft path | Verified | The Wechatsync practice created and read back a draft using a direct binary, QR-scan login, dedicated profile, and loopback bridge; SMS remains separately unverified. |
-| MkDocs Zhihu fixture | Added | `examples/zhihu/mkdocs-quickstart.md` and its PNG exist; no draft has been created through ChatPost commands yet. |
-| Business commands | Not implemented | Add these from the real package domain; do not fake future commands in the template. |
-
-## Out of Scope
-
-- No plan placeholder page is generated.
-- No unimplemented capability should be written as a user operation tutorial.
-- Commands in design documents remain explicitly proposed until code, tests, and help text exist.
-- The presence of the fixed article does not mean the ChatPost end-to-end path is implemented or that a new draft exists.
-- No secret, token, cookie, or Authorization header should appear in README, docs, issues, PR comments, or CI logs.
+These capabilities must stay out of the executable Quick Start until implementation, tests, and real acceptance evidence exist.

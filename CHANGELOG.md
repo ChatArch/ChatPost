@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.0 - 2026-08-04
+
+### Added
+
+- Add task-oriented `chatpost zhihu preflight`, `login`, `auth`, `draft dry-run`, and `draft create` commands.
+- Resolve exact Playwright browser installations through `chatup.playwright.resolve` while keeping Profile and publication state in ChatPost.
+- Launch the proven direct-browser route with a persistent Profile, exact unpacked extension, loopback CDP/bridge, and internal raw-CDP extension wake.
+- Write mode-`0600` success or `RESULT_UNKNOWN` receipts and prohibit automatic retry after ambiguous writes.
+- Add executable Runner examples and tests for loopback, path permissions, exact resolver usage, one-shot create, redaction, and cleanup.
+
+### Changed
+
+- Require `chatup>=0.2.4,<0.3.0` and `websocket-client>=1.8,<2.0`.
+- Keep generic runner/account/publication and same-ID article update commands explicitly proposed rather than executable.
+
 ## 0.0.2 - 2026-08-03
 
 ### Changed

@@ -1,11 +1,11 @@
 # 总体架构设计
 
 !!! warning "状态：设计提案"
-    `ChatPost 0.0.2` 当前只提供 `--help` 和 `--version`。本页定义后续实现边界，不代表这些命令已经可用。
+    `ChatPost 0.1.0` 已实现 task-specific `zhihu preflight/auth/draft` 链路；本页的通用 Runner、Account、Publication 与 update 资源模型仍是提案。
 
 ## 一句话模型
 
-ChatPost 是控制面；ChatUp 提供可复用的 Chrome 环境；带持久浏览器 Profile 的 Browser Runner 是执行面；平台账号只是绑定到 Runner 的逻辑发布目标。
+ChatPost 是控制面；ChatUp 提供可复用的 Playwright package/browser 环境；带持久浏览器 Profile 的 Browser Runner 是执行面；平台账号只是绑定到 Runner 的逻辑发布目标。
 
 ```text
 Markdown + local assets
@@ -40,27 +40,28 @@ ChatPost 不读取平台 Cookie，也不把浏览器 Profile 当作普通配置�
 | 知乎二维码扫码登录 | 已验证 | 在可见隔离浏览器中完成扫码，Profile 随后保持登录态。 |
 | 知乎短信验证码登录 | 待单独验收 | 这是标准人工备选路径，但现有端到端证据不应宣称它已经走通。 |
 | loopback bridge + token | 已验证 | 扩展与 CLI 通过本机 WebSocket 通讯，Token 不是知乎凭据。 |
-| ChatUp Chrome environment | 已发布依赖 | `chatup 0.2.3` 已提供 `chatup chrome-for-testing` 与 `chatup.chrome_for_testing.resolve`；ChatPost 不重复实现下载。 |
-| ChatPost runner/account CLI | 提案 | 命令、schema 和 Python service 尚未实现。 |
+| ChatUp Playwright environment | 已发布依赖 | `chatup 0.2.4` 提供 `chatup playwright` 与 `chatup.playwright.resolve`；ChatPost 不重复实现下载。 |
+| ChatPost task-specific Zhihu Runner | 已实现 | `preflight/auth/draft`、持久 Profile、exact extension、loopback CDP/bridge 与 receipt 已有代码和测试。 |
+| 通用 runner/account CLI | 提案 | 通用 registry、命令和 schema 尚未实现。 |
 | 多账号调度与 publication ledger | 提案 | 本页定义资源和状态边界，后续按测试实现。 |
 
 ## 核心资源
 
-### ChatUp Chrome dependency
+### ChatUp Playwright dependency
 
-Chrome for Testing 是 ChatUp 管理的机器级安装，不是 ChatPost Resource。ChatPost 只声明兼容版本并解析一个只读 descriptor：
+Playwright package 与其声明的 browser revision 是 ChatUp 管理的机器级安装，不是 ChatPost Resource。ChatPost 只声明兼容版本并解析一个只读 descriptor：
 
 ```text
-ChatUp ChromeForTestingInstallation
-├── kind = chrome-for-testing
-├── exact version
-├── platform
+ChatUp PlaywrightBrowserInstallation
+├── kind = playwright
+├── playwright_version
+├── browser / browser_revision / browser_version
 ├── binary_path
 ├── root_dir = installation root
-└── provenance / digest
+└── package_dir / browsers_dir / node_version
 ```
 
-`chatup chrome-for-testing install --version <tested-version>` 安装到 `~/.chatarch/chrome-for-testing/`。ChatPost 通过 `chatup.chrome_for_testing.resolve(...)` 解析已有安装；缺失时 fail closed 并提示运行 ChatUp，不自行下载、解压或修改系统 Chrome。
+`chatup playwright install <tested-version> --browser chromium` 安装到 `~/.chatarch/playwright/`。ChatPost 通过 `chatup.playwright.resolve(...)` 解析已有安装；缺失时 fail closed 并提示运行 ChatUp，不自行下载、解压或修改系统 Chrome。
 
 ChromeDriver 是另一个独立 ChatUp backend（`chatup chromedriver` / `chatup.chromedriver`）。当前 ChatPost Runner 直接启动 Chrome for Testing 并使用 CDP，不消费 ChromeDriver，也不假设两个 backend 共用版本或 descriptor。
 
@@ -144,7 +145,7 @@ platform account + draft/article ID
 
 ```text
 CHROME_DEPENDENCY_MISSING
-  -> user runs chatup chrome-for-testing install --version <tested-version>
+  -> user runs chatup playwright install <tested-version> --browser chromium
 CHROME_DEPENDENCY_READY
   -> runner add/start
 RUNNER_STARTING
@@ -171,7 +172,7 @@ RUNNING
 
 | 数据 | 所有者 | 是否秘密 | 是否进入 ledger |
 |---|---|---:|---:|
-| Chrome 二进制、版本与 digest | ChatUp `~/.chatarch/chrome-for-testing/` | 否 | 否 |
+| Playwright package、browser revision/version 与 binary path | ChatUp `~/.chatarch/playwright/` | 否 | 否 |
 | user-data-dir 路径引用 | Runner config | 否 | 否 |
 | Profile 内 Cookie/Local Storage | Chrome Profile | 是 | 否 |
 | bridge URL、端口 | Runner config/state | 否 | 否 |
@@ -205,7 +206,7 @@ examples/zhihu/mkdocs-quickstart.md
 
 首个功能版本包含：
 
-- 对已发布 `chatup>=0.2.3,<0.3.0` 的有界依赖，以及只读 Chrome descriptor 解析；
+- 对已发布 `chatup>=0.2.4,<0.3.0` 的有界依赖，以及只读 Chrome descriptor 解析；
 - host Runner 生命周期与健康检查；
 - 一个 Runner 一个独立 user-data-dir；
 - ChatEnv bridge secret reference；

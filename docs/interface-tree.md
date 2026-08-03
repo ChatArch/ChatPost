@@ -1,34 +1,36 @@
 # Python 接口树
 
-`ChatPost` 的 CLI 应保持薄入口；实质能力应放在可 import 的 Python 函数、类或 service 层里。
-
-## 包入口
-
-```python
-from chatpost import __version__
-```
-
-## 待补接口
+命令行只做参数解析；实质能力位于 `chatpost.zhihu`。
 
 ```text
-chatpost
-├── cli.py           # Click 入口，只做参数解析和输出
-├── dependencies.py  # 只读解析 ChatUp Chrome descriptor；不安装
-├── runner.py        # Profile/process/CDP/bridge 生命周期
-├── account.py       # platform@alias 与登录 checkpoint
-└── publication.py   # plan/draft/ledger/reconcile
+chatpost.zhihu
+├── ZhihuRunnerConfig
+├── load_runner_config(path)
+├── preflight(config)
+├── browser_session(config)
+├── execute_task(config, source, mode=...)
+├── ResultUnknownError
+└── RESULT_UNKNOWN
 ```
 
-Chrome 环境 contract 直接消费 ChatUp 已发布 public API：
+## ChatUp dependency
 
 ```python
-from chatup.chrome_for_testing import ChromeForTestingInstallation, resolve
+from chatup.playwright import PlaywrightBrowserInstallation, resolve
 ```
 
-ChatPost dependency adapter 只能封装只读 `resolve(...)` 和领域错误；不能复制 downloader/extractor，也不能在 `runner start` 中调用 `install(...)` 隐式安装。
+ChatPost 只解析已存在的 exact Playwright browser installation，不隐式安装或升级。
 
-## 更新清单
+## 示例
 
-- 每个实质 CLI 命令都要能映射到 importable API。
-- 文档里的函数签名应和代码一致。
-- 对外输出默认不要泄漏 token、cookie、内部 URL 或人员信息。
+```python
+from chatpost.zhihu import execute_task, load_runner_config, preflight
+
+config = load_runner_config("runner.toml")
+status = preflight(config)
+result = execute_task(config, "article.md", mode="dry-run")
+```
+
+`execute_task(..., mode="create")` 是外部写操作：调用方必须保留 receipt，并在 `ResultUnknownError` 后停止自动重试、先去知乎草稿箱消歧。
+
+`browser_session()` 直接启动 ChatUp resolver 返回的浏览器二进制，使用持久 Profile、unpacked extension 和 loopback CDP；它不提供 Playwright Page/Locator API。

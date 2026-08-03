@@ -1,13 +1,13 @@
 # Configuration, Environment, and State Design
 
 !!! warning "Status: design proposal"
-    This page defines the first functional configuration schema and data boundaries. `ChatPost 0.0.2` still has a scaffold `config.py` with only a placeholder `CHATPOST_API_KEY`; the production fields and commands below are not implemented.
+    `ChatPost 0.1.0` reads the task-specific `[zhihu]` Runner TOML and a mode-`0600` bridge environment file. The remaining generic Runner/Account/ledger schemas on this page are proposals.
 
 ## Decision
 
 ChatPost should not put every value in `.env`. Configuration has four classes:
 
-1. **Machine dependencies and versioned artifacts**: ChatUp owns Chrome for Testing; ChatPost/the adapter owns the extension;
+1. **Machine dependencies and versioned artifacts**: ChatUp owns the Playwright package/browser; ChatPost/the adapter owns the extension;
 2. **Non-secret configuration**: runners, accounts, port policy, and path references;
 3. **Secrets**: per-bridge or remote-runner tokens in ChatEnv;
 4. **Runtime/business state**: process health and the publication ledger, persisted separately.
@@ -20,8 +20,8 @@ Cookies, local storage, passwords, and verification codes belong to none of thes
 
 ```text
 ~/.chatarch/
-├── chrome-for-testing/           # ChatUp-owned CFT backend
-│   └── <version>/<platform>/...
+├── playwright/                   # ChatUp-owned Playwright backend
+│   └── <playwright-version>/{package,browsers,installation.json}
 └── chatpost/
     ├── config.toml
     ├── extensions/
@@ -47,25 +47,25 @@ Cookies, local storage, passwords, and verification codes belong to none of thes
 
 The Chrome installation is a ChatUp machine resource. A profile is ChatPost runner state. Article mappings are workspace state. Keeping all three separate avoids binding a portable content repository to one machine or login state.
 
-## ChatUp Chrome Dependency
+## ChatUp Playwright Dependency
 
 ChatPost consumes a bounded released ChatUp dependency:
 
 ```toml
-dependencies = ["chatup>=0.2.3,<0.3.0"]
+dependencies = ["chatup>=0.2.4,<0.3.0"]
 ```
 
 Environment preparation is an independent ChatUp command:
 
 ```bash
-chatup chrome-for-testing install --version <chatpost-tested-version> --output json -I
+chatup playwright install <chatpost-tested-version> --browser chromium --output json -I
 ```
 
-When starting a runner, ChatPost only calls `chatup.chrome_for_testing.resolve(...)` to read binary path, exact version, platform, installation root, and digest. It does not call an install API, store a browser registry, or download/extract Chrome. A missing or incompatible descriptor enters `CHROME_DEPENDENCY_MISSING` and prints an actionable `chatup chrome-for-testing install --version <chatpost-tested-version>` repair command.
+When starting a runner, ChatPost only calls `chatup.playwright.resolve(...)` to read the Playwright version, browser revision/version, binary path, package/browser roots, and Node version. It does not call an install API, maintain another browser registry, or download a browser. A missing or incompatible descriptor fails closed and points to `chatup playwright install <chatpost-tested-version> --browser chromium`.
 
 ## Non-Secret Configuration Example
 
-The following TOML is an expected schema, not currently readable configuration:
+See [CLI Tree](cli-tree.en.md) for the task-specific TOML that is currently readable. The generic registry TOML below remains a proposed schema:
 
 ```toml
 schema_version = 1
@@ -252,7 +252,7 @@ Secrets do not participate in this ordinary merge. They resolve through an expli
 
 | Existing value/state | ChatPost resource |
 |---|---|
-| `WECHATSYNC_CHROME_BIN` | ChatUp `ChromeForTestingInstallation.binary_path`, resolved read-only at runner start. |
+| `WECHATSYNC_CHROME_BIN` | ChatUp `PlaywrightBrowserInstallation.binary_path`, resolved read-only at runner start. |
 | `WECHATSYNC_CHROME_PROFILE` | Runner `user_data_dir`; managed by default or adopted by reference. |
 | `WECHATSYNC_DEBUG_PORT` | Runner CDP lease; auto by default. |
 | extension `serverUrl` / `SYNC_WS_PORT` | Runner `bridge_ws_url` / WebSocket lease; the extension initiates the connection. |
@@ -275,7 +275,7 @@ Migration does not copy `.env` or a profile. ChatUp first supplies the Chrome de
 
 Proposed `config validate` / `doctor` checks at least:
 
-1. `chatup>=0.2.3,<0.3.0` is installed and the ChatPost-compatible version resolves through `chatup.chrome_for_testing.resolve` to an executable; validation never installs it;
+1. `chatup>=0.2.4,<0.3.0` is installed and the ChatPost-compatible version resolves through `chatup.playwright.resolve` to an executable; validation never installs it;
 2. runner names, profile paths, and port leases are unique;
 3. CDP/bridge listeners bind to loopback and local control defaults to stdio;
 4. token profile references exist without reading/printing values;

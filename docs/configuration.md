@@ -1,13 +1,13 @@
 # 配置、环境与状态设计
 
 !!! warning "状态：设计提案"
-    这里定义 ChatPost 首个功能版本的 schema 与数据边界。`ChatPost 0.0.2` 的 `config.py` 仍是脚手架，只有 `CHATPOST_API_KEY` 占位字段；本页中的生产字段和命令尚未实现。
+    `ChatPost 0.1.0` 已读取 task-specific `[zhihu]` Runner TOML 和权限 `0600` 的 bridge env 文件；本页其余通用 Runner/Account/ledger schema 仍是提案。
 
 ## 设计结论
 
 ChatPost 不应该把所有内容塞进 `.env`。配置分成四类：
 
-1. **机器依赖与版本化制品**：Chrome for Testing 由 ChatUp 管理，扩展由 ChatPost/adapter 管理；
+1. **机器依赖与版本化制品**：Playwright package/browser 由 ChatUp 管理，扩展由 ChatPost/adapter 管理；
 2. **非秘密配置**：Runner、Account、端口策略和路径引用；
 3. **秘密**：每个 bridge/远端 Runner 的 token，放 ChatEnv；
 4. **运行状态与业务台账**：进程健康状态和 publication ledger，分别持久化。
@@ -20,8 +20,8 @@ Cookie、Local Storage、密码和验证码不属于任何 ChatPost 配置层。
 
 ```text
 ~/.chatarch/
-├── chrome-for-testing/           # ChatUp-owned CFT backend
-│   └── <version>/<platform>/...
+├── playwright/                   # ChatUp-owned Playwright backend
+│   └── <playwright-version>/{package,browsers,installation.json}
 └── chatpost/
     ├── config.toml
     ├── extensions/
@@ -47,25 +47,25 @@ Cookie、Local Storage、密码和验证码不属于任何 ChatPost 配置层。
 
 Chrome installation 是 ChatUp 机器级资源；Profile 是 ChatPost Runner 状态；文章映射是 workspace 级状态。三者分开，避免把可移动内容仓库与某台机器或登录态绑定。
 
-## ChatUp Chrome dependency
+## ChatUp Playwright dependency
 
 ChatPost 通过已发布的有界依赖消费 ChatUp：
 
 ```toml
-dependencies = ["chatup>=0.2.3,<0.3.0"]
+dependencies = ["chatup>=0.2.4,<0.3.0"]
 ```
 
 环境准备由 ChatUp 独立完成：
 
 ```bash
-chatup chrome-for-testing install --version <chatpost-tested-version> --output json -I
+chatup playwright install <chatpost-tested-version> --browser chromium --output json -I
 ```
 
-ChatPost 启动 Runner 时只调用 `chatup.chrome_for_testing.resolve(...)`：读取 binary path、exact version、platform、installation root 和 digest。它不调用安装 API，不保存一份 browser registry，也不下载/解压 Chrome。descriptor 缺失或版本不兼容时进入 `CHROME_DEPENDENCY_MISSING` 并打印可执行的 `chatup chrome-for-testing install --version <chatpost-tested-version>` 修复命令。
+ChatPost 启动 Runner 时只调用 `chatup.playwright.resolve(...)`：读取 Playwright version、browser revision/version、binary path、package/browser roots 与 Node version。它不调用安装 API，不保存另一份 browser registry，也不下载浏览器。descriptor 缺失或版本不兼容时 fail closed，并提示运行 `chatup playwright install <chatpost-tested-version> --browser chromium`。
 
 ## 非秘密配置示例
 
-以下 TOML 是预期 schema，不是当前可读配置：
+当前可读的 task-specific TOML 见 [CLI 树](cli-tree.md)；以下通用 registry TOML 仍是预期 schema：
 
 ```toml
 schema_version = 1
@@ -252,7 +252,7 @@ command options
 
 | 旧字段/状态 | ChatPost 资源 |
 |---|---|
-| `WECHATSYNC_CHROME_BIN` | ChatUp `ChromeForTestingInstallation.binary_path`；Runner 启动时只读解析。 |
+| `WECHATSYNC_CHROME_BIN` | ChatUp `PlaywrightBrowserInstallation.binary_path`；Runner 启动时只读解析。 |
 | `WECHATSYNC_CHROME_PROFILE` | Runner `user_data_dir`；默认 managed，也可 adopt 现有目录。 |
 | `WECHATSYNC_DEBUG_PORT` | Runner CDP lease；默认 auto。 |
 | extension `serverUrl` / `SYNC_WS_PORT` | Runner `bridge_ws_url` / WebSocket port lease；扩展主动连接。 |
@@ -275,7 +275,7 @@ command options
 
 提案中的 `config validate` / `doctor` 至少检查：
 
-1. 已安装 `chatup>=0.2.3,<0.3.0`，且 ChatPost 兼容版本可由 `chatup.chrome_for_testing.resolve` 解析并执行；验证过程不触发安装；
+1. 已安装 `chatup>=0.2.4,<0.3.0`，且 ChatPost 兼容版本可由 `chatup.playwright.resolve` 解析并执行；验证过程不触发安装；
 2. Runner 名称、Profile 路径和端口租约唯一；
 3. CDP/bridge bind address 为 loopback，本地 control transport 默认 stdio；
 4. token profile 引用存在但不读取/打印值；
