@@ -3,6 +3,8 @@
 !!! warning "Status: architecture proposal"
     This page describes how the first ChatPost release should manage Chrome. `ChatPost 0.0.2` does not yet implement `runner` or `account` commands. "Verified" refers to the existing Zhihu/Wechatsync practice; "proposed" refers to future ChatPost work.
 
+See [Overall Architecture](architecture.md) for the resource model, [Configuration, Environment, and State](configuration.md) for persistence, and [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md) for the concrete task.
+
 ## Direct Answers
 
 ### Does Chrome require Docker?
@@ -114,6 +116,18 @@ The first ChatPost implementation should:
 
 A future broker can introduce `runner_id` multiplexing, but the current protocol must not be presented as multi-tenant.
 
+## Three Connection Surfaces
+
+The verified practice used separate CDP, extension WebSocket, and bridge-control surfaces:
+
+```text
+Runner manager -> http://127.0.0.1:<cdp-port> -> Chrome
+Browser extension -> ws://127.0.0.1:<bridge-port> -> bridge server
+ChatPost adapter -> stdio (or controlled companion HTTP) -> bridge process
+```
+
+CDP opens login pages, proves exact extension identity, and supports diagnostics. The extension initiates the WebSocket connection, while local ChatPost calls the bridge process in-process or over stdio by default. A managed runner provisions these connections automatically. CDP, the extension WebSocket, and unauthenticated companion HTTP are never exposed publicly.
+
 ## Host Binary Runtime
 
 This is the recommended default.
@@ -129,14 +143,26 @@ This is the recommended default.
 ### Required Resources
 
 ```text
-browser binary
+ChatUp ChromeForTestingInstallation descriptor
 extension directory/version
 user-data-dir
 process identity/PID or service unit
 debug address/port
 bridge address/port/token reference
+control transport/endpoint
 runtime logs
 ```
+
+### ChatUp-Managed Chrome Dependency
+
+The verified practice ran Chrome for Testing directly from a Playwright cache without Docker. Released `chatup 0.2.3` now turns that temporary dependency into a reusable machine environment:
+
+```text
+~/.chatarch/chrome-for-testing/
+└── <version>/<platform>/...
+```
+
+The user installs it with `chatup chrome-for-testing install --version <chatpost-tested-version>`. A ChatPost runner only resolves the descriptor through `chatup.chrome_for_testing.resolve(...)`; it owns no download, extraction, upgrade, or browser registry. Chrome stays outside the ChatPost wheel and never overwrites system Chrome. Login state remains only in the runner's `chrome-data/`.
 
 ### Secure Defaults
 
@@ -180,7 +206,7 @@ Docker is optional, not required.
 | Dimension | Host binary | Docker |
 | --- | --- | --- |
 | First-release default | Yes | No |
-| Chrome installation | Host binary or Chrome for Testing | Pinned image version |
+| Chrome installation | ChatUp-managed Chrome for Testing | Pinned image version (later backend) |
 | Login / takeover | Simplest | Needs display, VNC, or controlled entry |
 | Profile persistence | Normal directory | Persistent volume |
 | Extension loading | Local directory | Image layer or read-only mount |
@@ -190,53 +216,43 @@ Docker is optional, not required.
 
 ## Proposed Multi-Account Configuration
 
-This illustrates an expected schema; `0.0.2` does not support it:
+This illustrates an expected TOML schema; `0.0.2` does not support it:
 
-```yaml
-runners:
-  mac-personal:
-    runtime: host
-    browser:
-      kind: chrome-for-testing
-      binary: auto
-      user_data_dir: ${CHATPOST_DATA}/runners/mac-personal/chrome
-      visible: true
-      debug_bind: 127.0.0.1
-      debug_port: auto
-    bridge:
-      bind: 127.0.0.1
-      port: auto
-      token_ref: chatenv://chatpost/mac-personal-bridge
+```toml
+[runners.mac-personal]
+runtime = "host"
+profile_mode = "managed"
 
-  mac-brand:
-    runtime: host
-    browser:
-      kind: chrome-for-testing
-      binary: auto
-      user_data_dir: ${CHATPOST_DATA}/runners/mac-brand/chrome
-      visible: true
-      debug_bind: 127.0.0.1
-      debug_port: auto
-    bridge:
-      bind: 127.0.0.1
-      port: auto
-      token_ref: chatenv://chatpost/mac-brand-bridge
+[runners.mac-personal.bridge]
+ws_bind = "127.0.0.1"
+ws_port = "auto"
+control_transport = "stdio"
+token_profile = "personal"
 
-accounts:
-  zhihu@personal:
-    platform: zhihu
-    runner: mac-personal
+[runners.mac-brand]
+runtime = "host"
+profile_mode = "managed"
 
-  csdn@personal:
-    platform: csdn
-    runner: mac-personal
+[runners.mac-brand.bridge]
+ws_bind = "127.0.0.1"
+ws_port = "auto"
+control_transport = "stdio"
+token_profile = "brand"
 
-  zhihu@brand:
-    platform: zhihu
-    runner: mac-brand
+[accounts."zhihu@personal"]
+platform = "zhihu"
+runner = "mac-personal"
+
+[accounts."csdn@personal"]
+platform = "csdn"
+runner = "mac-personal"
+
+[accounts."zhihu@brand"]
+platform = "zhihu"
+runner = "mac-brand"
 ```
 
-`token_ref` points to a secret provider; the configuration file never stores the token value.
+`token_profile` references a ChatEnv profile; configuration contains no plaintext token. See [Configuration, Environment, and State](configuration.md) for the complete schema and Wechatsync migration map.
 
 ## Ports and Locks
 
@@ -246,7 +262,7 @@ Every runner needs independent leases:
 user_data_dir lock
 CDP port lease
 bridge WebSocket port lease
-bridge companion HTTP port lease
+optional companion control port lease
 job lock
 ```
 
@@ -256,7 +272,7 @@ Before start, it checks:
 
 1. no other runner owns the user-data-dir;
 2. CDP and bridge ports are available;
-3. the Chrome binary and extension version exist;
+3. the ChatUp descriptor resolves read-only to an exact executable Chrome binary and the extension version exists;
 4. directory permissions are safe;
 5. the bridge binds to loopback;
 6. the runner identity matches any existing process.
@@ -321,12 +337,15 @@ ChatPost never stores:
 
 ```text
 default runtime       = host binary
+Chrome owner          = ChatUp (`~/.chatarch/chrome-for-testing/`)
+ChatPost resolution   = read-only `chatup.chrome_for_testing.resolve`
 Docker                = optional
 isolation unit        = browser persona / runner
 multiple same-platform accounts = separate user-data-dirs
 concurrent writes in one profile = forbidden
 concurrency across profiles      = allowed
 bridge                = one instance per runner
+local control         = prefer in-process / stdio
 network binding       = loopback only
 final publish         = human review checkpoint
 ```
@@ -335,4 +354,6 @@ final publish         = human review checkpoint
 
 - Chromium User Data Directory: <https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md>
 - Chrome Headless: <https://developer.chrome.com/docs/chromium/headless>
-- Local verified facts and source indexes are recorded in the project report `reports/browser-runner-facts.md`.
+- ChatUp Chrome CLI: <https://arch.gh.wzhecnu.cn/ChatUp/en/cli-tree/>
+- Wechatsync bridge server: <https://github.com/ChatArch/Wechatsync/blob/dev/packages/mcp-server/src/ws-bridge.ts>
+- Wechatsync extension WebSocket client: <https://github.com/ChatArch/Wechatsync/blob/dev/packages/extension/src/mcp/client.ts>

@@ -3,6 +3,8 @@
 !!! warning "状态：架构提案"
     本页描述 ChatPost 首版应如何管理 Chrome。`ChatPost 0.0.2` 尚未实现 `runner` 或 `account` 命令。文中“已验证”指现有知乎/Wechatsync 实践，“提案”指后续 ChatPost 实现。
 
+总体资源关系见 [总体架构设计](architecture.md)，持久化 schema 见 [配置、环境与状态设计](configuration.md)，具体任务见 [知乎首次设置与草稿验收](zhihu-first-run.md)。
+
 ## 直接答案
 
 ### Chrome 一定要 Docker 吗？
@@ -114,6 +116,18 @@ ChatPost control plane
 
 未来可以增加带 `runner_id` 的 broker，但不能在当前协议上假装已经支持多租户。
 
+## 三个连接面
+
+现有实践使用 CDP、extension WebSocket 和 bridge control 三个不同的连接面：
+
+```text
+Runner manager -> http://127.0.0.1:<cdp-port> -> Chrome
+Browser extension -> ws://127.0.0.1:<bridge-port> -> bridge server
+ChatPost adapter -> stdio (或受控 companion HTTP) -> bridge process
+```
+
+CDP 用于打开登录页、确认 exact extension identity 和诊断。扩展主动连接 WebSocket server；ChatPost 本地默认通过 in-process/stdio 调用 bridge process。Managed Runner 自动配置这些连接，普通用户无需填写 URL。不能把 CDP、extension WebSocket 或未鉴权 companion HTTP 暴露到公网。
+
 ## Host Binary 模式
 
 这是推荐默认值。
@@ -129,14 +143,26 @@ ChatPost control plane
 ### 必需资源
 
 ```text
-browser binary
+ChatUp ChromeForTestingInstallation descriptor
 extension directory/version
 user-data-dir
 process identity/PID or service unit
 debug address/port
 bridge address/port/token reference
+control transport/endpoint
 runtime logs
 ```
+
+### ChatUp 管理的 Chrome dependency
+
+已验证实践使用 Playwright 缓存中的 Chrome for Testing 二进制直接运行，没有 Docker。现在由已发布 `chatup 0.2.3` 把这个临时依赖提升为可复用机器环境：
+
+```text
+~/.chatarch/chrome-for-testing/
+└── <version>/<platform>/...
+```
+
+用户通过 `chatup chrome-for-testing install --version <chatpost-tested-version>` 安装；ChatPost Runner 只通过 `chatup.chrome_for_testing.resolve(...)` 解析 descriptor，不拥有下载、解压、升级或 browser registry。Chrome 不打进 ChatPost wheel，也不覆盖系统 Chrome；登录态仍只在 Runner 的 `chrome-data/` 中。
 
 ### 安全默认值
 
@@ -180,7 +206,7 @@ Docker 是可选 runtime，而不是要求。
 | 维度 | Host binary | Docker |
 | --- | --- | --- |
 | 首版默认 | 是 | 否 |
-| Chrome 安装 | 本机二进制或 Chrome for Testing | 镜像内固定版本 |
+| Chrome 安装 | ChatUp-managed Chrome for Testing | 镜像内固定版本（后续 backend） |
 | 登录与人工接管 | 最简单 | 需要显示/VNC/受控入口 |
 | Profile 持久化 | 普通目录 | 持久卷 |
 | 扩展加载 | 本地目录 | 镜像内或只读挂载 |
@@ -190,53 +216,43 @@ Docker 是可选 runtime，而不是要求。
 
 ## 多账号配置示例
 
-以下只是预期 schema，不是 `0.0.2` 已支持配置：
+以下只是预期 TOML schema，不是 `0.0.2` 已支持配置：
 
-```yaml
-runners:
-  mac-personal:
-    runtime: host
-    browser:
-      kind: chrome-for-testing
-      binary: auto
-      user_data_dir: ${CHATPOST_DATA}/runners/mac-personal/chrome
-      visible: true
-      debug_bind: 127.0.0.1
-      debug_port: auto
-    bridge:
-      bind: 127.0.0.1
-      port: auto
-      token_ref: chatenv://chatpost/mac-personal-bridge
+```toml
+[runners.mac-personal]
+runtime = "host"
+profile_mode = "managed"
 
-  mac-brand:
-    runtime: host
-    browser:
-      kind: chrome-for-testing
-      binary: auto
-      user_data_dir: ${CHATPOST_DATA}/runners/mac-brand/chrome
-      visible: true
-      debug_bind: 127.0.0.1
-      debug_port: auto
-    bridge:
-      bind: 127.0.0.1
-      port: auto
-      token_ref: chatenv://chatpost/mac-brand-bridge
+[runners.mac-personal.bridge]
+ws_bind = "127.0.0.1"
+ws_port = "auto"
+control_transport = "stdio"
+token_profile = "personal"
 
-accounts:
-  zhihu@personal:
-    platform: zhihu
-    runner: mac-personal
+[runners.mac-brand]
+runtime = "host"
+profile_mode = "managed"
 
-  csdn@personal:
-    platform: csdn
-    runner: mac-personal
+[runners.mac-brand.bridge]
+ws_bind = "127.0.0.1"
+ws_port = "auto"
+control_transport = "stdio"
+token_profile = "brand"
 
-  zhihu@brand:
-    platform: zhihu
-    runner: mac-brand
+[accounts."zhihu@personal"]
+platform = "zhihu"
+runner = "mac-personal"
+
+[accounts."csdn@personal"]
+platform = "csdn"
+runner = "mac-personal"
+
+[accounts."zhihu@brand"]
+platform = "zhihu"
+runner = "mac-brand"
 ```
 
-`token_ref` 指向 secret provider，配置文件本身不保存 token 明文。
+`token_profile` 指向 ChatEnv profile，配置文件本身不保存 token 明文。完整 schema 和旧 Wechatsync 变量迁移见 [配置、环境与状态设计](configuration.md)。
 
 ## 端口与锁
 
@@ -246,7 +262,7 @@ accounts:
 user_data_dir lock
 CDP port lease
 bridge WebSocket port lease
-bridge companion HTTP port lease
+optional companion control port lease
 job lock
 ```
 
@@ -256,7 +272,7 @@ job lock
 
 1. user-data-dir 没有被其他 Runner 占用；
 2. CDP/bridge 端口未被占用；
-3. Chrome binary 和扩展版本存在；
+3. ChatUp descriptor 可只读解析到 exact、可执行的 Chrome binary，且扩展版本存在；
 4. 目录权限符合要求；
 5. bridge 只绑定 loopback；
 6. Runner identity 与已有进程匹配。
@@ -323,12 +339,15 @@ ChatPost 不保存：
 
 ```text
 默认 runtime       = host binary
+Chrome owner        = ChatUp (`~/.chatarch/chrome-for-testing/`)
+ChatPost resolution = read-only `chatup.chrome_for_testing.resolve`
 Docker             = optional
 隔离单位           = browser persona / runner
 同平台多个账号     = 多个独立 user-data-dir
 同 profile 并发写入 = 禁止
 不同 profile 并发   = 允许
 bridge              = 每 runner 一个实例
+本地 control        = in-process / stdio 优先
 网络绑定           = loopback only
 最终发布           = 人工 Review checkpoint
 ```
@@ -337,4 +356,6 @@ bridge              = 每 runner 一个实例
 
 - Chromium User Data Directory: <https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md>
 - Chrome Headless: <https://developer.chrome.com/docs/chromium/headless>
-- 本地已验证事实和源码索引记录在项目报告 `reports/browser-runner-facts.md`。
+- ChatUp Chrome CLI: <https://arch.gh.wzhecnu.cn/ChatUp/cli-tree/>
+- Wechatsync bridge server: <https://github.com/ChatArch/Wechatsync/blob/dev/packages/mcp-server/src/ws-bridge.ts>
+- Wechatsync extension WebSocket client: <https://github.com/ChatArch/Wechatsync/blob/dev/packages/extension/src/mcp/client.ts>

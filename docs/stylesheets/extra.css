@@ -1,0 +1,44 @@
+.md-tabs {
+  background: #123e68;
+}
+
+.md-tabs__link {
+  color: #fff !important;
+  font-weight: 600;
+  opacity: 1;
+}
+
+.md-tabs__item--active .md-tabs__link {
+  border-bottom: 3px solid #f4c95d;
+}
+
+.md-tabs__link:focus,
+.md-tabs__link:hover {
+  opacity: 1;
+}
+
+.md-typeset h1 {
+  color: var(--md-default-fg-color);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.md-typeset table code {
+  white-space: nowrap;
+}
+
+.md-typeset pre > code {
+  overflow-x: auto;
+  scrollbar-color: var(--md-default-fg-color--lighter) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.md-typeset pre > code::-webkit-scrollbar {
+  height: 0.4rem;
+}
+
+.md-typeset pre > code::-webkit-scrollbar-thumb {
+  background: var(--md-default-fg-color--lighter);
+  border-radius: 999px;
+}
