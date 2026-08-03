@@ -62,6 +62,8 @@ ChatUp ChromeForTestingInstallation
 
 `chatup chrome-for-testing install --version <tested-version>` installs under `~/.chatarch/chrome-for-testing/`. ChatPost calls `chatup.chrome_for_testing.resolve(...)` for an existing installation. A missing dependency fails closed with a ChatUp command; ChatPost never downloads, extracts, or modifies system Chrome.
 
+ChromeDriver is a separate ChatUp backend (`chatup chromedriver` / `chatup.chromedriver`). The current ChatPost runner launches Chrome for Testing directly and uses CDP; it does not consume ChromeDriver or assume that the two backends share versions or descriptors.
+
 ### Runner
 
 A runner is the execution boundary for one browser persona:

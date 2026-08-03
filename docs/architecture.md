@@ -62,6 +62,8 @@ ChatUp ChromeForTestingInstallation
 
 `chatup chrome-for-testing install --version <tested-version>` 安装到 `~/.chatarch/chrome-for-testing/`。ChatPost 通过 `chatup.chrome_for_testing.resolve(...)` 解析已有安装；缺失时 fail closed 并提示运行 ChatUp，不自行下载、解压或修改系统 Chrome。
 
+ChromeDriver 是另一个独立 ChatUp backend（`chatup chromedriver` / `chatup.chromedriver`）。当前 ChatPost Runner 直接启动 Chrome for Testing 并使用 CDP，不消费 ChromeDriver，也不假设两个 backend 共用版本或 descriptor。
+
 ### Runner
 
 Runner 是一个 Browser persona 的执行边界：
