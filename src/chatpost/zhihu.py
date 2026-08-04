@@ -904,11 +904,18 @@ def _stop_adapter_after_failure(
     cleanup_error = (
         f"{reason}; adapter process was left running for manual recovery"
     )
-    if process.poll() is None:
+
+    def process_has_exited() -> bool:
+        try:
+            return process.poll() is not None
+        except (OSError, ValueError):
+            return False
+
+    if not process_has_exited():
         try:
             process.terminate()
         except OSError:
-            if process.poll() is None:
+            if not process_has_exited():
                 return "", "", {
                     "adapter_cleanup_status": "MANUAL_RECOVERY_REQUIRED",
                     "adapter_cleanup_error": cleanup_error,
@@ -916,6 +923,8 @@ def _stop_adapter_after_failure(
     try:
         stdout, stderr = process.communicate(timeout=10)
     except (OSError, ValueError, subprocess.TimeoutExpired):
+        if process_has_exited():
+            return "", "", {"adapter_cleanup_status": "CLOSED"}
         return "", "", {
             "adapter_cleanup_status": "MANUAL_RECOVERY_REQUIRED",
             "adapter_cleanup_error": cleanup_error,
@@ -1053,6 +1062,25 @@ def _run_adapter(
         if "adapter_cleanup_error" in adapter_cleanup:
             raise RuntimeError(adapter_cleanup["adapter_cleanup_error"]) from timeout_error
         raise RuntimeError("Wechatsync auth timed out") from timeout_error
+    except (OSError, ValueError):
+        _stdout, _stderr, adapter_cleanup = _stop_adapter_after_failure(
+            process,
+            reason="Adapter execution result could not be read",
+        )
+        message = (
+            "Wechatsync create result could not be read after the bridge connected; "
+            "do not retry automatically"
+        )
+        if "adapter_cleanup_error" in adapter_cleanup:
+            message = f"{message}; {adapter_cleanup['adapter_cleanup_error']}"
+        if mode == "create":
+            raise ResultUnknownError(
+                message,
+                receipt={"status": RESULT_UNKNOWN, **adapter_cleanup},
+            ) from None
+        if "adapter_cleanup_error" in adapter_cleanup:
+            raise RuntimeError(adapter_cleanup["adapter_cleanup_error"]) from None
+        raise RuntimeError("Wechatsync auth result could not be read") from None
 
     return subprocess.CompletedProcess(
         command,
@@ -1071,17 +1099,20 @@ def _source_sha256(source: Path) -> str:
 
 
 def _result_unknown_receipt(
-    source: Path | None,
+    source_sha256: str,
     browser: dict[str, Any],
 ) -> dict[str, Any]:
-    if source is None:
-        raise ValueError("A source file is required for a create receipt")
     receipt: dict[str, Any] = {
         "status": RESULT_UNKNOWN,
-        "source_sha256": _source_sha256(source),
+        "source_sha256": source_sha256,
         "adapter_cleanup_status": "CLOSED",
     }
-    for key in ("cleanup_status", "cleanup_error"):
+    for key in (
+        "cleanup_status",
+        "cleanup_error",
+        "extension_cleanup_status",
+        "extension_cleanup_error",
+    ):
         if key in browser:
             receipt[key] = browser[key]
     return receipt
@@ -1143,6 +1174,11 @@ def execute_task(
     source_path = Path(source).expanduser().resolve() if source is not None else None
     if mode != "auth" and (source_path is None or not source_path.is_file()):
         raise ValueError(f"Source file does not exist: {source_path}")
+    source_sha256 = (
+        _source_sha256(source_path)
+        if mode != "auth" and source_path is not None
+        else None
+    )
 
     if mode == "dry-run":
         result = adapter_runner(config, source_path, mode, None)
@@ -1151,37 +1187,46 @@ def execute_task(
         preview = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
         return {
             "status": "DRY_RUN_OK",
-            "source_sha256": _source_sha256(source_path),
+            "source_sha256": source_sha256,
             "preview": preview[:8000],
         }
 
-    with browser_session_factory(config) as session:
-        browser, endpoint = session
-        result = adapter_runner(config, source_path, mode, endpoint)
+    try:
+        with browser_session_factory(config) as session:
+            browser, endpoint = session
+            result = adapter_runner(config, source_path, mode, endpoint)
+    except ResultUnknownError as error:
+        if mode == "create" and source_sha256 is not None:
+            error.receipt["source_sha256"] = source_sha256
+        raise
 
     output = "\n".join(part for part in (result.stdout, result.stderr) if part)
     if result.returncode != 0:
         if mode == "create":
+            if source_sha256 is None:
+                raise RuntimeError("Create source digest was not established")
             raise ResultUnknownError(
                 "Wechatsync create did not return a definitive success; do not retry automatically",
-                receipt=_result_unknown_receipt(source_path, browser),
+                receipt=_result_unknown_receipt(source_sha256, browser),
             )
         raise RuntimeError(output.strip() or "Zhihu auth check failed")
 
     if mode == "auth":
         return {"status": "READY", **browser}
 
+    if source_sha256 is None:
+        raise RuntimeError("Create source digest was not established")
     match = _REVIEW_URL.search(output)
     if match is None:
         raise ResultUnknownError(
             "Wechatsync exited successfully without a review URL; do not retry automatically",
-            receipt=_result_unknown_receipt(source_path, browser),
+            receipt=_result_unknown_receipt(source_sha256, browser),
         )
     return {
         "status": "DRAFT_CREATED",
         "draft_id": match.group("id"),
         "review_url": match.group(0),
-        "source_sha256": _source_sha256(source_path),
+        "source_sha256": source_sha256,
         "adapter_cleanup_status": "CLOSED",
         **browser,
     }

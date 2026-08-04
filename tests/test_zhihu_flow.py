@@ -273,10 +273,47 @@ def test_create_invokes_adapter_exactly_once_and_returns_review_receipt(tmp_path
     assert result["source_sha256"]
 
 
+def test_create_captures_source_hash_before_the_side_effect(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# immutable input", encoding="utf-8")
+    expected_sha256 = zhihu._source_sha256(source)
+
+    @contextmanager
+    def browser_session(_config):
+        browser = {"browser_version": "149.0.7827.55"}
+        yield browser, _endpoint()
+        browser.update(
+            cleanup_status="CLOSED",
+            extension_cleanup_status="CLOSED",
+        )
+
+    def adapter(_config, adapter_source, _mode, _endpoint_value):
+        adapter_source.unlink()
+        return subprocess.CompletedProcess(
+            [],
+            0,
+            "同步成功 https://zhuanlan.zhihu.com/p/2067000000000000001/edit",
+            "",
+        )
+
+    result = execute_task(
+        config,
+        source,
+        mode="create",
+        adapter_runner=adapter,
+        browser_session_factory=browser_session,
+    )
+
+    assert result["status"] == "DRAFT_CREATED"
+    assert result["source_sha256"] == expected_sha256
+
+
 def test_ambiguous_create_is_not_retried(tmp_path):
     config = load_runner_config(_config(tmp_path))
     source = tmp_path / "article.md"
     source.write_text("# Infra title\n\nCHATPOST-PLAYWRIGHT-INFRA-V1", encoding="utf-8")
+    expected_sha256 = zhihu._source_sha256(source)
     calls = 0
 
     @contextmanager
@@ -286,9 +323,10 @@ def test_ambiguous_create_is_not_retried(tmp_path):
             _endpoint(),
         )
 
-    def adapter(*_args):
+    def adapter(_config, adapter_source, _mode, _endpoint_value):
         nonlocal calls
         calls += 1
+        adapter_source.unlink()
         raise ResultUnknownError("adapter result was ambiguous")
 
     with pytest.raises(ResultUnknownError) as error:
@@ -302,20 +340,27 @@ def test_ambiguous_create_is_not_retried(tmp_path):
 
     assert calls == 1
     assert error.value.status == RESULT_UNKNOWN
+    assert error.value.receipt["source_sha256"] == expected_sha256
 
 
 def test_nonzero_create_receipt_includes_completed_cleanup(tmp_path):
     config = load_runner_config(_config(tmp_path))
     source = tmp_path / "article.md"
     source.write_text("# Infra title\n\nCHATPOST-PLAYWRIGHT-INFRA-V1", encoding="utf-8")
+    expected_sha256 = zhihu._source_sha256(source)
 
     @contextmanager
     def browser_session(_config):
         browser = {"browser_version": "149.0.7827.55"}
         yield browser, _endpoint()
-        browser["cleanup_status"] = "CLOSED"
+        browser.update(
+            cleanup_status="CLOSED",
+            extension_cleanup_status="MANUAL_RECOVERY_REQUIRED",
+            extension_cleanup_error="popup close timed out",
+        )
 
-    def adapter(*_args):
+    def adapter(_config, adapter_source, _mode, _endpoint_value):
+        adapter_source.unlink()
         return subprocess.CompletedProcess([], 1, "", "ambiguous create failure")
 
     with pytest.raises(ResultUnknownError) as error:
@@ -328,7 +373,12 @@ def test_nonzero_create_receipt_includes_completed_cleanup(tmp_path):
         )
 
     assert error.value.receipt["cleanup_status"] == "CLOSED"
+    assert error.value.receipt["extension_cleanup_status"] == (
+        "MANUAL_RECOVERY_REQUIRED"
+    )
+    assert error.value.receipt["extension_cleanup_error"] == "popup close timed out"
     assert error.value.receipt["adapter_cleanup_status"] == "CLOSED"
+    assert error.value.receipt["source_sha256"] == expected_sha256
 
 
 def test_missing_review_url_receipt_includes_cleanup_failure(tmp_path):
@@ -343,6 +393,7 @@ def test_missing_review_url_receipt_includes_cleanup_failure(tmp_path):
         browser.update(
             cleanup_status="MANUAL_RECOVERY_REQUIRED",
             cleanup_error="CDP close timed out",
+            extension_cleanup_status="CLOSED",
         )
 
     def adapter(*_args):
@@ -359,6 +410,7 @@ def test_missing_review_url_receipt_includes_cleanup_failure(tmp_path):
 
     assert error.value.receipt["cleanup_status"] == "MANUAL_RECOVERY_REQUIRED"
     assert error.value.receipt["cleanup_error"] == "CDP close timed out"
+    assert error.value.receipt["extension_cleanup_status"] == "CLOSED"
     assert error.value.receipt["adapter_cleanup_status"] == "CLOSED"
 
 
@@ -1093,6 +1145,90 @@ def test_create_timeout_cleanup_timeout_records_adapter_manual_recovery(
         "MANUAL_RECOVERY_REQUIRED"
     )
     assert "left running" in captured.value.receipt["adapter_cleanup_error"]
+
+
+@pytest.mark.parametrize(
+    "communication_error",
+    [
+        OSError("oauth_token=POST-WAKE-COMMUNICATION-CANARY"),
+        ValueError("oauth_token=POST-WAKE-COMMUNICATION-CANARY"),
+    ],
+    ids=["os-error", "value-error"],
+)
+def test_create_communication_error_after_wake_preserves_unknown_and_cleanup(
+    monkeypatch, tmp_path, communication_error
+):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# title", encoding="utf-8")
+    terminated = []
+    communicate_timeouts = []
+
+    class Process:
+        pid = 4242
+        returncode = None
+
+        def poll(self):
+            return self.returncode
+
+        def terminate(self):
+            terminated.append(True)
+            self.returncode = -15
+
+        def communicate(self, timeout):
+            communicate_timeouts.append(timeout)
+            if timeout == 180:
+                raise type(communication_error)(str(communication_error))
+            assert timeout == 10
+            return "", ""
+
+    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
+    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
+    monkeypatch.setattr(zhihu, "_process_owns_listener", lambda *_args: True)
+    monkeypatch.setattr(zhihu, "_wake_extension", lambda *_args: None)
+
+    with pytest.raises(ResultUnknownError) as captured:
+        zhihu._run_adapter(config, source, "create", _endpoint())
+
+    assert terminated == [True]
+    assert communicate_timeouts == [180, 10]
+    assert captured.value.receipt["status"] == RESULT_UNKNOWN
+    assert captured.value.receipt["adapter_cleanup_status"] == "CLOSED"
+    assert "POST-WAKE-COMMUNICATION-CANARY" not in str(captured.value)
+
+
+def test_create_communication_error_after_process_exit_records_closed_cleanup(
+    monkeypatch, tmp_path
+):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# title", encoding="utf-8")
+    terminated = []
+
+    class Process:
+        pid = 4242
+        returncode = 0
+
+        def poll(self):
+            return self.returncode
+
+        def terminate(self):
+            terminated.append(True)
+
+        def communicate(self, timeout):
+            raise ValueError(f"output stream unavailable after timeout={timeout}")
+
+    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
+    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
+    monkeypatch.setattr(zhihu, "_process_owns_listener", lambda *_args: True)
+    monkeypatch.setattr(zhihu, "_wake_extension", lambda *_args: None)
+
+    with pytest.raises(ResultUnknownError) as captured:
+        zhihu._run_adapter(config, source, "create", _endpoint())
+
+    assert terminated == []
+    assert captured.value.receipt["adapter_cleanup_status"] == "CLOSED"
+    assert "adapter_cleanup_error" not in captured.value.receipt
 
 
 def test_adapter_output_redaction_blocks_dynamic_credentials_but_keeps_review_url():

@@ -49,9 +49,13 @@ def test_quick_start_keeps_create_update_and_publish_boundaries_explicit():
             assert "receipt could not be written" in text
             assert "numeric IPv4 loopback `127.0.0.1`" in text
             assert "multi-line structured private assignments" in text
+            assert "source_sha256 is captured before the browser or adapter starts" in text
+            assert "post-wake output-read failure" in text
         else:
             assert "receipt 分别记录 browser `cleanup_status`" in text
             assert "fail-closed 为 `[REDACTED]`" in text
             assert "receipt 无法落盘" in text
             assert "数值 IPv4 loopback `127.0.0.1`" in text
             assert "跨行结构化私密赋值" in text
+            assert "source_sha256 在 browser 或 adapter 启动前捕获" in text
+            assert "唤醒后的输出读取失败" in text
