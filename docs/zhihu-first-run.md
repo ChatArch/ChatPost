@@ -223,11 +223,11 @@ RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
 
 每次 browser 启动都会生成随机 `data:text/plain,chatpost-run-*` marker。ChatPost 只有在配置的 loopback 端口同时看到该 marker 和对应 browser WebSocket UUID 后，才把 CDP 绑定为本次进程所有。
 
-扩展发现、`Target.attachToTarget`、扩展求值和登录页创建全部通过这个已捕获的 browser WebSocket 完成；ChatPost 不会跟随后来从可复用 CDP 端口发现的 target-level WebSocket。只有 loopback bridge 的 listener PID（由监听 socket 反查）属于本次启动的 Node 子进程时才判定 ready；foreign listener 或 Wechatsync secondary mode 会在唤醒扩展前 fail closed。create 在这条歧义路径上返回 `RESULT_UNKNOWN`，不得自动重试。
+扩展发现、`Target.attachToTarget`、扩展求值和登录页创建全部通过这个已捕获的 browser WebSocket 完成。`Target.createTarget` 返回本轮 popup ID；ChatPost 将这个 exact identity 贯穿 browser session，并在 attach 前重验其精确 popup URL 和 `page` / `background_page` 类型。恢复出来的旧 popup、其他 stale popup 和 service worker 均不会被选择，也不会跟随后来从可复用 CDP 端口发现的 target-level WebSocket。只有 loopback bridge 的 listener PID（由监听 socket 反查）属于本次启动的 Node 子进程时才判定 ready；foreign listener 或 Wechatsync secondary mode 会在唤醒扩展前 fail closed。create 在这条歧义路径上返回 `RESULT_UNKNOWN`，不得自动重试。
 
 正常清理通过启动时捕获的 browser WebSocket endpoint 发送 CDP `Browser.close`，不会重新发现后来可能占用同一端口的其他浏览器，也不会发送进程终止信号。若草稿结果已经明确、但清理失败，receipt 仍保留 `DRAFT_CREATED`，并附带 `cleanup_status=MANUAL_RECOVERY_REQUIRED`；此时人工恢复进程，不能再次执行 create。browser 启动失败时，ChatPost 会先等待 stderr drain，再返回限长诊断；Profile 路径、私密赋值、URL/连接信息和运行 marker 均经过脱敏。若私有 env 在 preflight 后消失、不可读或不再包含预期 token，diagnostics 会 fail-closed 为 `[REDACTED]`，外围错误仍保留 browser 退出码。
 
-`RESULT_UNKNOWN` receipt 同时记录 browser `cleanup_status` 与 adapter `adapter_cleanup_status`；只有需要人工恢复时才写对应 error 字段。这适用于 adapter 非零退出、成功退出但缺 review URL、扩展唤醒失败和 adapter 超时。若本轮 adapter 子进程在一次有界停止请求后仍未退出，create 仍保持 `RESULT_UNKNOWN`，记录 `adapter_cleanup_status=MANUAL_RECOVERY_REQUIRED`，保留进程供人工恢复，并且不得自动重试。receipt 不写入 browser endpoint、token 或连接信息。
+receipt 分别记录 browser `cleanup_status`、本轮 popup `extension_cleanup_status` 与 adapter `adapter_cleanup_status`；只有需要人工恢复时才写对应 error 字段。该契约同时适用于 `DRAFT_CREATED` 与 `RESULT_UNKNOWN`，包括 adapter 非零退出、成功退出但缺 review URL、扩展唤醒失败和 adapter 超时。cleanup 会通过 browser-level `Target.closeTarget` 重验并只关闭本轮创建的 popup，然后请求 `Browser.close`；popup cleanup 失败会被独立记录，不会阻止 browser close 尝试，也不会覆盖 authoritative result。若本轮 adapter 子进程在一次有界停止请求后仍未退出，create 仍保持 `RESULT_UNKNOWN`，记录 `adapter_cleanup_status=MANUAL_RECOVERY_REQUIRED`，保留进程供人工恢复，并且不得自动重试。receipt 不写入 target ID、browser endpoint、token 或连接信息。
 
 如果 authoritative result 已经产生但 receipt 无法落盘，ChatPost 不会用普通文件系统异常覆盖主结果：明确成功时先输出 `DRAFT_CREATED`；歧义写入时继续明确 `RESULT_UNKNOWN`；随后报告 receipt 无法写入，并明确不得自动重试。
 

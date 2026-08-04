@@ -108,10 +108,11 @@ def _installation(tmp_path: Path) -> PlaywrightBrowserInstallation:
     )
 
 
-def _endpoint() -> zhihu._CdpEndpoint:
+def _endpoint(target_id: str | None = "extension-owned-target") -> zhihu._CdpEndpoint:
     return zhihu._CdpEndpoint(
         base_url="http://127.0.0.1:9227",
         browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id=target_id,
     )
 
 
@@ -334,22 +335,88 @@ def test_browser_session_rechecks_preflight_before_process_start(monkeypatch, tm
         base_url="http://127.0.0.1:9227",
         browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
     )
+    owned_endpoint = _endpoint("current-run-popup")
     monkeypatch.setattr(
         zhihu,
         "_wait_for_cdp",
         lambda *_args: (order.append("cdp"), endpoint)[1],
     )
-    monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: order.append("extension"))
+    monkeypatch.setattr(
+        zhihu,
+        "_wait_for_extension",
+        lambda *_args: (order.append("extension"), owned_endpoint)[1],
+    )
+    monkeypatch.setattr(
+        zhihu,
+        "_close_extension_target",
+        lambda _config, captured: order.append(
+            "extension-close" if captured is owned_endpoint else "wrong-endpoint"
+        ),
+        raising=False,
+    )
     monkeypatch.setattr(
         zhihu,
         "_close_browser",
-        lambda _endpoint, _process: order.append("browser-close"),
+        lambda captured, _process: order.append(
+            "browser-close" if captured is owned_endpoint else "wrong-endpoint"
+        ),
     )
 
-    with zhihu.browser_session(config):
+    with zhihu.browser_session(config) as (browser, captured_endpoint):
+        assert captured_endpoint is owned_endpoint
         order.append("yield")
 
-    assert order == ["preflight", "cdp", "extension", "yield", "browser-close"]
+    assert order == [
+        "preflight",
+        "cdp",
+        "extension",
+        "yield",
+        "extension-close",
+        "browser-close",
+    ]
+    assert browser["extension_cleanup_status"] == "CLOSED"
+
+
+def test_extension_cleanup_failure_does_not_mask_task_or_browser_cleanup(
+    monkeypatch, tmp_path
+):
+    config = load_runner_config(_config(tmp_path))
+    installation = _installation(tmp_path)
+    initial_endpoint = _endpoint(None)
+    owned_endpoint = _endpoint("current-run-popup")
+    order = []
+
+    class Process:
+        returncode = None
+        stderr = None
+
+        def poll(self):
+            return None
+
+    monkeypatch.setattr(zhihu, "preflight", lambda _config: None)
+    monkeypatch.setattr(zhihu, "resolve", lambda *_args, **_kwargs: installation)
+    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
+    monkeypatch.setattr(zhihu, "_wait_for_cdp", lambda *_args: initial_endpoint)
+    monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: owned_endpoint)
+    monkeypatch.setattr(
+        zhihu,
+        "_close_extension_target",
+        lambda *_args: (_ for _ in ()).throw(RuntimeError("popup close failed")),
+    )
+    monkeypatch.setattr(
+        zhihu,
+        "_close_browser",
+        lambda *_args: order.append("browser-close"),
+    )
+
+    with zhihu.browser_session(config) as (browser, _endpoint_value):
+        browser["task_completed"] = True
+
+    assert browser["task_completed"] is True
+    assert browser["extension_cleanup_status"] == "MANUAL_RECOVERY_REQUIRED"
+    assert browser["extension_cleanup_error"] == "popup close failed"
+    assert browser["cleanup_status"] == "CLOSED"
+    assert order == ["browser-close"]
 
 
 def test_cdp_startup_error_includes_bounded_redacted_diagnostics(tmp_path):
@@ -492,6 +559,55 @@ def test_browser_diagnostics_redact_json_and_quoted_private_fields(tmp_path):
     assert "QUOTED-AUTH-CANARY" not in message
 
 
+def test_wait_for_extension_binds_the_popup_created_by_this_run(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    endpoint = _endpoint(None)
+    popup = f"chrome-extension://{config.extension_id}/src/popup/index.html"
+    messages = []
+
+    class Socket:
+        def send(self, message):
+            messages.append(json.loads(message))
+
+        def recv(self):
+            request = messages[-1]
+            if request["method"] == "Target.createTarget":
+                result = {"targetId": "current-run-popup"}
+            else:
+                result = {
+                    "targetInfos": [
+                        {
+                            "targetId": "stale-restored-popup",
+                            "type": "page",
+                            "url": popup,
+                        },
+                        {
+                            "targetId": "current-run-popup",
+                            "type": "page",
+                            "url": popup,
+                        },
+                    ]
+                }
+            return json.dumps({"id": request["id"], "result": result})
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(
+        zhihu.websocket,
+        "create_connection",
+        lambda *_args, **_kwargs: Socket(),
+    )
+
+    owned_endpoint = zhihu._wait_for_extension(config, endpoint)
+
+    assert owned_endpoint.extension_target_id == "current-run-popup"
+    assert [message["method"] for message in messages] == [
+        "Target.createTarget",
+        "Target.getTargets",
+    ]
+
+
 def test_extension_lookup_revalidates_captured_browser_identity(monkeypatch, tmp_path):
     config = load_runner_config(_config(tmp_path))
     endpoint = _endpoint()
@@ -550,6 +666,14 @@ def test_extension_target_never_consumes_target_websocket(monkeypatch, tmp_path)
                                 ),
                             },
                             {
+                                "targetId": "stale-restored-popup",
+                                "type": "page",
+                                "url": (
+                                    f"chrome-extension://{config.extension_id}/"
+                                    "src/popup/index.html"
+                                ),
+                            },
+                            {
                                 "targetId": "extension-owned-target",
                                 "type": "page",
                                 "url": (
@@ -578,6 +702,57 @@ def test_extension_target_never_consumes_target_websocket(monkeypatch, tmp_path)
 
     assert target["targetId"] == "extension-owned-target"
     assert connections == [endpoint.browser_websocket_url]
+
+
+def test_extension_cleanup_closes_only_the_popup_created_by_this_run(
+    monkeypatch, tmp_path
+):
+    config = load_runner_config(_config(tmp_path))
+    endpoint = _endpoint("extension-owned-target")
+    popup = f"chrome-extension://{config.extension_id}/src/popup/index.html"
+    messages = []
+
+    class Socket:
+        def send(self, message):
+            messages.append(json.loads(message))
+
+        def recv(self):
+            request = messages[-1]
+            if request["method"] == "Target.getTargets":
+                result = {
+                    "targetInfos": [
+                        {
+                            "targetId": "stale-restored-popup",
+                            "type": "page",
+                            "url": popup,
+                        },
+                        {
+                            "targetId": "extension-owned-target",
+                            "type": "page",
+                            "url": popup,
+                        },
+                    ]
+                }
+            else:
+                result = {"success": True}
+            return json.dumps({"id": request["id"], "result": result})
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(
+        zhihu.websocket,
+        "create_connection",
+        lambda *_args, **_kwargs: Socket(),
+    )
+
+    zhihu._close_extension_target(config, endpoint)
+
+    assert [message["method"] for message in messages] == [
+        "Target.getTargets",
+        "Target.closeTarget",
+    ]
+    assert messages[1]["params"] == {"targetId": "extension-owned-target"}
 
 
 def test_cdp_ownership_timeout_requires_manual_recovery(monkeypatch, tmp_path):
@@ -691,8 +866,10 @@ def test_browser_cleanup_failure_is_reported_without_masking_completed_task(
         base_url="http://127.0.0.1:9227",
         browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
     )
+    owned_endpoint = _endpoint()
     monkeypatch.setattr(zhihu, "_wait_for_cdp", lambda *_args: endpoint)
-    monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: None)
+    monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: owned_endpoint)
+    monkeypatch.setattr(zhihu, "_close_extension_target", lambda *_args: None)
     monkeypatch.setattr(
         zhihu,
         "_close_browser",
@@ -703,7 +880,7 @@ def test_browser_cleanup_failure_is_reported_without_masking_completed_task(
         browser, captured_endpoint = session
         browser["task_completed"] = True
 
-    assert captured_endpoint == endpoint
+    assert captured_endpoint == owned_endpoint
 
     assert browser["task_completed"] is True
     assert browser["cleanup_status"] == "MANUAL_RECOVERY_REQUIRED"
@@ -728,8 +905,10 @@ def test_cleanup_type_error_never_masks_active_result_unknown(monkeypatch, tmp_p
     monkeypatch.setattr(zhihu, "preflight", lambda _config: None)
     monkeypatch.setattr(zhihu, "resolve", lambda *_args, **_kwargs: installation)
     monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
+    owned_endpoint = _endpoint()
     monkeypatch.setattr(zhihu, "_wait_for_cdp", lambda *_args: endpoint)
-    monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: None)
+    monkeypatch.setattr(zhihu, "_wait_for_extension", lambda *_args: owned_endpoint)
+    monkeypatch.setattr(zhihu, "_close_extension_target", lambda *_args: None)
     monkeypatch.setattr(
         zhihu,
         "_close_browser",
@@ -1017,6 +1196,14 @@ def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, t
                 result = {
                     "targetInfos": [
                         {
+                            "targetId": "stale-restored-popup",
+                            "type": "page",
+                            "url": (
+                                f"chrome-extension://{config.extension_id}/"
+                                "src/popup/index.html"
+                            ),
+                        },
+                        {
                             "targetId": "owned-extension-target",
                             "type": "page",
                             "url": (
@@ -1044,11 +1231,11 @@ def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, t
     result = zhihu._wake_extension(
         config,
         {"WECHATSYNC_TOKEN": "top-secret"},
-        _endpoint(),
+        _endpoint("owned-extension-target"),
     )
 
     assert result == {"server": True, "enabled": True}
-    assert connections == [_endpoint().browser_websocket_url]
+    assert connections == [_endpoint("owned-extension-target").browser_websocket_url]
     commands = [message for message in messages if "method" in message]
     assert [command["method"] for command in commands] == [
         "Target.getTargets",

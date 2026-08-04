@@ -31,6 +31,8 @@
 - Preserve `DRAFT_CREATED` or `RESULT_UNKNOWN` when receipt persistence fails, emit the authoritative result, and explicitly prohibit retry instead of surfacing a generic filesystem error.
 - Record adapter cleanup independently from browser cleanup; keep create as `RESULT_UNKNOWN` with `adapter_cleanup_status=MANUAL_RECOVERY_REQUIRED` when the owned adapter child does not stop after one bounded request.
 - Structurally redact dynamic private assignments, WebSocket/loopback connections, and ownership markers from adapter output while preserving the Zhihu review URL required for a definitive receipt.
+- Carry the exact popup target ID returned by `Target.createTarget` through the browser session, reject stale restored popup pages during wake-up, and close only the per-run popup with `Target.closeTarget` before browser shutdown.
+- Record per-run popup cleanup separately from browser and adapter cleanup so popup cleanup failures never mask `DRAFT_CREATED` / `RESULT_UNKNOWN` or prevent the owned `Browser.close` attempt.
 
 ## 0.0.2 - 2026-08-03
 

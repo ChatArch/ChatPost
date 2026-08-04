@@ -25,7 +25,7 @@ import urllib.request
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import Thread
 from typing import Any
@@ -88,6 +88,7 @@ class ZhihuRunnerConfig:
 class _CdpEndpoint:
     base_url: str
     browser_websocket_url: str
+    extension_target_id: str | None = None
 
 
 class ResultUnknownError(RuntimeError):
@@ -499,17 +500,20 @@ def _owned_browser_socket(endpoint: _CdpEndpoint) -> Iterator[Any]:
 def _extension_target_from_result(
     config: ZhihuRunnerConfig,
     result: dict[str, Any],
+    *,
+    expected_target_id: str,
 ) -> dict[str, Any] | None:
     targets = result.get("targetInfos")
     if not isinstance(targets, list):
         raise TypeError("Browser CDP returned malformed target metadata")
-    expected = f"chrome-extension://{config.extension_id}/"
+    expected = f"chrome-extension://{config.extension_id}/src/popup/index.html"
     for target in targets:
         if (
             isinstance(target, dict)
             and target.get("type") in {"page", "background_page"}
-            and str(target.get("url", "")).startswith(expected)
+            and target.get("url") == expected
             and isinstance(target.get("targetId"), str)
+            and target.get("targetId") == expected_target_id
         ):
             return target
     return None
@@ -519,27 +523,70 @@ def _extension_target(
     config: ZhihuRunnerConfig,
     endpoint: _CdpEndpoint,
 ) -> dict[str, Any] | None:
+    if not endpoint.extension_target_id:
+        raise RuntimeError("Owned extension popup identity is unavailable")
     with _owned_browser_socket(endpoint) as debug_socket:
         result = _cdp_command(debug_socket, 1, "Target.getTargets")
-    return _extension_target_from_result(config, result)
+    return _extension_target_from_result(
+        config,
+        result,
+        expected_target_id=endpoint.extension_target_id,
+    )
 
 
 def _wait_for_extension(
     config: ZhihuRunnerConfig,
     endpoint: _CdpEndpoint,
-) -> None:
+) -> _CdpEndpoint:
     popup = f"chrome-extension://{config.extension_id}/src/popup/index.html"
     with _owned_browser_socket(endpoint) as debug_socket:
-        _cdp_command(debug_socket, 1, "Target.createTarget", {"url": popup})
+        created = _cdp_command(debug_socket, 1, "Target.createTarget", {"url": popup})
+        target_id = created.get("targetId")
+        if not isinstance(target_id, str) or not target_id:
+            raise TypeError("Extension target creation returned no target identity")
         deadline = time.monotonic() + 10
         identifier = 2
         while time.monotonic() < deadline:
             result = _cdp_command(debug_socket, identifier, "Target.getTargets")
-            if _extension_target_from_result(config, result) is not None:
-                return
+            if (
+                _extension_target_from_result(
+                    config,
+                    result,
+                    expected_target_id=target_id,
+                )
+                is not None
+            ):
+                return replace(endpoint, extension_target_id=target_id)
             identifier += 1
             time.sleep(0.1)
     raise RuntimeError(f"Expected extension did not appear: {config.extension_id}")
+
+
+def _close_extension_target(
+    config: ZhihuRunnerConfig,
+    endpoint: _CdpEndpoint,
+) -> None:
+    """Close only the extension popup created through this owned browser session."""
+
+    if not endpoint.extension_target_id:
+        raise RuntimeError("Owned extension popup identity is unavailable")
+    with _owned_browser_socket(endpoint) as debug_socket:
+        targets = _cdp_command(debug_socket, 1, "Target.getTargets")
+        target = _extension_target_from_result(
+            config,
+            targets,
+            expected_target_id=endpoint.extension_target_id,
+        )
+        if target is None:
+            return
+        result = _cdp_command(
+            debug_socket,
+            2,
+            "Target.closeTarget",
+            {"targetId": endpoint.extension_target_id},
+        )
+        if result.get("success") is not True:
+            raise RuntimeError("Owned extension popup did not close")
 
 
 def _cdp_evaluate(
@@ -575,10 +622,16 @@ def _wake_extension(
     token = environment.get("WECHATSYNC_TOKEN")
     if not token:
         raise RuntimeError("WECHATSYNC_TOKEN is missing")
+    if not endpoint.extension_target_id:
+        raise RuntimeError("Owned extension popup identity is unavailable")
     server_url = f"ws://{config.bridge_host}:{config.bridge_port}"
     with _owned_browser_socket(endpoint) as debug_socket:
         targets = _cdp_command(debug_socket, 1, "Target.getTargets")
-        target = _extension_target_from_result(config, targets)
+        target = _extension_target_from_result(
+            config,
+            targets,
+            expected_target_id=endpoint.extension_target_id,
+        )
         if target is None:
             raise RuntimeError("Expected extension target is unavailable")
         attached = _cdp_command(
@@ -733,7 +786,7 @@ def browser_session(
             diagnostics,
             diagnostic_thread,
         )
-        _wait_for_extension(config, endpoint)
+        endpoint = _wait_for_extension(config, endpoint)
         try:
             yield browser, endpoint
         except ResultUnknownError as error:
@@ -741,14 +794,32 @@ def browser_session(
             raise
     finally:
         if process.poll() is not None:
+            browser["extension_cleanup_status"] = "CLOSED"
             browser["cleanup_status"] = "CLOSED"
         elif endpoint is None:
+            browser["extension_cleanup_status"] = "NOT_ESTABLISHED"
             browser["cleanup_status"] = "MANUAL_RECOVERY_REQUIRED"
             browser["cleanup_error"] = (
                 "Owned CDP endpoint was not established; "
                 "the process was left running for manual recovery"
             )
         else:
+            if endpoint.extension_target_id is None:
+                browser["extension_cleanup_status"] = "NOT_ESTABLISHED"
+            else:
+                try:
+                    _close_extension_target(config, endpoint)
+                    browser["extension_cleanup_status"] = "CLOSED"
+                except (
+                    KeyError,
+                    OSError,
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                    websocket.WebSocketException,
+                ) as error:
+                    browser["extension_cleanup_status"] = "MANUAL_RECOVERY_REQUIRED"
+                    browser["extension_cleanup_error"] = str(error)
             try:
                 _close_browser(endpoint, process)
                 browser["cleanup_status"] = "CLOSED"
@@ -766,6 +837,13 @@ def browser_session(
             active_result_unknown.receipt["cleanup_status"] = browser["cleanup_status"]
             if "cleanup_error" in browser:
                 active_result_unknown.receipt["cleanup_error"] = browser["cleanup_error"]
+            active_result_unknown.receipt["extension_cleanup_status"] = browser[
+                "extension_cleanup_status"
+            ]
+            if "extension_cleanup_error" in browser:
+                active_result_unknown.receipt["extension_cleanup_error"] = browser[
+                    "extension_cleanup_error"
+                ]
         if diagnostic_thread is not None:
             diagnostic_thread.join(timeout=1)
 
