@@ -13,9 +13,11 @@ import json
 import os
 import re
 import secrets
+import shutil
 import socket
 import stat
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -49,10 +51,10 @@ _DIAGNOSTIC_OWNERSHIP_MARKER = re.compile(
     r"data:text/plain,chatpost-run-[^\s\"'<>;,]+"
 )
 _DIAGNOSTIC_PRIVATE_ASSIGNMENT = re.compile(
-    r"(?im)(?<![\w])((?:[A-Z0-9_-]*)(?:"
+    r"(?im)(?<![\w])(?P<quote>[\"']?)(?P<key>(?:[A-Z0-9_-]*)(?:"
     r"TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|PRIVATE[_-]?KEY|"
     r"CREDENTIAL|AUTHORIZATION|COOKIE|SESSION|CSRF"
-    r")[A-Z0-9_-]*)(\s*[:=]\s*).*$"
+    r")[A-Z0-9_-]*)(?P=quote)(?P<separator>\s*[:=]\s*).*$"
 )
 _PROTECTED_BROWSER_ARGS = (
     "--user-data-dir",
@@ -194,6 +196,79 @@ def _port_is_open(host: str, port: int) -> bool:
         return sock.connect_ex((host, port)) == 0
 
 
+def _linux_listening_socket_inodes(host: str, port: int) -> set[str]:
+    loopback_addresses = {
+        "0100007F",
+        "00000000000000000000000001000000",
+        "00000000000000000000000000000001",
+    }
+    inodes: set[str] = set()
+    for table in (Path("/proc/net/tcp"), Path("/proc/net/tcp6")):
+        try:
+            lines = table.read_text(encoding="ascii").splitlines()[1:]
+        except OSError:
+            continue
+        for line in lines:
+            fields = line.split()
+            if len(fields) < 10 or fields[3] != "0A":
+                continue
+            address, raw_port = fields[1].rsplit(":", 1)
+            if int(raw_port, 16) != port or address not in loopback_addresses:
+                continue
+            if host in _LOOPBACK_HOSTS:
+                inodes.add(fields[9])
+    return inodes
+
+
+def _process_owns_listener(pid: int, host: str, port: int) -> bool:
+    """Prove that one loopback TCP listener belongs to the spawned adapter PID."""
+
+    if pid <= 0 or host not in _LOOPBACK_HOSTS:
+        return False
+    if sys.platform.startswith("linux"):
+        listener_inodes = _linux_listening_socket_inodes(host, port)
+        if not listener_inodes:
+            return False
+        try:
+            descriptors = Path(f"/proc/{pid}/fd").iterdir()
+            for descriptor in descriptors:
+                try:
+                    target = os.readlink(descriptor)
+                except OSError:
+                    continue
+                match = re.fullmatch(r"socket:\[(\d+)\]", target)
+                if match and match.group(1) in listener_inodes:
+                    return True
+        except OSError:
+            return False
+        return False
+    if sys.platform == "darwin":
+        lsof = shutil.which("lsof")
+        if lsof is None:
+            return False
+        try:
+            result = subprocess.run(
+                [
+                    lsof,
+                    "-nP",
+                    "-a",
+                    "-p",
+                    str(pid),
+                    f"-iTCP@{host}:{port}",
+                    "-sTCP:LISTEN",
+                ],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=3,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return result.returncode == 0 and bool(result.stdout.strip())
+    return False
+
+
 def _is_executable(path: Path) -> bool:
     return path.is_file() and os.access(path, os.X_OK)
 
@@ -294,7 +369,11 @@ def _sanitize_browser_diagnostics(
     text = _DIAGNOSTIC_LOOPBACK.sub("[REDACTED]", text)
     text = _DIAGNOSTIC_OWNERSHIP_MARKER.sub("[REDACTED]", text)
     text = _DIAGNOSTIC_PRIVATE_ASSIGNMENT.sub(
-        lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", text
+        lambda match: (
+            f"{match.group('quote')}{match.group('key')}{match.group('quote')}"
+            f"{match.group('separator')}[REDACTED]"
+        ),
+        text,
     )
     return _redact(text, private_values)[-2000:].strip()
 
@@ -374,95 +453,144 @@ def _wait_for_cdp(
     )
 
 
-def _extension_target(
+def _cdp_command(
+    debug_socket: Any,
+    identifier: int,
+    method: str,
+    params: dict[str, Any] | None = None,
+    *,
+    session_id: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {"id": identifier, "method": method}
+    if params is not None:
+        payload["params"] = params
+    if session_id is not None:
+        payload["sessionId"] = session_id
+    debug_socket.send(json.dumps(payload))
+    while True:
+        response = json.loads(debug_socket.recv())
+        if response.get("id") != identifier:
+            continue
+        if response.get("error"):
+            raise RuntimeError(f"Browser CDP command failed: {method}")
+        result = response.get("result", {})
+        if not isinstance(result, dict):
+            raise TypeError(f"Browser CDP command returned malformed data: {method}")
+        return result
+
+
+@contextmanager
+def _owned_browser_socket(endpoint: _CdpEndpoint) -> Iterator[Any]:
+    try:
+        debug_socket = websocket.create_connection(
+            endpoint.browser_websocket_url,
+            timeout=5,
+            suppress_origin=True,
+        )
+    except (OSError, TypeError, ValueError, websocket.WebSocketException) as error:
+        raise RuntimeError("Captured owned browser CDP identity is unavailable") from error
+    try:
+        yield debug_socket
+    finally:
+        debug_socket.close()
+
+
+def _extension_target_from_result(
     config: ZhihuRunnerConfig,
-    endpoint: _CdpEndpoint | None = None,
+    result: dict[str, Any],
 ) -> dict[str, Any] | None:
-    base_url = endpoint.base_url if endpoint is not None else (
-        f"http://{config.cdp_host}:{config.cdp_port}"
-    )
-    targets = _http_json(base_url + "/json/list")
+    targets = result.get("targetInfos")
+    if not isinstance(targets, list):
+        raise TypeError("Browser CDP returned malformed target metadata")
     expected = f"chrome-extension://{config.extension_id}/"
     for target in targets:
-        if str(target.get("url", "")).startswith(expected) and target.get(
-            "webSocketDebuggerUrl"
+        if (
+            isinstance(target, dict)
+            and str(target.get("url", "")).startswith(expected)
+            and isinstance(target.get("targetId"), str)
         ):
             return target
     return None
+
+
+def _extension_target(
+    config: ZhihuRunnerConfig,
+    endpoint: _CdpEndpoint,
+) -> dict[str, Any] | None:
+    with _owned_browser_socket(endpoint) as debug_socket:
+        result = _cdp_command(debug_socket, 1, "Target.getTargets")
+    return _extension_target_from_result(config, result)
 
 
 def _wait_for_extension(
     config: ZhihuRunnerConfig,
     endpoint: _CdpEndpoint,
 ) -> None:
-    base = endpoint.base_url
-    expected = f"chrome-extension://{config.extension_id}/"
-    popup = expected + "src/popup/index.html"
-    try:
-        _http_json(
-            base + "/json/new?" + urllib.parse.quote(popup, safe=":/"),
-            method="PUT",
-        )
-    except (OSError, urllib.error.URLError, ValueError):
-        pass
-    deadline = time.monotonic() + 10
-    while time.monotonic() < deadline:
-        if _extension_target(config, endpoint) is not None:
-            return
-        time.sleep(0.1)
+    popup = f"chrome-extension://{config.extension_id}/src/popup/index.html"
+    with _owned_browser_socket(endpoint) as debug_socket:
+        _cdp_command(debug_socket, 1, "Target.createTarget", {"url": popup})
+        deadline = time.monotonic() + 10
+        identifier = 2
+        while time.monotonic() < deadline:
+            result = _cdp_command(debug_socket, identifier, "Target.getTargets")
+            if _extension_target_from_result(config, result) is not None:
+                return
+            identifier += 1
+            time.sleep(0.1)
     raise RuntimeError(f"Expected extension did not appear: {config.extension_id}")
 
 
-def _cdp_evaluate(socket: Any, identifier: int, expression: str) -> Any:
-    socket.send(
-        json.dumps(
-            {
-                "id": identifier,
-                "method": "Runtime.evaluate",
-                "params": {
-                    "expression": expression,
-                    "awaitPromise": True,
-                    "returnByValue": True,
-                },
-            }
-        )
+def _cdp_evaluate(
+    debug_socket: Any,
+    identifier: int,
+    expression: str,
+    *,
+    session_id: str,
+) -> Any:
+    response = _cdp_command(
+        debug_socket,
+        identifier,
+        "Runtime.evaluate",
+        {
+            "expression": expression,
+            "awaitPromise": True,
+            "returnByValue": True,
+        },
+        session_id=session_id,
     )
-    while True:
-        response = json.loads(socket.recv())
-        if response.get("id") != identifier:
-            continue
-        if response.get("error") or response.get("result", {}).get("exceptionDetails"):
-            raise RuntimeError("Extension CDP evaluation failed")
-        return (
-            response.get("result", {})
-            .get("result", {})
-            .get("value")
-        )
+    if response.get("exceptionDetails"):
+        raise RuntimeError("Extension CDP evaluation failed")
+    return response.get("result", {}).get("value")
 
 
 def _wake_extension(
     config: ZhihuRunnerConfig,
     environment: dict[str, str],
-    endpoint: _CdpEndpoint | None = None,
+    endpoint: _CdpEndpoint,
 ) -> dict[str, bool]:
-    """Configure and enable the exact Wechatsync extension over loopback CDP."""
+    """Configure and enable the exact Wechatsync extension over owned browser CDP."""
 
     token = environment.get("WECHATSYNC_TOKEN")
     if not token:
         raise RuntimeError("WECHATSYNC_TOKEN is missing")
-    target = _extension_target(config, endpoint)
-    if target is None:
-        raise RuntimeError("Expected extension target is unavailable")
-    debug_socket = websocket.create_connection(
-        target["webSocketDebuggerUrl"],
-        timeout=5,
-        suppress_origin=True,
-    )
     server_url = f"ws://{config.bridge_host}:{config.bridge_port}"
-    try:
+    with _owned_browser_socket(endpoint) as debug_socket:
+        targets = _cdp_command(debug_socket, 1, "Target.getTargets")
+        target = _extension_target_from_result(config, targets)
+        if target is None:
+            raise RuntimeError("Expected extension target is unavailable")
+        attached = _cdp_command(
+            debug_socket,
+            2,
+            "Target.attachToTarget",
+            {"targetId": target["targetId"], "flatten": True},
+        )
+        session_id = attached.get("sessionId")
+        if not isinstance(session_id, str):
+            raise TypeError("Extension CDP attach returned no session identity")
         set_server = _cdp_evaluate(
             debug_socket,
-            1,
+            3,
             "new Promise((resolve) => {"
             "chrome.runtime.sendMessage("
             + json.dumps(
@@ -476,18 +604,18 @@ def _wake_extension(
             + ", (response) => resolve({ok: !chrome.runtime.lastError && "
             "response?.ok !== false}));"
             "})",
+            session_id=session_id,
         )
         enabled = _cdp_evaluate(
             debug_socket,
-            2,
+            4,
             "new Promise((resolve) => {"
             "chrome.runtime.sendMessage({type: 'MCP_ENABLE'}, "
             "(response) => resolve({ok: !chrome.runtime.lastError && "
             "response?.ok !== false}));"
             "})",
+            session_id=session_id,
         )
-    finally:
-        debug_socket.close()
     result = {
         "server": bool(isinstance(set_server, dict) and set_server.get("ok")),
         "enabled": bool(isinstance(enabled, dict) and enabled.get("ok")),
@@ -559,7 +687,9 @@ def _close_browser(endpoint: _CdpEndpoint, process: subprocess.Popen[str]) -> No
 
 
 @contextmanager
-def browser_session(config: ZhihuRunnerConfig) -> Iterator[dict[str, Any]]:
+def browser_session(
+    config: ZhihuRunnerConfig,
+) -> Iterator[tuple[dict[str, Any], _CdpEndpoint]]:
     """Start one owned browser process and stop it gracefully on exit."""
 
     preflight(config)
@@ -603,7 +733,7 @@ def browser_session(config: ZhihuRunnerConfig) -> Iterator[dict[str, Any]]:
         )
         _wait_for_extension(config, endpoint)
         try:
-            yield browser
+            yield browser, endpoint
         except ResultUnknownError as error:
             active_result_unknown = error
             raise
@@ -680,6 +810,7 @@ def _run_adapter(
     config: ZhihuRunnerConfig,
     source: Path | None,
     mode: str,
+    endpoint: _CdpEndpoint | None = None,
 ) -> subprocess.CompletedProcess[str]:
     environment, redactions = _adapter_environment(config)
     command = _adapter_command(config, source, mode)
@@ -700,6 +831,9 @@ def _run_adapter(
             _redact(result.stderr, redactions),
         )
 
+    if endpoint is None:
+        raise ValueError("An owned browser CDP endpoint is required")
+
     process = subprocess.Popen(
         command,
         env=environment,
@@ -709,12 +843,18 @@ def _run_adapter(
         text=True,
     )
     bridge_ready = False
+    foreign_bridge = False
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         if process.poll() is not None:
             break
         if _port_is_open(config.bridge_host, config.bridge_port):
-            bridge_ready = True
+            bridge_ready = _process_owns_listener(
+                process.pid,
+                config.bridge_host,
+                config.bridge_port,
+            )
+            foreign_bridge = not bridge_ready
             break
         time.sleep(0.1)
 
@@ -738,6 +878,12 @@ def _run_adapter(
             _redact(stderr, redactions),
         )
         if mode == "create":
+            if foreign_bridge:
+                raise ResultUnknownError(
+                    "Bridge listener is not owned by this Wechatsync process; "
+                    "do not retry automatically",
+                    receipt={"status": RESULT_UNKNOWN},
+                )
             raise ResultUnknownError(
                 "Wechatsync create exited before the bridge became ready; do not retry automatically",
                 receipt={"status": RESULT_UNKNOWN},
@@ -745,8 +891,14 @@ def _run_adapter(
         return result
 
     try:
-        _wake_extension(config, environment)
-    except (OSError, RuntimeError, ValueError, websocket.WebSocketException) as error:
+        _wake_extension(config, environment, endpoint)
+    except (
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        websocket.WebSocketException,
+    ) as error:
         process.terminate()
         try:
             stdout, stderr = process.communicate(timeout=10)
@@ -807,13 +959,11 @@ def _result_unknown_receipt(
     return receipt
 
 
-def _open_login_page(config: ZhihuRunnerConfig) -> None:
-    base = f"http://{config.cdp_host}:{config.cdp_port}"
+def _open_login_page(config: ZhihuRunnerConfig, endpoint: _CdpEndpoint) -> None:
+    del config
     login_url = "https://www.zhihu.com/signin"
-    _http_json(
-        base + "/json/new?" + urllib.parse.quote(login_url, safe=":/?=&"),
-        method="PUT",
-    )
+    with _owned_browser_socket(endpoint) as debug_socket:
+        _cdp_command(debug_socket, 1, "Target.createTarget", {"url": login_url})
 
 
 def wait_for_login(
@@ -821,10 +971,13 @@ def wait_for_login(
     *,
     timeout: int = 900,
     adapter_runner: Callable[
-        [ZhihuRunnerConfig, Path | None, str], subprocess.CompletedProcess[str]
+        [ZhihuRunnerConfig, Path | None, str, _CdpEndpoint | None],
+        subprocess.CompletedProcess[str],
     ] = _run_adapter,
     browser_session_factory: Callable[[ZhihuRunnerConfig], Any] = browser_session,
-    login_page_opener: Callable[[ZhihuRunnerConfig], None] = _open_login_page,
+    login_page_opener: Callable[[ZhihuRunnerConfig, _CdpEndpoint], None] = (
+        _open_login_page
+    ),
     sleeper: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
@@ -833,10 +986,11 @@ def wait_for_login(
     if timeout < 1:
         raise ValueError("Login timeout must be at least one second")
     deadline = clock() + timeout
-    with browser_session_factory(config) as browser:
-        login_page_opener(config)
+    with browser_session_factory(config) as session:
+        browser, endpoint = session
+        login_page_opener(config, endpoint)
         while clock() < deadline:
-            result = adapter_runner(config, None, "auth")
+            result = adapter_runner(config, None, "auth", endpoint)
             if result.returncode == 0:
                 return {"status": "READY", **browser}
             sleeper(3)
@@ -849,7 +1003,8 @@ def execute_task(
     *,
     mode: str,
     adapter_runner: Callable[
-        [ZhihuRunnerConfig, Path | None, str], subprocess.CompletedProcess[str]
+        [ZhihuRunnerConfig, Path | None, str, _CdpEndpoint | None],
+        subprocess.CompletedProcess[str],
     ] = _run_adapter,
     browser_session_factory: Callable[[ZhihuRunnerConfig], Any] = browser_session,
 ) -> dict[str, Any]:
@@ -862,7 +1017,7 @@ def execute_task(
         raise ValueError(f"Source file does not exist: {source_path}")
 
     if mode == "dry-run":
-        result = adapter_runner(config, source_path, mode)
+        result = adapter_runner(config, source_path, mode, None)
         if result.returncode != 0:
             raise RuntimeError((result.stderr or result.stdout).strip() or "Dry-run failed")
         preview = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
@@ -872,8 +1027,9 @@ def execute_task(
             "preview": preview[:8000],
         }
 
-    with browser_session_factory(config) as browser:
-        result = adapter_runner(config, source_path, mode)
+    with browser_session_factory(config) as session:
+        browser, endpoint = session
+        result = adapter_runner(config, source_path, mode, endpoint)
 
     output = "\n".join(part for part in (result.stdout, result.stderr) if part)
     if result.returncode != 0:

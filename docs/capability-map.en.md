@@ -13,7 +13,7 @@ This page separates real `ChatPost 0.1.0` behavior, verified external evidence, 
 | Article dry-run | Implemented | `chatpost zhihu draft dry-run` starts no browser and writes nothing to Zhihu. |
 | One-shot draft create | Implemented | `chatpost zhihu draft create` invokes the adapter once; success writes a mode-`0600` receipt and ambiguity writes `RESULT_UNKNOWN`. |
 | ChatUp Playwright dependency | Implemented | Bounded `chatup>=0.2.4,<0.3.0`; read-only `chatup.playwright.resolve`. |
-| Raw-CDP extension wake | Implemented | Connects only to the exact extension target and configures its loopback bridge URL/token. |
+| Raw-CDP extension wake | Implemented | Uses the captured browser WebSocket for `Target.getTargets`, `Target.attachToTarget`, and extension evaluation; never follows a later target-level WebSocket. The bridge listener PID must belong to this task's Node subprocess. |
 | Secret redaction | Implemented | Environment secret values in adapter output become `[REDACTED]`; startup diagnostics also redact private assignments, URLs/connections, and ownership markers, and fail closed if the private env becomes unavailable; receipts contain no tokens, cookies, or local storage. |
 
 ## Verified Evidence

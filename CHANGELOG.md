@@ -24,6 +24,10 @@
 - Record completed browser cleanup metadata on every `RESULT_UNKNOWN` receipt, including non-zero adapter exits and successful exits without a review URL.
 - Bind browser ownership to a per-run startup marker and captured WebSocket UUID before extension wake or cleanup.
 - Drain startup stderr before reporting an exit; redact private assignments, URLs/connections, and ownership markers from bounded diagnostics; and fail closed if the private env becomes unavailable after preflight.
+- Route extension discovery, target attachment, extension evaluation, and login-page creation through the browser WebSocket UUID captured at startup instead of consuming rediscovered target WebSockets.
+- Require the bridge listening socket to be owned by the Wechatsync subprocess started for the current task; reject foreign listeners and secondary mode before extension wake.
+- Redact JSON-style quoted private assignment keys in browser startup diagnostics.
+- Restrict the OIDC publish workflow to version tags and enforce the tag/package-version match on every run.
 
 ## 0.0.2 - 2026-08-03
 

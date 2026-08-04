@@ -34,6 +34,8 @@ def test_quick_start_keeps_create_update_and_publish_boundaries_explicit():
         assert "Browser.close" in text
         assert "chatpost-run-*" in text
         assert "WebSocket UUID" in text
+        assert "Target.attachToTarget" in text
+        assert "listener PID" in text
         assert "MANUAL_RECOVERY_REQUIRED" in text
         if relative.endswith(".en.md"):
             assert "The `RESULT_UNKNOWN` receipt also records `cleanup_status`" in text

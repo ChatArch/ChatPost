@@ -108,6 +108,13 @@ def _installation(tmp_path: Path) -> PlaywrightBrowserInstallation:
     )
 
 
+def _endpoint() -> zhihu._CdpEndpoint:
+    return zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+    )
+
+
 def test_runner_config_rejects_non_loopback_bind(tmp_path):
     path = _config(tmp_path, bridge_host="0.0.0.0")
 
@@ -139,8 +146,9 @@ def test_dry_run_does_not_start_browser(tmp_path):
     source.write_text("# title\n\nmarker", encoding="utf-8")
     calls = []
 
-    def adapter(config, source, mode):
-        calls.append((source, mode))
+    def adapter(config, source, mode, endpoint):
+        del config
+        calls.append((source, mode, endpoint))
         return subprocess.CompletedProcess([], 0, "dry-run ok", "")
 
     def forbidden_browser(*_args, **_kwargs):
@@ -154,7 +162,7 @@ def test_dry_run_does_not_start_browser(tmp_path):
         browser_session_factory=forbidden_browser,
     )
 
-    assert calls == [(source.resolve(), "dry-run")]
+    assert calls == [(source.resolve(), "dry-run", None)]
     assert result["status"] == "DRY_RUN_OK"
     assert result["preview"] == "dry-run ok"
 
@@ -188,11 +196,14 @@ def test_create_invokes_adapter_exactly_once_and_returns_review_receipt(tmp_path
     @contextmanager
     def browser_session(_config):
         browser_entries.append("start")
-        yield {"browser_version": "149.0.7827.55", "browser_revision": "1228"}
+        yield (
+            {"browser_version": "149.0.7827.55", "browser_revision": "1228"},
+            _endpoint(),
+        )
         browser_entries.append("stop")
 
-    def adapter(_config, _source, mode):
-        adapter_calls.append(mode)
+    def adapter(_config, _source, mode, endpoint):
+        adapter_calls.append((mode, endpoint))
         return subprocess.CompletedProcess(
             [],
             0,
@@ -208,7 +219,7 @@ def test_create_invokes_adapter_exactly_once_and_returns_review_receipt(tmp_path
         browser_session_factory=browser_session,
     )
 
-    assert adapter_calls == ["create"]
+    assert adapter_calls == [("create", _endpoint())]
     assert browser_entries == ["start", "stop"]
     assert result["status"] == "DRAFT_CREATED"
     assert result["draft_id"] == "2067000000000000001"
@@ -224,7 +235,10 @@ def test_ambiguous_create_is_not_retried(tmp_path):
 
     @contextmanager
     def browser_session(_config):
-        yield {"browser_version": "149.0.7827.55", "browser_revision": "1228"}
+        yield (
+            {"browser_version": "149.0.7827.55", "browser_revision": "1228"},
+            _endpoint(),
+        )
 
     def adapter(*_args):
         nonlocal calls
@@ -252,7 +266,7 @@ def test_nonzero_create_receipt_includes_completed_cleanup(tmp_path):
     @contextmanager
     def browser_session(_config):
         browser = {"browser_version": "149.0.7827.55"}
-        yield browser
+        yield browser, _endpoint()
         browser["cleanup_status"] = "CLOSED"
 
     def adapter(*_args):
@@ -278,7 +292,7 @@ def test_missing_review_url_receipt_includes_cleanup_failure(tmp_path):
     @contextmanager
     def browser_session(_config):
         browser = {"browser_version": "149.0.7827.55"}
-        yield browser
+        yield browser, _endpoint()
         browser.update(
             cleanup_status="MANUAL_RECOVERY_REQUIRED",
             cleanup_error="CDP close timed out",
@@ -457,6 +471,104 @@ def test_browser_diagnostics_structurally_redact_connections_and_markers(tmp_pat
     )
 
 
+def test_browser_diagnostics_redact_json_and_quoted_private_fields(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+
+    message = zhihu._sanitize_browser_diagnostics(
+        config,
+        [
+            (
+                '{"oauth_token": "JSON-OAUTH-CANARY", "cookie": '
+                '"session=JSON-COOKIE-CANARY; theme=dark"}'
+            ),
+            "authorization='Bearer QUOTED-AUTH-CANARY'",
+        ],
+    )
+
+    assert "JSON-OAUTH-CANARY" not in message
+    assert "JSON-COOKIE-CANARY" not in message
+    assert "QUOTED-AUTH-CANARY" not in message
+
+
+def test_extension_lookup_revalidates_captured_browser_identity(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    endpoint = _endpoint()
+    connections = []
+
+    def connect(url, **_kwargs):
+        connections.append(url)
+        raise zhihu.websocket.WebSocketException("captured identity is gone")
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", connect)
+
+    with pytest.raises(RuntimeError, match="owned browser CDP identity"):
+        zhihu._extension_target(config, endpoint)
+
+    assert connections == [endpoint.browser_websocket_url]
+
+
+def test_login_page_open_revalidates_captured_browser_identity(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    endpoint = _endpoint()
+    connections = []
+
+    def connect(url, **_kwargs):
+        connections.append(url)
+        raise zhihu.websocket.WebSocketException("captured identity is gone")
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", connect)
+
+    with pytest.raises(RuntimeError, match="owned browser CDP identity"):
+        zhihu._open_login_page(config, endpoint)
+
+    assert connections == [endpoint.browser_websocket_url]
+
+
+def test_extension_target_never_consumes_target_websocket(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    endpoint = _endpoint()
+    connections = []
+
+    class Socket:
+        def send(self, message):
+            self.message = json.loads(message)
+
+        def recv(self):
+            return json.dumps(
+                {
+                    "id": self.message["id"],
+                    "result": {
+                        "targetInfos": [
+                            {
+                                "targetId": "extension-owned-target",
+                                "url": (
+                                    f"chrome-extension://{config.extension_id}/"
+                                    "src/popup/index.html"
+                                ),
+                                "webSocketDebuggerUrl": (
+                                    "ws://127.0.0.1:9999/devtools/page/foreign"
+                                ),
+                            }
+                        ]
+                    },
+                }
+            )
+
+        def close(self):
+            pass
+
+    def connect(url, **_kwargs):
+        connections.append(url)
+        return Socket()
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", connect)
+
+    target = zhihu._extension_target(config, endpoint)
+
+    assert target["targetId"] == "extension-owned-target"
+    assert connections == [endpoint.browser_websocket_url]
+
+
 def test_cdp_ownership_timeout_requires_manual_recovery(monkeypatch, tmp_path):
     config = load_runner_config(_config(tmp_path))
 
@@ -576,8 +688,11 @@ def test_browser_cleanup_failure_is_reported_without_masking_completed_task(
         lambda *_args: (_ for _ in ()).throw(RuntimeError("manual recovery required")),
     )
 
-    with zhihu.browser_session(config) as browser:
+    with zhihu.browser_session(config) as session:
+        browser, captured_endpoint = session
         browser["task_completed"] = True
+
+    assert captured_endpoint == endpoint
 
     assert browser["task_completed"] is True
     assert browser["cleanup_status"] == "MANUAL_RECOVERY_REQUIRED"
@@ -647,47 +762,159 @@ def test_bridge_start_timeout_is_result_unknown_and_stops_adapter(monkeypatch, t
     monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
 
     with pytest.raises(ResultUnknownError):
-        zhihu._run_adapter(config, source, "create")
+        zhihu._run_adapter(config, source, "create", _endpoint())
 
     assert terminated == [True]
+
+
+def test_foreign_bridge_listener_is_rejected_before_extension_wake(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# title", encoding="utf-8")
+    terminated = []
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+    )
+
+    class Process:
+        pid = 4242
+        returncode = None
+
+        def poll(self):
+            return self.returncode
+
+        def terminate(self):
+            terminated.append(True)
+            self.returncode = -15
+
+        def communicate(self, timeout):
+            assert timeout == 10
+            return "", "foreign listener"
+
+    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
+    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
+    monkeypatch.setattr(
+        zhihu,
+        "_process_owns_listener",
+        lambda pid, host, port: (pid, host, port) == (4242, "127.0.0.1", 9999),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        zhihu,
+        "_wake_extension",
+        lambda *_args: (_ for _ in ()).throw(
+            AssertionError("foreign bridge must not wake the extension")
+        ),
+    )
+
+    with pytest.raises(ResultUnknownError, match="not owned"):
+        zhihu._run_adapter(config, source, "create", endpoint)
+
+    assert terminated == [True]
+
+
+def test_owned_bridge_listener_wakes_extension_with_captured_endpoint(
+    monkeypatch, tmp_path
+):
+    config = load_runner_config(_config(tmp_path))
+    endpoint = _endpoint()
+    wake_calls = []
+
+    class Process:
+        pid = 4242
+        returncode = 0
+
+        def poll(self):
+            return None
+
+        def communicate(self, timeout):
+            assert timeout == 180
+            return "authenticated", ""
+
+        def terminate(self):
+            raise AssertionError("owned bridge must not be terminated")
+
+    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
+    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
+    monkeypatch.setattr(
+        zhihu,
+        "_process_owns_listener",
+        lambda pid, host, port: (pid, host, port) == (4242, "127.0.0.1", 9527),
+    )
+    monkeypatch.setattr(
+        zhihu,
+        "_wake_extension",
+        lambda actual_config, environment, actual_endpoint: wake_calls.append(
+            (actual_config, bool(environment["WECHATSYNC_TOKEN"]), actual_endpoint)
+        ),
+    )
+
+    result = zhihu._run_adapter(config, None, "auth", endpoint)
+
+    assert result.returncode == 0
+    assert wake_calls == [(config, True, endpoint)]
 
 
 def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, tmp_path):
     config = load_runner_config(_config(tmp_path))
     messages = []
+    connections = []
 
     class Socket:
         def send(self, message):
             messages.append(json.loads(message))
 
         def recv(self):
-            return json.dumps(
-                {
-                    "id": len(messages),
-                    "result": {"result": {"value": {"ok": True}}},
+            request = messages[-1]
+            if request["method"] == "Target.getTargets":
+                result = {
+                    "targetInfos": [
+                        {
+                            "targetId": "owned-extension-target",
+                            "url": (
+                                f"chrome-extension://{config.extension_id}/"
+                                "src/popup/index.html"
+                            ),
+                        }
+                    ]
                 }
-            )
+            elif request["method"] == "Target.attachToTarget":
+                result = {"sessionId": "owned-extension-session"}
+            else:
+                result = {"result": {"value": {"ok": True}}}
+            return json.dumps({"id": request["id"], "result": result})
 
         def close(self):
             messages.append({"closed": True})
 
-    monkeypatch.setattr(
-        zhihu,
-        "_extension_target",
-        lambda _config, _endpoint=None: {
-            "url": f"chrome-extension://{config.extension_id}/src/popup/index.html",
-            "webSocketDebuggerUrl": "ws://127.0.0.1/devtools/page/1",
-        },
-    )
-    monkeypatch.setattr(
-        zhihu.websocket,
-        "create_connection",
-        lambda *_args, **_kwargs: Socket(),
-    )
+    def connect(url, **_kwargs):
+        connections.append(url)
+        return Socket()
 
-    result = zhihu._wake_extension(config, {"WECHATSYNC_TOKEN": "top-secret"})
+    monkeypatch.setattr(zhihu.websocket, "create_connection", connect)
+
+    result = zhihu._wake_extension(
+        config,
+        {"WECHATSYNC_TOKEN": "top-secret"},
+        _endpoint(),
+    )
 
     assert result == {"server": True, "enabled": True}
+    assert connections == [_endpoint().browser_websocket_url]
+    commands = [message for message in messages if "method" in message]
+    assert [command["method"] for command in commands] == [
+        "Target.getTargets",
+        "Target.attachToTarget",
+        "Runtime.evaluate",
+        "Runtime.evaluate",
+    ]
+    assert commands[1]["params"] == {
+        "targetId": "owned-extension-target",
+        "flatten": True,
+    }
+    assert commands[2]["sessionId"] == "owned-extension-session"
+    assert commands[3]["sessionId"] == "owned-extension-session"
     payload = json.dumps(messages, ensure_ascii=False)
     assert "MCP_SET_SERVER_URL" in payload
     assert "MCP_ENABLE" in payload
@@ -709,10 +936,10 @@ def test_login_checkpoint_repeats_only_read_only_auth_until_ready(tmp_path):
 
     @contextmanager
     def session(_config):
-        yield {"browser_version": "149.0.7827.55"}
+        yield {"browser_version": "149.0.7827.55"}, _endpoint()
 
-    def adapter(_config, source, mode):
-        calls.append((source, mode))
+    def adapter(_config, source, mode, endpoint):
+        calls.append((source, mode, endpoint))
         return next(responses)
 
     result = wait_for_login(
@@ -720,15 +947,17 @@ def test_login_checkpoint_repeats_only_read_only_auth_until_ready(tmp_path):
         timeout=60,
         adapter_runner=adapter,
         browser_session_factory=session,
-        login_page_opener=lambda _config: calls.append((None, "open-login")),
+        login_page_opener=lambda _config, endpoint: calls.append(
+            (None, "open-login", endpoint)
+        ),
         sleeper=lambda _seconds: None,
         clock=iter([0.0, 1.0, 2.0, 3.0]).__next__,
     )
 
     assert result == {"status": "READY", "browser_version": "149.0.7827.55"}
     assert calls == [
-        (None, "open-login"),
-        (None, "auth"),
-        (None, "auth"),
-        (None, "auth"),
+        (None, "open-login", _endpoint()),
+        (None, "auth", _endpoint()),
+        (None, "auth", _endpoint()),
+        (None, "auth", _endpoint()),
     ]
