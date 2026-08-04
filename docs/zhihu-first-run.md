@@ -163,7 +163,7 @@ macOS 通常可把 `browser_args` 设为空数组。Linux 是否需要额外参�
 - Profile 存在且不向 group/other 开放；
 - Node、Wechatsync CLI 与扩展 manifest；
 - env 权限和 token 是否存在，但不显示值；
-- CDP/bridge 均为 loopback 且端口尚未被占用。
+- CDP/bridge 均显式绑定数值 IPv4 loopback `127.0.0.1` 且端口尚未被占用；拒绝 `localhost` 和 IPv6 loopback，避免连接 readiness 与 listener PID ownership 命中不同 socket。
 
 ## 7. 首次人工登录
 
@@ -231,7 +231,7 @@ receipt 分别记录 browser `cleanup_status`、本轮 popup `extension_cleanup_
 
 如果 authoritative result 已经产生但 receipt 无法落盘，ChatPost 不会用普通文件系统异常覆盖主结果：明确成功时先输出 `DRAFT_CREATED`；歧义写入时继续明确 `RESULT_UNKNOWN`；随后报告 receipt 无法写入，并明确不得自动重试。
 
-adapter stdout/stderr 除了替换私有 env 的精确值，还会结构化遮蔽动态私密赋值、WebSocket URL、loopback 连接信息和 ownership marker；用于 authoritative result 的知乎 `/edit` review URL 会保留。
+adapter stdout/stderr 除了替换私有 env 的精确值，还会结构化遮蔽动态私密赋值（包括跨行结构化私密赋值）、WebSocket URL、loopback 连接信息和 ownership marker；用于 authoritative result 的知乎 `/edit` review URL 会保留。
 
 图片上传失败可以与草稿创建成功同时发生；必须按编辑页实际内容报告，不能把 CLI exit 0 当成图片完整证明。
 

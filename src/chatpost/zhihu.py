@@ -41,7 +41,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised on Python 3.10 CI
 RESULT_UNKNOWN = "RESULT_UNKNOWN"
 _REVIEW_URL = re.compile(r"https://zhuanlan\.zhihu\.com/p/(?P<id>[0-9]+)/edit")
 _EXTENSION_ID = re.compile(r"^[a-p]{32}$")
-_LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+_LOOPBACK_HOSTS = {"127.0.0.1"}
 _DIAGNOSTIC_URL = re.compile(r"(?i)\b(?:wss?|https?)://[^\s\"'<>;,]+")
 _ADAPTER_WEBSOCKET_URL = re.compile(r"(?i)\bwss?://[^\s\"'<>;,]+")
 _DIAGNOSTIC_LOOPBACK = re.compile(
@@ -133,7 +133,9 @@ def load_runner_config(path: str | Path) -> ZhihuRunnerConfig:
     cdp_host = _required(table, "cdp_host", str)
     bridge_host = _required(table, "bridge_host", str)
     if cdp_host not in _LOOPBACK_HOSTS or bridge_host not in _LOOPBACK_HOSTS:
-        raise ValueError("CDP and bridge hosts must be loopback addresses")
+        raise ValueError(
+            "CDP and bridge hosts must both be the 127.0.0.1 loopback address"
+        )
 
     cdp_port = _port(table, "cdp_port")
     bridge_port = _port(table, "bridge_port")
@@ -199,13 +201,10 @@ def _port_is_open(host: str, port: int) -> bool:
 
 
 def _linux_listening_socket_inodes(host: str, port: int) -> set[str]:
-    loopback_addresses = {
-        "0100007F",
-        "00000000000000000000000001000000",
-        "00000000000000000000000000000001",
-    }
+    if host != "127.0.0.1":
+        return set()
     inodes: set[str] = set()
-    for table in (Path("/proc/net/tcp"), Path("/proc/net/tcp6")):
+    for table in (Path("/proc/net/tcp"),):
         try:
             lines = table.read_text(encoding="ascii").splitlines()[1:]
         except OSError:
@@ -215,10 +214,9 @@ def _linux_listening_socket_inodes(host: str, port: int) -> set[str]:
             if len(fields) < 10 or fields[3] != "0A":
                 continue
             address, raw_port = fields[1].rsplit(":", 1)
-            if int(raw_port, 16) != port or address not in loopback_addresses:
+            if int(raw_port, 16) != port or address != "0100007F":
                 continue
-            if host in _LOOPBACK_HOSTS:
-                inodes.add(fields[9])
+            inodes.add(fields[9])
     return inodes
 
 

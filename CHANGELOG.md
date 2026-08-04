@@ -33,6 +33,8 @@
 - Structurally redact dynamic private assignments, WebSocket/loopback connections, and ownership markers from adapter output while preserving the Zhihu review URL required for a definitive receipt.
 - Carry the exact popup target ID returned by `Target.createTarget` through the browser session, reject stale restored popup pages during wake-up, and close only the per-run popup with `Target.closeTarget` before browser shutdown.
 - Record per-run popup cleanup separately from browser and adapter cleanup so popup cleanup failures never mask `DRAFT_CREATED` / `RESULT_UNKNOWN` or prevent the owned `Browser.close` attempt.
+- Require numeric IPv4 loopback `127.0.0.1` for CDP and bridge ownership, and match Linux listener PID inodes only against the exact IPv4 listening address so hostname/IPv6 socket mismatches cannot satisfy readiness.
+- Cover multi-line structured private assignments in diagnostics regression tests while preserving safe field names and separators.
 
 ## 0.0.2 - 2026-08-03
 

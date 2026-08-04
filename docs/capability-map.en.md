@@ -7,14 +7,14 @@ This page separates real `ChatPost 0.1.0` behavior, verified external evidence, 
 | Capability | Status | Contract |
 |---|---|---|
 | CLI base | Implemented | `chatpost --help` and `--version`. |
-| Zhihu static preflight | Implemented | `chatpost zhihu preflight` checks the exact Playwright install, Profile/secret permissions, Node, extension, CLI, and loopback ports. |
+| Zhihu static preflight | Implemented | `chatpost zhihu preflight` checks the exact Playwright install, Profile/secret permissions, Node, extension, CLI, and numeric IPv4 loopback `127.0.0.1` ports; `localhost` and IPv6 loopback are rejected. |
 | First-login checkpoint | Implemented | `chatpost zhihu login` keeps one Profile alive and polls read-only auth for manual QR/code login; it writes no article. |
 | Zhihu auth check | Implemented | `chatpost zhihu auth` starts the controlled Runner, performs read-only Wechatsync auth, and stops gracefully. |
 | Article dry-run | Implemented | `chatpost zhihu draft dry-run` starts no browser and writes nothing to Zhihu. |
 | One-shot draft create | Implemented | `chatpost zhihu draft create` invokes the adapter once; success writes a mode-`0600` receipt and ambiguity writes `RESULT_UNKNOWN`. Per-run popup, browser, and adapter cleanup are recorded independently; receipt-write failure preserves and emits the authoritative result instead of inviting a retry. |
 | ChatUp Playwright dependency | Implemented | Bounded `chatup>=0.2.4,<0.3.0`; read-only `chatup.playwright.resolve`. |
 | Raw-CDP extension wake | Implemented | Uses the captured browser WebSocket and the exact popup ID returned by this run's `Target.createTarget`; revalidates exact ID/URL/type before `Target.attachToTarget`, ignores stale restored popups and service workers, and never follows a target-level WebSocket. Cleanup closes only the per-run popup with `Target.closeTarget`. The bridge listener PID must belong to this task's Node subprocess. |
-| Secret redaction | Implemented | Adapter output redacts exact environment values plus dynamic private assignments, WebSocket/loopback connections, and ownership markers while preserving the Zhihu review URL. Startup diagnostics additionally fail closed if the private env becomes unavailable; receipts contain no tokens, cookies, or local storage. |
+| Secret redaction | Implemented | Adapter output redacts exact environment values plus dynamic private assignments, including multi-line structured private assignments, WebSocket/loopback connections, and ownership markers while preserving the Zhihu review URL. Startup diagnostics additionally fail closed if the private env becomes unavailable; receipts contain no tokens, cookies, or local storage. |
 
 ## Verified Evidence
 

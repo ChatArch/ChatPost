@@ -123,6 +123,51 @@ def test_runner_config_rejects_non_loopback_bind(tmp_path):
         load_runner_config(path)
 
 
+@pytest.mark.parametrize(
+    ("host_key", "host"),
+    [
+        ("cdp_host", "localhost"),
+        ("bridge_host", "localhost"),
+        ("cdp_host", "::1"),
+        ("bridge_host", "::1"),
+    ],
+)
+def test_runner_config_requires_numeric_ipv4_loopback(tmp_path, host_key, host):
+    path = _config(tmp_path, **{host_key: host})
+
+    with pytest.raises(ValueError, match="127.0.0.1"):
+        load_runner_config(path)
+
+
+def test_linux_listener_inodes_match_exact_ipv4_loopback(monkeypatch):
+    port = 9527
+    raw_port = f"{port:04X}"
+
+    class ProcTable:
+        def __init__(self, path):
+            self.path = str(path)
+
+        def read_text(self, *, encoding):
+            assert encoding == "ascii"
+            if self.path.endswith("/tcp"):
+                address, inode = "0100007F", "ipv4-inode"
+            else:
+                address, inode = (
+                    "00000000000000000000000001000000",
+                    "ipv6-inode",
+                )
+            return (
+                "header\n"
+                f"0: {address}:{raw_port} 00000000:0000 0A 0 0 0 0 0 {inode}\n"
+            )
+
+    monkeypatch.setattr(zhihu, "Path", ProcTable)
+
+    assert zhihu._linux_listening_socket_inodes("127.0.0.1", port) == {
+        "ipv4-inode"
+    }
+
+
 def test_preflight_resolves_exact_playwright_and_checks_static_inputs(tmp_path):
     config = load_runner_config(_config(tmp_path))
     installation = _installation(tmp_path)
@@ -557,6 +602,18 @@ def test_browser_diagnostics_redact_json_and_quoted_private_fields(tmp_path):
     assert "JSON-OAUTH-CANARY" not in message
     assert "JSON-COOKIE-CANARY" not in message
     assert "QUOTED-AUTH-CANARY" not in message
+
+
+def test_browser_diagnostics_redact_multiline_json_private_value(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+
+    message = zhihu._sanitize_browser_diagnostics(
+        config,
+        ['{"oauth_token":', '  "MULTILINE-OAUTH-CANARY"}'],
+    )
+
+    assert "MULTILINE-OAUTH-CANARY" not in message
+    assert '"oauth_token":\n  [REDACTED]' in message
 
 
 def test_wait_for_extension_binds_the_popup_created_by_this_run(monkeypatch, tmp_path):

@@ -140,7 +140,7 @@ macOS normally uses an empty `browser_args` list. Add Linux arguments only when 
   -I
 ```
 
-Continue only on `status=READY`. Preflight checks the exact ChatUp installation, Profile and secret permissions, Node, the Wechatsync CLI and extension manifest, a present token without printing it, and unused loopback-only CDP/bridge ports.
+Continue only on `status=READY`. Preflight checks the exact ChatUp installation, Profile and secret permissions, Node, the Wechatsync CLI and extension manifest, a present token without printing it, and unused CDP/bridge ports bound to the numeric IPv4 loopback `127.0.0.1`. Hostnames such as `localhost` and the IPv6 loopback are rejected so connection readiness and listener PID ownership cannot refer to different sockets.
 
 ## 7. Manual First Login
 
@@ -202,7 +202,7 @@ Receipts record browser `cleanup_status`, per-run popup `extension_cleanup_statu
 
 If receipt persistence fails after an authoritative result exists, ChatPost does not replace that result with a generic filesystem error. It emits `DRAFT_CREATED` first for a definitive success, or keeps the explicit `RESULT_UNKNOWN` classification for an ambiguous write, then reports that the receipt could not be written and says not to retry automatically.
 
-Adapter stdout/stderr redaction covers exact private-env values plus dynamic private assignments, WebSocket URLs, loopback connection details, and ownership markers. The expected Zhihu `/edit` review URL remains available for the authoritative result.
+Adapter stdout/stderr redaction covers exact private-env values plus dynamic private assignments (including multi-line structured private assignments), WebSocket URLs, loopback connection details, and ownership markers. The expected Zhihu `/edit` review URL remains available for the authoritative result.
 
 Image-upload failure can coexist with successful draft creation. Report the actual editor content; exit code zero alone does not prove image completeness.
 
