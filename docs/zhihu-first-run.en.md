@@ -1,287 +1,218 @@
 # Zhihu First Setup and Draft Acceptance
 
-!!! warning "Status: task-oriented design proposal"
-    `ChatPost 0.0.2` does not implement these commands. The fixed article and acceptance boundary are committed now; code and tests must exist before this page becomes an executable tutorial.
+This is the executable `ChatPost 0.1.0` Quick Start. It reproduces the verified Playwright-cache + Profile + Wechatsync route while separating artifact and task ownership between ChatUp and ChatPost.
 
-## Target Task
-
-Write this article into an isolated Zhihu draft:
+## Boundary
 
 ```text
-examples/zhihu/mkdocs-quickstart.md
+ChatUp 0.2.4
+  -> install exact Playwright package + browser revision
+  -> chatup.playwright.resolve(...)
+
+ChatPost 0.1.0
+  -> persistent Profile + browser lifecycle
+  -> exact extension + loopback CDP/bridge
+  -> login checkpoint / auth / dry-run / one create / receipt
+
+Wechatsync
+  -> Zhihu adapter and draft write
 ```
 
-Acceptance stops at the draft. Read back the title, marker, code, and local image; record the publication receipt; then leave final review and publish to the user.
+The route is user-level, Docker-free, and root-free. It never reads or exports cookies/local storage, creates drafts only, never clicks final publish, never retries `RESULT_UNKNOWN`, and does not yet implement same-ID update.
 
-## Verified Baseline
-
-The existing Wechatsync practice proved that:
-
-- Chrome for Testing runs directly as a host binary without Docker;
-- visible Chrome can load an unpacked extension;
-- Zhihu QR-scan login passed in a visible isolated browser and the session remains in its dedicated user-data-dir;
-- SMS code is a standard manual alternative but has not passed a separate end-to-end acceptance in this path;
-- a loopback WebSocket bridge connects the extension and CLI;
-- read-only auth can gate a draft create/readback operation;
-- cookies never need to be exported to the CLI.
-
-ChatUp turns the Chrome binary into a reusable machine dependency. ChatPost turns the remaining scripts and state into stable Runner, Account, and Publication resources.
-
-## Proposed First Run
-
-### 1. Initialize the Control Plane
+## 1. Install Python Packages
 
 ```bash
-chatpost init
-chatpost config validate
+python3 -m venv "$HOME/.chatarch/venvs/chatpost"
+"$HOME/.chatarch/venvs/chatpost/bin/python" -m pip install --upgrade pip
+"$HOME/.chatarch/venvs/chatpost/bin/python" -m pip install \
+  "chatup==0.2.4" \
+  "chatpost==0.1.0"
+
+CHATUP="$HOME/.chatarch/venvs/chatpost/bin/chatup"
+CHATPOST="$HOME/.chatarch/venvs/chatpost/bin/chatpost"
+"$CHATUP" --version
+"$CHATPOST" --version
 ```
 
-This creates user configuration and the workspace `.chatpost/` ledger without a platform write.
-
-### 2. Prepare the Chrome Dependency With ChatUp
+## 2. Prepare Node.js and the Playwright Browser
 
 ```bash
-chatup chrome-for-testing install \
-  --version <chatpost-tested-version> \
+"$CHATUP" nodejs -I
+# Refresh the shell as instructed by ChatUp, then verify Node/npm.
+node --version
+npm --version
+
+"$CHATUP" playwright install 1.61.1 \
+  --browser chromium \
   --output json \
-  --doctor \
+  -I
+"$CHATUP" playwright doctor 1.61.1 \
+  --browser chromium \
+  --output json \
   -I
 ```
 
-Expected behavior:
+ChatUp installs under `~/.chatarch/playwright/1.61.1/`. ChatPost only resolves that installation and never downloads or upgrades implicitly.
 
-- ChatUp installs Chrome for Testing under `~/.chatarch/chrome-for-testing/`;
-- ChatUp `installation.json` records exact version, platform, binary path, provenance, and digest;
-- leave system Chrome unchanged;
-- require no Docker;
-- later ChatPost calls only `chatup.chrome_for_testing.resolve(...)`; it never downloads or upgrades Chrome.
-
-### 3. Create an Isolated Runner
-
-```bash
-chatpost runner add zhihu-personal \
-  --runtime host
-
-chatpost runner start zhihu-personal --visible
-chatpost runner status zhihu-personal
-```
-
-Default profile path:
+Task-verified combination:
 
 ```text
-~/.chatarch/chatpost/runners/zhihu-personal/chrome-data/
+Playwright package  1.61.1
+browser             chromium
+revision            1228
+Chrome for Testing  149.0.7827.55
 ```
 
-`status` reports each layer independently:
-
-```text
-chrome        CHATUP_RESOLVED + exact version
-process       READY
-cdp           READY
-extension     READY + exact identity
-bridge_ws     EXTENSION_CONNECTED + protocol version
-control       READY + stdio
-profile       LOCKED_BY_THIS_RUNNER
-```
-
-Any ambiguous layer prevents write readiness.
-
-The current Wechatsync message schema does not negotiate a protocol version. “Protocol version” here is an implementation requirement, not an existing capability: add a handshake or prove the exact bridge/extension artifact pair through the compatibility manifest. Otherwise enter `PROTOCOL_UNVERIFIED` and forbid a real write.
-
-### 4. Register the Logical Account
+## 3. Prepare the Wechatsync Adapter
 
 ```bash
-chatpost account add zhihu@personal --runner zhihu-personal
-chatpost account show zhihu@personal
+git clone https://github.com/ChatArch/Wechatsync.git "$HOME/.chatarch/src/Wechatsync"
+cd "$HOME/.chatarch/src/Wechatsync"
+git checkout 0073787cfbff0f7af4d1b427da3adbb16d92eeb8
+corepack enable
+pnpm install --frozen-lockfile
+pnpm build
+
+test -f packages/cli/dist/index.js
+test -f packages/extension/dist/manifest.json
 ```
 
-This creates a binding only. It accepts no Zhihu password, phone number, cookies, or verification codes.
+ChatPost orchestrates Wechatsync's CLI, extension, and receipt. It does not copy the Zhihu adapter business logic.
 
-### 5. Complete Manual First Login
+## 4. Create the Profile and Private Bridge Environment
 
 ```bash
-chatpost account login zhihu@personal
+RUNNER_HOME="$HOME/.chatarch/chatpost/runners/zhihu-primary"
+install -d -m 700 "$RUNNER_HOME/profile"
+install -d -m 700 "$RUNNER_HOME/run"
 ```
 
-Track the two login routes separately:
-
-| Route | Current evidence |
-|---|---|
-| Image QR scan | Verified; the default route for the first real acceptance. |
-| Phone SMS code | Standard manual alternative; not yet accepted end to end. |
-
-Expected flow:
-
-1. start or wake the correct runner;
-2. navigate to the official Zhihu sign-in page;
-3. keep the browser visible;
-4. let the user complete the selected manual route; the first acceptance uses the verified QR scan;
-5. wait until the page leaves the login state;
-6. run a read-only adapter auth check;
-7. set the account state to `READY`.
-
-Timeout, expired QR, verification, or risk controls enter `NEEDS_LOGIN` / `NEEDS_ACTION`. ChatPost never captures QR tokens, records codes, or bypasses platform controls.
-
-### 6. Confirm Authentication Read-Only
+Generate a local bridge token without printing it:
 
 ```bash
-chatpost account status zhihu@personal --output json
+RUNNER_HOME="$RUNNER_HOME" python3 - <<'PY'
+import os
+import secrets
+from pathlib import Path
+
+path = Path(os.environ["RUNNER_HOME"]) / "bridge.env"
+path.write_text(
+    "WECHATSYNC_TOKEN=" + secrets.token_urlsafe(32) + "\n",
+    encoding="utf-8",
+)
+path.chmod(0o600)
+PY
 ```
 
-Minimum response:
+The bridge token authenticates only the local extension/CLI and is not a Zhihu password. Never commit or document the env, Profile, cookies, local storage, QR content, or verification codes.
 
-```json
-{
-  "target": "zhihu@personal",
-  "runner": "zhihu-personal",
-  "state": "READY",
-  "checked_at": "<timestamp>"
-}
+## 5. Write Runner TOML
+
+Copy `examples/zhihu/runner.toml.example` to `$RUNNER_HOME/runner.toml`, set mode `0600`, and replace all paths with absolute paths on the current machine.
+
+```toml
+[zhihu]
+playwright_version = "1.61.1"
+playwright_home = "/home/user/.chatarch/playwright"
+profile_dir = "/home/user/.chatarch/chatpost/runners/zhihu-primary/profile"
+extension_dir = "/home/user/.chatarch/src/Wechatsync/packages/extension/dist"
+node_bin = "/absolute/path/to/node"
+wechatsync_cli = "/home/user/.chatarch/src/Wechatsync/packages/cli/dist/index.js"
+env_file = "/home/user/.chatarch/chatpost/runners/zhihu-primary/bridge.env"
+cdp_host = "127.0.0.1"
+cdp_port = 9227
+bridge_host = "127.0.0.1"
+bridge_port = 9527
+extension_id = "dipgimoobbhdefncjomgehikkbaklgii"
+headless = true
+browser_args = ["--disable-dev-shm-usage"]
 ```
 
-A public display name may help human confirmation, but it is not the account key and must not create private logs.
+macOS normally uses an empty `browser_args` list. Add Linux arguments only when real smoke evidence requires them. Never expose ports or weaken the ownership boundary by default.
 
-### 7. Plan the Fixed Article
+## 6. Static Preflight
 
 ```bash
-chatpost plan examples/zhihu/mkdocs-quickstart.md \
-  --to zhihu@personal \
+"$CHATPOST" zhihu preflight \
+  --config "$RUNNER_HOME/runner.toml" \
   --output json \
-  --no-interactive
+  -I
 ```
 
-The plan verifies:
+Continue only on `status=READY`. Preflight checks the exact ChatUp installation, Profile and secret permissions, Node, the Wechatsync CLI and extension manifest, a present token without printing it, and unused CDP/bridge ports bound to the numeric IPv4 loopback `127.0.0.1`. Hostnames such as `localhost` and the IPv6 loopback are rejected so connection readiness and listener PID ownership cannot refer to different sockets.
 
-- a non-empty title and body;
-- marker `CHATPOST-MKDOCS-SMOKE-V1`;
-- readable local image `assets/mkdocs-pipeline.png`;
-- READY target, runner, adapter, and auth;
-- no active ledger draft for this source/target;
-- operation `create_draft`;
-- no remote upload or write during planning.
+## 7. Manual First Login
 
-### 8. Create Exactly One Draft
+Check an existing Profile first:
 
 ```bash
-chatpost draft create examples/zhihu/mkdocs-quickstart.md \
-  --to zhihu@personal
+"$CHATPOST" zhihu auth \
+  --config "$RUNNER_HOME/runner.toml" \
+  --output json \
+  -I
 ```
 
-Immediately before the write, revalidate the same runner, account, and source hash. One invocation may issue only one create RPC and never retries automatically from an exception path.
-
-A clear success records:
-
-```text
-source_ref
-source_sha256
-target = zhihu@personal
-runner = zhihu-personal
-operation = create_draft
-draft_id
-review_url
-status = DRAFT_CREATED
-adapter/browser/protocol versions
-```
-
-### 9. Read Back and Review
+If logged out, start the checkpoint:
 
 ```bash
-chatpost publication status <publication-ref>
-chatpost publication open <publication-ref>
+"$CHATPOST" zhihu login \
+  --config "$RUNNER_HOME/runner.toml" \
+  --timeout 900 \
+  --output json \
+  -I
 ```
 
-Acceptance checks:
+`login` keeps the same browser/Profile open, opens Zhihu sign-in, and polls read-only auth until it returns `READY`. Set `headless=false` on a machine with a display. A server needs an explicitly authorized local-only display/tunnel or controlled screenshot route; never expose CDP, VNC, or bridge publicly.
 
-| Item | Expected |
-|---|---|
-| Title | Matches the fixture's H1 exactly |
-| Marker | One `CHATPOST-MKDOCS-SMOKE-V1` |
-| Code | Includes `mkdocs serve` and `mkdocs build --strict` |
-| Table | Page-responsibility table exists |
-| Image | Local PNG uploaded and visible in the editor |
-| Final publish | Not clicked |
+Run `auth` once more after login. ChatPost never reads cookies from the Profile.
 
-## Reuse an Existing Authenticated Profile
-
-Internal acceptance may bind the previously isolated profile by reference:
+## 8. Dry Run
 
 ```bash
-chatpost runner add zhihu-personal \
-  --runtime host \
-  --profile-mode adopt \
-  --user-data-dir <existing-isolated-profile>
+ARTICLE=/absolute/path/to/article.md
+"$CHATPOST" zhihu draft dry-run "$ARTICLE" \
+  --config "$RUNNER_HOME/runner.toml" \
+  --output json \
+  -I
 ```
 
-Adoption rules:
+Confirm the title, body, asset references, and fixed marker from the JSON `preview` field. The preview is capped at 8,000 characters and redacts values resolved from the private env. Dry-run starts no browser, connects no extension, and writes nothing to Zhihu.
 
-- bind a directory reference; do not copy the profile;
-- never read cookies;
-- never place the private path in public docs or the ledger;
-- check ownership, permissions, and process lock before start;
-- still require exact extension, bridge, and read-only auth preflight;
-- return to visible manual login if the session has expired.
+## 9. Create Exactly One Draft
 
-The daily Chrome default profile is never adopted.
-
-## Connection Surfaces During First Run
-
-```text
-CDP URL
-  ChatPost runner manager -> Chrome
-  login navigation, extension proof, diagnostics
-
-Bridge WebSocket URL
-  browser extension -> bridge server
-  extension-initiated connection; tasks/receipts carry the bridge token
-
-Control transport
-  ChatPost adapter -> bridge process
-  managed local default is in-process/stdio; no HTTP URL required
+```bash
+RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
+"$CHATPOST" zhihu draft create "$ARTICLE" \
+  --config "$RUNNER_HOME/runner.toml" \
+  --receipt "$RECEIPT" \
+  --output json \
+  -I
 ```
 
-A managed local runner allocates ports and provisions extension-owned URL/token fields only after exact extension proof. Users type neither `9227`, `9527`, nor a companion port. If safe provisioning is unavailable, enter `NEEDS_EXTENSION_SETUP` and open the exact extension's settings; never read Zhihu cookies as a shortcut.
+Acceptance requires `DRAFT_CREATED`, a draft ID and `/edit` review URL, a mode-`0600` receipt, editor-page readback of the expected title and marker, and no final publish.
 
-## RESULT_UNKNOWN
+Each browser startup creates a random `data:text/plain,chatpost-run-*` marker. ChatPost binds CDP to the spawned process only after the configured loopback port exposes both that marker and the corresponding browser WebSocket UUID.
 
-When a create request has been sent but WebSocket loss, timeout, or a missing receipt prevents confirmation:
+Extension discovery, `Target.attachToTarget`, extension evaluation, and login-page creation all run through that captured browser WebSocket. `Target.createTarget` returns a per-run popup ID; ChatPost carries that exact identity through the browser session and revalidates its exact popup URL and `page` / `background_page` type before attachment. Restored or stale popup pages and service workers are never selected, and ChatPost never follows a target-level WebSocket discovered later from the reusable CDP port. The Wechatsync bridge is ready only when the listener PID resolved from the loopback listening socket belongs to the Node subprocess started for this task; a foreign listener or Wechatsync secondary mode fails closed before extension wake. A create attempt on that ambiguous path returns `RESULT_UNKNOWN` and must not be retried automatically.
 
-```text
-RUNNING -> RESULT_UNKNOWN
-```
+Normal cleanup sends CDP `Browser.close` to the browser WebSocket endpoint captured at startup. It does not rediscover whichever browser might later occupy the same port, and it sends no process termination signal. If the draft result is already definitive but cleanup fails, the receipt keeps `DRAFT_CREATED` and adds `cleanup_status=MANUAL_RECOVERY_REQUIRED`. Recover the process manually and do not run create again. For browser startup failures, ChatPost waits for stderr drain and returns only bounded diagnostics with Profile paths, private assignments, URLs/connections, and the run marker redacted. If the private env disappears, is unreadable, or no longer contains the expected token after preflight, diagnostics fail closed to `[REDACTED]` while preserving the browser exit code in the surrounding error.
 
-ChatPost must:
+Receipts record browser `cleanup_status`, per-run popup `extension_cleanup_status`, and adapter `adapter_cleanup_status` independently; each corresponding error field is included only when manual recovery is required. This applies to `DRAFT_CREATED` and `RESULT_UNKNOWN`, including a non-zero adapter exit, a successful exit without a review URL, extension-wake failure, adapter timeout, and a post-wake output-read failure. Cleanup revalidates and closes only the popup created by this run with browser-level `Target.closeTarget`, then requests `Browser.close`. Popup cleanup failure is recorded independently; it neither prevents the browser-close attempt nor replaces the authoritative result. If the adapter subprocess still has not exited after one bounded stop request, create remains `RESULT_UNKNOWN`, records `adapter_cleanup_status=MANUAL_RECOVERY_REQUIRED`, preserves the primary result, leaves the subprocess for manual recovery, and reports the adapter cleanup error separately. `source_sha256 is captured before the browser or adapter starts`; every success or ambiguity receipt reuses that value, so later source-file mutation, removal, or read failure cannot replace an authoritative result. Receipts never contain target IDs, browser endpoints, tokens, or connection details.
 
-1. preserve source hash, target, runner, start time, and invocation ID;
-2. retain available diagnostics before releasing the page;
-3. forbid another `draft create`;
-4. use `publication status/reconcile` plus human draft-box inspection;
-5. allow another decision only after proving the first attempt did not create a draft.
+If receipt persistence fails after an authoritative result exists, ChatPost does not replace that result with a generic filesystem error. It emits `DRAFT_CREATED` first for a definitive success, or keeps the explicit `RESULT_UNKNOWN` classification for an ambiguous write, then reports that the receipt could not be written and says not to retry automatically.
 
-## Acceptance Matrix
+Adapter stdout/stderr redaction covers exact private-env values plus dynamic private assignments, including multi-line structured private assignments with nested objects/arrays and multi-line quoted values. If a private value has no provable closing boundary, ChatPost drops the unknown tail and restores only the strict Zhihu `/edit` review-URL allowlist needed for an authoritative result. WebSocket URLs, loopback connection details, and ownership markers are also redacted.
 
-| Capability | Offline | Local runner | Real Zhihu draft |
-|---|---:|---:|---:|
-| ChatUp descriptor contract | Required | Required | Indirect |
-| Profile lock/port leases | Required | Required | Required |
-| QR-scan login | Contract | Required | Verified |
-| SMS-code login | Contract | Optional | Needs separate acceptance |
-| Exact extension identity | Fake contract | Required | Required |
-| Bridge token redaction | Required | Required | Required |
-| Account auth check | Fake | Required | Required |
-| Side-effect-free plan | Required | Required | No write |
-| Single create RPC | Fake recorder | Required | Exactly once |
-| Receipt/ledger | Required | Required | Required |
-| Title/marker/code/image readback | Fixture | Optional | Required |
-| Final publish not triggered | Contract | Contract | Required |
+Image-upload failure can coexist with successful draft creation. Report the actual editor content; exit code zero alone does not prove image completeness.
 
-## Common Failures
+## 10. Ambiguity Recovery
 
-- **Chrome dependency absent**: enter `CHROME_DEPENDENCY_MISSING` and run the exact `chatup chrome-for-testing install --version ...` command from the error. ChatPost neither falls back to an unknown system browser nor installs implicitly.
-- **Profile locked**: report the owner; never kill daily Chrome.
-- **Wrong extension**: enter `EXTENSION_UNAVAILABLE`; a random service worker is not proof.
-- **Extension URL/token absent**: enter `NEEDS_EXTENSION_SETUP`, open the exact extension settings, and never write platform storage.
-- **Protocol compatibility unproven**: enter `PROTOCOL_UNVERIFIED` and forbid real writes after auth.
-- **Bridge disconnect**: fail before a write; enter `RESULT_UNKNOWN` after a possible write.
-- **Account logged out**: open visible Chrome and wait for the user.
-- **Image missing**: fail planning; do not create a truncated draft.
-- **Ledger already has a draft ID**: fail create and require explicit update or human resolution.
+For `{"status":"RESULT_UNKNOWN"}`, stop automation immediately. Do not run create again. Inspect the same account's draft box by title, marker, and time, then record the unique draft ID/review URL or make a human decision before any new create.
+
+## Repository Collaboration
+
+- ChatUp provides only the Playwright package/browser substrate. It creates no Profile, launches no browser, and knows nothing about Zhihu.
+- ChatPost owns Profile/process/CDP/bridge/login checkpoint/one-shot write/receipt. It duplicates no Playwright download logic and reads no login database.
+- Wechatsync is the Zhihu adapter. Protocol changes are handled explicitly at ChatPost's adapter boundary.
+- Article update needs separate acceptance based on a stored draft/article ID. Title matching or another create is not update.

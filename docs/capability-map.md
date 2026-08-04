@@ -1,51 +1,43 @@
 # 能力地图
 
-这个页面用于校对 `ChatPost` 当前有哪些一等能力、哪些能力已经验证，以及哪些事情不属于当前包。
+本页区分 `ChatPost 0.1.0` 的真实能力、已验证的外部链路，以及仍属提案的资源模型。
 
-## 能力分组
-
-<div class="grid cards" markdown>
-
-- **命令行入口**
-
-    `chatpost --help` 和 `chatpost --version` 是默认可验证入口。
-
-- **Python 接口**
-
-    实质能力应放到可 import 的 Python 函数、类或 service 层，而不是只写在 Click 回调里。
-
-- **配置与环境**
-
-    已声明已发布 `chatup>=0.2.3,<0.3.0` 机器环境依赖；已有 ChatEnv provider 脚手架；生产 schema 把非秘密 TOML、secret profile、runtime state 和 ledger 分开。
-
-- **Browser Runner 设计**
-
-    Chrome 安装归 ChatUp；ChatPost 只设计 host/Docker Runner、多个 user-data-dir 与 bridge 隔离；Runner 命令尚未实现。
-
-- **任务导向的知乎验收**
-
-    仓库已加入固定 MkDocs 博客稿与本地图片；后续只用一次明确 draft create 验证 ChatPost，不自动最终发布。
-
-</div>
-
-## 当前边界
+## 已实现
 
 | 能力 | 状态 | 说明 |
-| --- | --- | --- |
-| 命令行基础入口 | 已实现 | 模板生成 Click group、`--version` 和基础测试。 |
-| ChatEnv 配置提供者 | 脚手架已实现 | `config.py` 与 `chatenv.configs` 存在，但当前 `CHATPOST_API_KEY` 只是占位，生产 bridge schema 尚未实现。 |
-| 总体架构与配置模型 | 提案 | 已定义 ChatUp dependency 与 Runner/Account/Publication、ChatEnv、ledger 边界。 |
-| CLI 结构设计 | 提案 | 已定义 runner/account/plan/draft/publication 边界；ChatPost 不再设计 browser install 命令。 |
-| ChatUp Chrome for Testing backend | 已声明并验证 | `pyproject.toml` 有界依赖已发布 `chatup 0.2.3`，测试验证 `chatup.chrome_for_testing.resolve` 只读 public API。 |
-| Runner 隔离 | 提案 | 默认 host binary、每 Runner 独立 user-data-dir/bridge；ChatPost 只解析 ChatUp descriptor，不安装 Chrome。 |
-| 历史知乎草稿链路 | 已验证 | Wechatsync 实践已用直接二进制、二维码扫码登录、独立 Profile 和 loopback bridge 创建并回读草稿；短信路线尚未单独验收。 |
-| MkDocs 知乎测试稿 | 已加入 | `examples/zhihu/mkdocs-quickstart.md` 与本地 PNG 已存在；尚未通过 ChatPost 命令创建草稿。 |
-| 业务命令 | 未实现 | 按当前包真实需求补充，不能在模板里伪造未来命令。 |
+|---|---|---|
+| CLI 基础入口 | 已实现 | `chatpost --help`、`--version`。 |
+| 知乎静态检查 | 已实现 | `chatpost zhihu preflight` 检查 exact Playwright install、Profile/secret 权限、Node、扩展、CLI 和数值 IPv4 loopback `127.0.0.1` 端口；拒绝 `localhost` 与 IPv6 loopback。 |
+| 首次登录 checkpoint | 已实现 | `chatpost zhihu login` 保持同一 Profile 并循环只读 auth，供人工扫码/验证码；不写文章。 |
+| 知乎登录检查 | 已实现 | `chatpost zhihu auth` 启动受控 Runner，调用 Wechatsync 只读 auth，然后优雅停止。 |
+| 文章 dry-run | 已实现 | `chatpost zhihu draft dry-run` 不启动浏览器、不写知乎。 |
+| 单次草稿创建 | 已实现 | `chatpost zhihu draft create` 只调用一次 adapter；browser/adapter 启动前捕获 source digest，成功写 `0600` receipt，唤醒后任何输出/读取状态不明均写 `RESULT_UNKNOWN`。本轮 popup、browser 与 adapter cleanup 分别记录；写入后 source 或 receipt I/O 失败仍保留 authoritative result，不能据此重试。 |
+| ChatUp Playwright dependency | 已实现 | 有界依赖 `chatup>=0.2.4,<0.3.0`，只读调用 `chatup.playwright.resolve`。 |
+| 原始 CDP 扩展唤醒 | 已实现 | 通过启动时捕获的 browser WebSocket 和本轮 `Target.createTarget` 返回的 exact popup ID；`Target.attachToTarget` 前按 exact ID/URL/type 重验，忽略 stale restored popup 与 service worker，也不跟随 target-level WebSocket。cleanup 只用 `Target.closeTarget` 关闭本轮 popup；bridge listener PID 必须属于本轮 Node 子进程。 |
+| Secret redaction | 已实现 | adapter 输出遮蔽 env 精确值及动态私密赋值（包括跨行结构化私密赋值中的嵌套 object/array 与跨行 quoted value）；无法证明闭合边界时丢弃未知尾部，仅恢复严格知乎 `/edit` review URL 白名单。WebSocket/loopback 连接和 ownership marker 同样遮蔽；启动诊断在私有 env 不可用时整段 fail-closed；receipt 不保存 token、Cookie 或 LocalStorage。 |
 
-## 不在当前范围
+## 已验证事实
 
-- 不生成计划类占位页。
-- 不把未实现能力写成用户可执行教程。
-- 设计文档中的命令必须持续标注为“提案”，直到代码、测试和 help text 都存在。
-- 固定博客稿存在不代表 ChatPost 端到端链路已经实现或已经创建新草稿。
-- 不在 README、docs、issue、PR 评论或 CI log 中输出 secret、token、cookie 或 Authorization header。
+- 历史 Baseline 在本地 Mac 使用 Playwright cache 的 CFT 149、持久 Profile、Wechatsync 扩展和 loopback bridge 创建并回读知乎草稿。
+- ChatUp `1.61.1/chromium` task-local 真实安装解析到 revision `1228`、CFT `149.0.7827.55`，doctor 为 `READY`。
+- ChatPost 单元测试锁定 loopback、exact resolver、单次 create、歧义不重试和 receipt 边界。
+- 第二篇 Infra 草稿是否通过新命令创建，以任务报告和真实编辑链接回读为准；不能仅凭单元测试宣称完成。
+
+## 责任边界
+
+| Owner | 负责 | 不负责 |
+|---|---|---|
+| ChatUp | Playwright package/browser 安装、版本、revision、路径、doctor | Profile、登录、扩展、草稿 |
+| ChatPost | Profile、浏览器生命周期、CDP、bridge、任务门、receipt | 下载 browser、知乎最终发布 |
+| Wechatsync | 知乎 adapter、内容转换和草稿写入 | 机器 browser 安装、长期 ledger |
+| 人工 | 首次登录、编辑页 Review、最终发布 | 自动化 secret 导出 |
+
+## 仍属提案
+
+- 通用 `runner` / `account` / `publication` 命令；
+- 多账号调度与长期 publication ledger；
+- same-ID 文章更新；
+- 自动最终发布；
+- Playwright Page/Locator 自动化。
+
+这些能力不能进入当前 Quick Start，直到代码、测试和真实验收都存在。

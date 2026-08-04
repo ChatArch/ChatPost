@@ -29,7 +29,8 @@ Choose documentation by scenario:
 | Understand ChatPost resources and data flow | [Overall Architecture](docs/architecture.en.md) |
 | Review the ChatUp Chrome dependency, ChatEnv, and state ownership | [Configuration, Environment, and State](docs/configuration.en.md) |
 | Follow first Zhihu login and fixed-article draft acceptance | [Zhihu First Setup and Draft Acceptance](docs/zhihu-first-run.en.md) |
-| Install the package, run the CLI, and confirm it works | [CLI Tree](docs/cli-tree.en.md) |
+| Run the fastest Playwright + Wechatsync Zhihu draft path | [Zhihu First Setup and Draft Acceptance](docs/zhihu-first-run.en.md) |
+| Inspect the current real commands | [CLI Tree](docs/cli-tree.en.md) |
 | Review the proposed CLI, ChatUp runtime dependency, and multi-account isolation | [Browser Runners and Account Isolation](docs/browser-runners.en.md) |
 | Check first-class capabilities and current boundaries | [Capability Map](docs/capability-map.en.md) |
 | Call package behavior directly from Python | [Python Interface Tree](docs/interface-tree.md) |
@@ -40,13 +41,14 @@ Choose documentation by scenario:
 pip install -e ".[dev]"
 chatpost --help
 chatpost --version
+chatpost zhihu --help
 python -m pytest -q
 python -m build
 ```
 
 ## CLI Contract
 
-This package depends on `chatstyle>=0.1.1,<0.2.0`, `chatenv>=0.2.0,<0.3.0`, and `chatup>=0.2.3,<0.3.0`. ChatUp owns Chrome installation; future ChatPost runners only resolve its descriptor. New commands should prefer:
+This package depends on `chatstyle>=0.1.1,<0.2.0`, `chatenv>=0.2.0,<0.3.0`, `chatup>=0.2.4,<0.3.0`, and `websocket-client>=1.8,<2.0`. ChatUp owns Playwright package/browser installation. ChatPost only resolves an exact descriptor and owns the Profile, extension, loopback CDP/bridge, and one-shot draft task.
 
 - `CommandSchema` / `CommandField` for inputs.
 - `add_interactive_option()` for the shared `-i/-I` switch.

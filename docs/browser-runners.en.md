@@ -1,7 +1,7 @@
 # Browser Runners and Account Isolation
 
 !!! warning "Status: architecture proposal"
-    This page describes how the first ChatPost release should manage Chrome. `ChatPost 0.0.2` does not yet implement `runner` or `account` commands. "Verified" refers to the existing Zhihu/Wechatsync practice; "proposed" refers to future ChatPost work.
+    `ChatPost 0.1.0` implements the task-specific Zhihu Runner lifecycle but not generic `runner` or `account` registry commands. The remaining multi-account and remote models on this page are proposals.
 
 See [Overall Architecture](architecture.md) for the resource model, [Configuration, Environment, and State](configuration.md) for persistence, and [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md) for the concrete task.
 
@@ -143,7 +143,7 @@ This is the recommended default.
 ### Required Resources
 
 ```text
-ChatUp ChromeForTestingInstallation descriptor
+ChatUp PlaywrightBrowserInstallation descriptor
 extension directory/version
 user-data-dir
 process identity/PID or service unit
@@ -155,14 +155,14 @@ runtime logs
 
 ### ChatUp-Managed Chrome Dependency
 
-The verified practice ran Chrome for Testing directly from a Playwright cache without Docker. Released `chatup 0.2.3` now turns that temporary dependency into a reusable machine environment:
+The verified practice ran Chrome for Testing directly from a Playwright cache without Docker. Released `chatup 0.2.4` now turns that temporary dependency into a reusable machine environment:
 
 ```text
-~/.chatarch/chrome-for-testing/
-└── <version>/<platform>/...
+~/.chatarch/playwright/
+└── <playwright-version>/{package,browsers,installation.json}
 ```
 
-The user installs it with `chatup chrome-for-testing install --version <chatpost-tested-version>`. A ChatPost runner only resolves the descriptor through `chatup.chrome_for_testing.resolve(...)`; it owns no download, extraction, upgrade, or browser registry. Chrome stays outside the ChatPost wheel and never overwrites system Chrome. Login state remains only in the runner's `chrome-data/`.
+The user installs it with `chatup playwright install <chatpost-tested-version> --browser chromium`. A ChatPost runner only resolves the descriptor through `chatup.playwright.resolve(...)`; it owns no download, extraction, upgrade, or browser registry. Chrome stays outside the ChatPost wheel and never overwrites system Chrome. Login state remains only in the runner's `chrome-data/`.
 
 ### Secure Defaults
 
@@ -216,7 +216,7 @@ Docker is optional, not required.
 
 ## Proposed Multi-Account Configuration
 
-This illustrates an expected TOML schema; `0.0.2` does not support it:
+This illustrates an expected generic multi-account TOML schema; the `0.1.0` task-specific Runner does not support it:
 
 ```toml
 [runners.mac-personal]
@@ -337,8 +337,8 @@ ChatPost never stores:
 
 ```text
 default runtime       = host binary
-Chrome owner          = ChatUp (`~/.chatarch/chrome-for-testing/`)
-ChatPost resolution   = read-only `chatup.chrome_for_testing.resolve`
+Chrome owner          = ChatUp (`~/.chatarch/playwright/`)
+ChatPost resolution   = read-only `chatup.playwright.resolve`
 Docker                = optional
 isolation unit        = browser persona / runner
 multiple same-platform accounts = separate user-data-dirs

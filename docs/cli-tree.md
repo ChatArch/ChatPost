@@ -1,284 +1,135 @@
-# CLI 结构设计
+# CLI 树
 
-!!! warning "状态：设计提案，不是当前可用命令"
-    `ChatPost 0.0.2` 当前只实现 `chatpost --help` 和 `chatpost --version`。本页定义首个功能版本的预期命令边界，用于实现前 Review；示例现在不能直接执行。
-
-总体分层见 [总体架构设计](architecture.md)，ChatUp dependency 与 ChatEnv 边界见 [配置、环境与状态设计](configuration.md)，Runner/Profile 多账号隔离见 [Browser Runner 与账号隔离](browser-runners.md)。知乎任务流见 [知乎首次设置与草稿验收](zhihu-first-run.md)。
-
-## 设计目标
-
-ChatPost CLI 同时服务两类用户：
-
-- 人在终端中准备内容、登录账号、打开草稿并 Review；
-- 自动任务以 JSON 输出调用同一控制面，但默认只到草稿，不替人绕过登录或点击最终发布。
-
-首版遵循以下原则：
-
-1. **显式目标**：目标写成 `platform@account`，例如 `zhihu@personal`。
-2. **创建与更新分离**：`draft create` 和 `draft update` 不互相回退。
-3. **Runner 与账号分离**：账号是逻辑发布目标，Runner 是持有浏览器登录态的执行环境。
-4. **默认 fail-closed**：账号、文章 ID、Runner 或登录状态不明确时停止，不猜测、不自动新建副本。
-5. **最终发布是人工 checkpoint**：首版没有自动 `publish` 命令。
+`ChatPost 0.1.0` 首先提供一条任务导向的知乎草稿链路。通用 `runner`、`account`、`publication` 和文章更新命令仍是后续设计，不能当作当前接口。
 
 ## 当前真实命令
 
 ```text
 chatpost
-├── --help                     # 查看当前真实命令树
-└── --version                  # 输出安装版本
+├── --help
+├── --version
+└── zhihu
+    ├── preflight
+    ├── login
+    ├── auth
+    └── draft
+        ├── dry-run
+        └── create
 ```
 
-## 首版预期命令树
-
-以下全部为提案：
-
-```text
-chatpost
-├── init [PATH]                # 初始化 workspace、配置和 publication ledger
-├── platform
-│   ├── list                   # 列出已安装 adapter
-│   └── show PLATFORM          # 查看平台能力：draft/update/images/review 等
-├── runner
-│   ├── add NAME               # 注册 persona/Profile；ChatUp 解析 Chrome
-│   ├── list                   # 列出 Runner 与健康状态
-│   ├── show NAME              # 查看 runtime、profile ref、端口和绑定账号
-│   ├── start NAME             # 启动 ChatPost 拥有的 Runner
-│   ├── stop NAME              # 优雅停止 ChatPost 拥有的 Runner
-│   ├── status NAME            # 检查进程、CDP、扩展 WS、control transport
-│   ├── doctor NAME            # 检查二进制、目录权限、端口冲突和版本
-│   └── open NAME              # 打开可见浏览器，供登录或人工接管
-├── account
-│   ├── add TARGET             # 注册 platform@alias，并绑定 Runner
-│   ├── list                   # 列出逻辑账号，不显示 Cookie
-│   ├── show TARGET            # 查看绑定关系和最近 auth 状态
-│   ├── login TARGET           # 打开登录页并进入人工 checkpoint
-│   └── status TARGET          # 只读检查平台登录态
-├── plan SOURCE                # 解析内容并生成无远端写入的执行计划
-├── draft
-│   ├── create SOURCE          # 显式创建草稿；成功后写入 ledger
-│   └── update SOURCE          # 只更新已有 ID；缺 ID 时失败
-├── publication
-│   ├── list                   # 按 source/target/status 查询发布记录
-│   ├── show REF               # 查看 ID、hash、receipt 和状态
-│   ├── status REF             # 只读回查平台状态
-│   ├── open REF               # 在正确 Runner 中打开草稿供 Review
-│   └── reconcile REF          # 人工处理 RESULT_UNKNOWN，不自动重试
-├── config
-│   ├── path                   # 显示生效配置和 ledger 路径
-│   ├── show                   # 显示脱敏后的合并配置
-│   └── validate               # 校验 schema、引用和端口分配
-└── doctor                     # 全局检查配置、Runner、adapter 和 ledger
-```
-
-## 目标语法
-
-统一使用：
-
-```text
-<platform>@<account-alias>
-```
-
-示例：
-
-```text
-zhihu@personal
-zhihu@brand
-csdn@personal
-xiaohongshu@brand
-```
-
-`account-alias` 是本地逻辑名称，不是平台用户名，也不应包含手机号、邮箱或其他隐私信息。
-
-## 推荐工作流
-
-以下展示预期交互，不代表当前已经实现：
+查看真实 help：
 
 ```bash
-# 0. 在 ChatPost 之外准备机器 Chrome 环境
-chatup chrome-for-testing install \
-  --version <chatpost-tested-version> \
+chatpost --help
+chatpost zhihu --help
+chatpost zhihu draft --help
+```
+
+## 任务顺序
+
+```bash
+chatpost zhihu preflight \
+  --config runner.toml \
   --output json \
   -I
 
-# 1. 初始化控制面
-chatpost init
+chatpost zhihu login \
+  --config runner.toml \
+  --timeout 900 \
+  --output json \
+  -I
 
-# 2. 注册 Runner；启动时通过 ChatUp 只读解析 binary descriptor
-chatpost runner add mac-personal --runtime host
-chatpost runner doctor mac-personal
-chatpost runner start mac-personal --visible
+chatpost zhihu auth \
+  --config runner.toml \
+  --output json \
+  -I
 
-# 3. 注册逻辑账号；不把密码或 Cookie 交给 CLI
-chatpost account add zhihu@personal --runner mac-personal
-chatpost account login zhihu@personal
-chatpost account status zhihu@personal
+chatpost zhihu draft dry-run article.md \
+  --config runner.toml \
+  --output json \
+  -I
 
-# 4. 对固定博客测试稿生成纯本地计划
-chatpost plan examples/zhihu/mkdocs-quickstart.md \
-  --to zhihu@personal \
-  --output json
-
-# 5. 显式且只执行一次草稿创建
-chatpost draft create examples/zhihu/mkdocs-quickstart.md \
-  --to zhihu@personal
-
-# 6. 打开草稿，让人 Review 和最终发布
-chatpost publication open <publication-ref>
+chatpost zhihu draft create article.md \
+  --config runner.toml \
+  --receipt receipt.json \
+  --output json \
+  -I
 ```
 
-## ChatUp dependency 边界
+五道门的职责不同：
 
-Chrome 安装属于独立 `chatup chrome-for-testing`，不进入 ChatPost 命令树。ChatPost 依赖 `chatup>=0.2.3,<0.3.0`，并只调用 `chatup.chrome_for_testing.resolve(...)`：
+1. `preflight` 只读检查 exact Playwright install、Profile 权限、扩展、Node、Wechatsync CLI、secret 文件和 loopback 端口；不会安装、启动或写知乎。
+2. `login` 保持同一个浏览器/Profile，打开知乎登录页并循环只读 auth；适合扫码或验证码的人工 checkpoint，不写文章。
+3. `auth` 启动同一个 Runner，调用 Wechatsync 的一次只读知乎登录检查，然后优雅停止浏览器。
+4. `draft dry-run` 只解析文章，不启动浏览器，不连接扩展，不写知乎。
+5. `draft create` 只调用一次 Wechatsync create 路径。成功时写入权限 `0600` 的 receipt；结果不明确时写 `RESULT_UNKNOWN`，禁止自动重试。
 
-- compatibility pin 由 ChatPost release 定义；
-- binary/version/platform/root/digest 来自 ChatUp descriptor；
-- 缺失时进入 `CHROME_DEPENDENCY_MISSING` 并提示用户运行 exact `chatup chrome-for-testing install --version ...`；
-- `config validate`、`runner doctor/start` 都不能隐式下载或升级 Chrome；
-- Profile、登录态、扩展和草稿仍由 ChatPost Runner 边界管理。
+`ChatPost 0.1.0` **没有最终发布命令**，也没有文章更新命令。
 
-## Runner 命令边界
+## ChatUp 边界
 
-`runner add` 预期支持：
-
-```text
---runtime host|docker
---profile-mode managed|adopt
---user-data-dir PATH        # 默认由 ChatPost 创建专属目录
---visible / --headless
-```
-
-安全默认值：
-
-- `host` 是默认 runtime；Docker 不是要求。
-- Chrome installation 位于 ChatUp 的 `~/.chatarch/chrome-for-testing/`；ChatPost 只读取 descriptor。
-- CDP 与 bridge 只绑定 `127.0.0.1`。
-- 每个 Runner 使用独立 user-data-dir、debug port、bridge port 和 token。
-- 扩展主动连接 `bridge_ws_url`；ChatPost managed local 默认通过 in-process/stdio 控制 bridge process。
-- 只有证明 exact extension identity 后才能写入扩展自己的 URL/token 配置；否则进入 `NEEDS_EXTENSION_SETUP`。
-- bridge token 使用 secret reference，不出现在 `config show`、ledger 或日志中。
-- `runner stop` 只优雅停止由 ChatPost 启动且身份匹配的进程。
-
-## Account 命令边界
-
-`account add` 只注册映射：
-
-```text
-logical target -> runner -> browser persona -> platform session
-```
-
-它不会：
-
-- 接收平台密码；
-- 导入 Cookie；
-- 绕过验证码或二维码；
-- 自动声明账号已经登录。
-
-`account login` 的职责是打开正确 Runner 和平台登录页，随后等待用户在浏览器中完成操作。`account status` 再通过 adapter 做只读验证。
-
-## Plan 与远端写入
-
-`plan` 必须保持纯读：
-
-- 解析 Markdown、front matter 和本地图片；
-- 解析目标账号及 Runner；
-- 读取 ledger，判断目标是否已有 draft/article ID；
-- 输出 adapter 能力和预计操作；
-- 不启动草稿创建、图片上传或平台更新。
-
-机器调用可使用：
+机器级制品先由 ChatUp 显式准备：
 
 ```bash
-chatpost plan article.md --to zhihu@personal --output json --no-interactive
+chatup nodejs -I
+chatup playwright install 1.61.1 --browser chromium --output json -I
+chatup playwright doctor 1.61.1 --browser chromium --output json -I
 ```
 
-## Create 与 Update 必须 fail-closed
+ChatPost 依赖 `chatup>=0.2.4,<0.3.0`，并只调用：
+
+```python
+from chatup.playwright import resolve
+
+installation = resolve("1.61.1", browser="chromium")
+```
+
+责任边界：
+
+- ChatUp：Playwright package、它声明的 browser revision、安装元数据和 executable path；
+- ChatPost：持久 Profile、扩展、CDP、loopback bridge、Wechatsync 进程、单次任务与 receipt；
+- Wechatsync：知乎 adapter 与草稿写入；
+- 人工：首次登录和最终发布确认。
+
+这里的 Playwright 能力是**安装和解析 substrate**。当前成功路径仍直接启动浏览器二进制，并通过原始 CDP 唤醒扩展；没有使用 Playwright `Page`、Locator 或 `launchPersistentContext()`。
+
+## 非秘密 Runner 配置
+
+```toml
+[zhihu]
+playwright_version = "1.61.1"
+playwright_home = "/absolute/path/to/.chatarch/playwright"
+profile_dir = "/absolute/path/to/zhihu-profile"
+extension_dir = "/absolute/path/to/Wechatsync/packages/extension/dist"
+node_bin = "/absolute/path/to/node"
+wechatsync_cli = "/absolute/path/to/Wechatsync/packages/cli/dist/index.js"
+env_file = "/absolute/path/to/chatpost-zhihu.env"
+cdp_host = "127.0.0.1"
+cdp_port = 9227
+bridge_host = "127.0.0.1"
+bridge_port = 9527
+extension_id = "dipgimoobbhdefncjomgehikkbaklgii"
+headless = true
+browser_args = ["--disable-dev-shm-usage"]
+```
+
+安全约束：
+
+- `profile_dir` 必须存在且不得向 group/other 开放；
+- `env_file` 必须是 `0600` 或更严格，并包含 `WECHATSYNC_TOKEN`；
+- CDP 与 bridge 只能绑定 loopback；
+- `browser_args` 不能覆盖 Profile、CDP 或扩展所有权参数；
+- 配置文件只保存路径和非秘密值，不保存 Cookie、LocalStorage 或知乎凭据。
+
+## 仍属提案的命令
+
+以下资源边界仍有价值，但命令尚未实现：
 
 ```text
-draft create
-  -> 只允许 create
-  -> 如果 ledger 已有 active draft，可要求显式确认或改用 update
-
-draft update
-  -> 只允许 update
-  -> 必须从 ledger 或 --post-id 得到已有 ID
-  -> adapter/RPC/ID 缺失时失败
-  -> 绝不回退成 create
+runner add|start|status|doctor|stop
+account add|login|status
+publication list|show|retry
+article update
 ```
 
-这条边界用于避免自动任务因字段丢失、扩展版本不匹配或断线而制造重复草稿。
-
-## Publication ledger
-
-首版 ledger 至少记录：
-
-```text
-source_ref
-source_sha256
-target                 # platform@alias
-runner
-mode                   # create_draft / update_draft
-draft_id / article_id
-public_url / review_url
-last_success_commit
-status
-created_at / updated_at
-```
-
-ledger 不记录：
-
-- Cookie、Local Storage；
-- 平台密码、短信验证码；
-- bridge token 明文；
-- Chrome profile 文件内容。
-
-## 状态与恢复
-
-建议统一状态：
-
-```text
-PLANNED
-CHROME_DEPENDENCY_MISSING
-RUNNER_UNAVAILABLE
-EXTENSION_UNAVAILABLE
-NEEDS_EXTENSION_SETUP
-PROTOCOL_UNVERIFIED
-NEEDS_LOGIN
-READY
-RUNNING
-DRAFT_CREATED
-AWAITING_REVIEW
-COMPLETED
-FAILED
-RESULT_UNKNOWN
-NEEDS_ACTION
-```
-
-如果请求已发出但回执丢失，必须写入 `RESULT_UNKNOWN`。用户先运行 `publication status` 或 `publication reconcile` 回查，不允许自动重试 create/update。
-
-## 首版不提供自动 Publish
-
-`draft create/update` 到草稿即结束。用户通过 `publication open` 在平台页面 Review 并最终发布。
-
-未来如果增加 `publish`，必须作为独立 capability 设计，至少要求：
-
-- 平台与账号明确授权；
-- 可审计的显式确认；
-- 与 draft/update 分开的测试和权限；
-- 不绕过验证码、风控和平台规则。
-
-## 实现顺序
-
-建议正式开发按以下顺序：
-
-1. `init`、config schema 与 ledger；
-2. ChatUp `chatup.chrome_for_testing.resolve` dependency adapter 与 ChatPost compatibility pin；
-3. `runner add/list/status/doctor` 的 host runtime；
-4. `account add/status/login checkpoint`；
-5. `platform list/show` 与 adapter protocol；
-6. `plan`；
-7. 用固定 MkDocs 稿验证 `draft create`；
-8. `draft update` 与 fail-closed contract；
-9. `publication open/status/reconcile`；
-10. Docker、远端 Runner 与更多平台 adapter。
-
-每个命令只有在代码、测试和帮助文本都存在后，才能从“提案”改成“已实现”。
+实现这些命令前，文档必须持续标为提案；不得把它们写进可执行 Quick Start。
