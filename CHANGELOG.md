@@ -28,6 +28,9 @@
 - Require the bridge listening socket to be owned by the Wechatsync subprocess started for the current task; reject foreign listeners and secondary mode before extension wake.
 - Redact JSON-style quoted private assignment keys in browser startup diagnostics.
 - Restrict the OIDC publish workflow to version tags and enforce the tag/package-version match on every run.
+- Preserve `DRAFT_CREATED` or `RESULT_UNKNOWN` when receipt persistence fails, emit the authoritative result, and explicitly prohibit retry instead of surfacing a generic filesystem error.
+- Record adapter cleanup independently from browser cleanup; keep create as `RESULT_UNKNOWN` with `adapter_cleanup_status=MANUAL_RECOVERY_REQUIRED` when the owned adapter child does not stop after one bounded request.
+- Structurally redact dynamic private assignments, WebSocket/loopback connections, and ownership markers from adapter output while preserving the Zhihu review URL required for a definitive receipt.
 
 ## 0.0.2 - 2026-08-03
 

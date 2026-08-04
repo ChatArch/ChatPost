@@ -37,9 +37,16 @@ def test_quick_start_keeps_create_update_and_publish_boundaries_explicit():
         assert "Target.attachToTarget" in text
         assert "listener PID" in text
         assert "MANUAL_RECOVERY_REQUIRED" in text
+        assert "adapter_cleanup_status" in text
+        assert "review URL" in text
         if relative.endswith(".en.md"):
-            assert "The `RESULT_UNKNOWN` receipt also records `cleanup_status`" in text
+            assert (
+                "The `RESULT_UNKNOWN` receipt also records browser `cleanup_status`"
+                in text
+            )
             assert "fail closed to `[REDACTED]`" in text
+            assert "receipt could not be written" in text
         else:
-            assert "`RESULT_UNKNOWN` receipt 同样记录 `cleanup_status`" in text
+            assert "`RESULT_UNKNOWN` receipt 同时记录 browser `cleanup_status`" in text
             assert "fail-closed 为 `[REDACTED]`" in text
+            assert "receipt 无法落盘" in text

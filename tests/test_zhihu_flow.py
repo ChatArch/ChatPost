@@ -282,6 +282,7 @@ def test_nonzero_create_receipt_includes_completed_cleanup(tmp_path):
         )
 
     assert error.value.receipt["cleanup_status"] == "CLOSED"
+    assert error.value.receipt["adapter_cleanup_status"] == "CLOSED"
 
 
 def test_missing_review_url_receipt_includes_cleanup_failure(tmp_path):
@@ -312,6 +313,7 @@ def test_missing_review_url_receipt_includes_cleanup_failure(tmp_path):
 
     assert error.value.receipt["cleanup_status"] == "MANUAL_RECOVERY_REQUIRED"
     assert error.value.receipt["cleanup_error"] == "CDP close timed out"
+    assert error.value.receipt["adapter_cleanup_status"] == "CLOSED"
 
 
 def test_browser_session_rechecks_preflight_before_process_start(monkeypatch, tmp_path):
@@ -774,6 +776,141 @@ def test_bridge_start_timeout_is_result_unknown_and_stops_adapter(monkeypatch, t
         zhihu._run_adapter(config, source, "create", _endpoint())
 
     assert terminated == [True]
+
+
+def test_extension_wake_cleanup_timeout_preserves_unknown_and_adapter_state(
+    monkeypatch, tmp_path
+):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# title", encoding="utf-8")
+    terminated = []
+
+    class Process:
+        pid = 4242
+        returncode = None
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            terminated.append(True)
+
+        def communicate(self, timeout):
+            assert timeout == 10
+            raise subprocess.TimeoutExpired("wechatsync", timeout)
+
+    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
+    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
+    monkeypatch.setattr(zhihu, "_process_owns_listener", lambda *_args: True)
+    monkeypatch.setattr(
+        zhihu,
+        "_wake_extension",
+        lambda *_args: (_ for _ in ()).throw(RuntimeError("wake rejected")),
+    )
+
+    with pytest.raises(ResultUnknownError) as captured:
+        zhihu._run_adapter(config, source, "create", _endpoint())
+
+    assert terminated == [True]
+    assert captured.value.receipt["status"] == RESULT_UNKNOWN
+    assert captured.value.receipt["adapter_cleanup_status"] == (
+        "MANUAL_RECOVERY_REQUIRED"
+    )
+    assert "left running" in captured.value.receipt["adapter_cleanup_error"]
+
+
+def test_create_timeout_cleanup_timeout_records_adapter_manual_recovery(
+    monkeypatch, tmp_path
+):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# title", encoding="utf-8")
+    terminated = []
+    communicate_timeouts = []
+
+    class Process:
+        pid = 4242
+        returncode = None
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            terminated.append(True)
+
+        def communicate(self, timeout):
+            communicate_timeouts.append(timeout)
+            raise subprocess.TimeoutExpired("wechatsync", timeout)
+
+    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
+    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
+    monkeypatch.setattr(zhihu, "_process_owns_listener", lambda *_args: True)
+    monkeypatch.setattr(zhihu, "_wake_extension", lambda *_args: None)
+
+    with pytest.raises(ResultUnknownError) as captured:
+        zhihu._run_adapter(config, source, "create", _endpoint())
+
+    assert communicate_timeouts == [180, 10]
+    assert terminated == [True]
+    assert captured.value.receipt["adapter_cleanup_status"] == (
+        "MANUAL_RECOVERY_REQUIRED"
+    )
+    assert "left running" in captured.value.receipt["adapter_cleanup_error"]
+
+
+def test_adapter_output_redaction_blocks_dynamic_credentials_but_keeps_review_url():
+    review_url = "https://zhuanlan.zhihu.com/p/2067000000000000001/edit"
+    output = (
+        '"oauth_token":"OAUTH-DYNAMIC-CANARY"\n'
+        '"client_secret": "CLIENT DYNAMIC CANARY"\n'
+        "Authorization: Bearer AUTH-DYNAMIC-CANARY\n"
+        "Cookie=session=COOKIE-DYNAMIC-CANARY; Path=/\n"
+        "ws://127.0.0.1:9227/devtools/page/private\n"
+        "http://127.0.0.1:9527/private\n"
+        "data:text/plain,chatpost-run-private-marker\n"
+        f"{review_url}"
+    )
+
+    redacted = zhihu._redact(output, [])
+
+    for canary in (
+        "OAUTH-DYNAMIC-CANARY",
+        "CLIENT DYNAMIC CANARY",
+        "AUTH-DYNAMIC-CANARY",
+        "COOKIE-DYNAMIC-CANARY",
+        "devtools/page/private",
+        "chatpost-run-private-marker",
+    ):
+        assert canary not in redacted
+    assert review_url in redacted
+    assert redacted.count("[REDACTED]") >= 7
+
+
+def test_dry_run_adapter_path_structurally_redacts_dynamic_credentials(
+    monkeypatch, tmp_path
+):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# title", encoding="utf-8")
+    review_url = "https://zhuanlan.zhihu.com/p/2067000000000000001/edit"
+
+    monkeypatch.setattr(
+        zhihu.subprocess,
+        "run",
+        lambda *args, **_kwargs: subprocess.CompletedProcess(
+            args[0],
+            1,
+            '"client_secret":"DYNAMIC-CLIENT-CANARY"',
+            f"ws://127.0.0.1:9227/private\n{review_url}",
+        ),
+    )
+
+    result = zhihu._run_adapter(config, source, "dry-run")
+
+    assert "DYNAMIC-CLIENT-CANARY" not in result.stdout
+    assert "ws://" not in result.stderr
+    assert review_url in result.stderr
 
 
 def test_foreign_bridge_listener_is_rejected_before_extension_wake(monkeypatch, tmp_path):

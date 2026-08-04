@@ -11,10 +11,10 @@
 | 首次登录 checkpoint | 已实现 | `chatpost zhihu login` 保持同一 Profile 并循环只读 auth，供人工扫码/验证码；不写文章。 |
 | 知乎登录检查 | 已实现 | `chatpost zhihu auth` 启动受控 Runner，调用 Wechatsync 只读 auth，然后优雅停止。 |
 | 文章 dry-run | 已实现 | `chatpost zhihu draft dry-run` 不启动浏览器、不写知乎。 |
-| 单次草稿创建 | 已实现 | `chatpost zhihu draft create` 只调用一次 adapter；成功写 `0600` receipt，歧义写 `RESULT_UNKNOWN`。 |
+| 单次草稿创建 | 已实现 | `chatpost zhihu draft create` 只调用一次 adapter；成功写 `0600` receipt，歧义写 `RESULT_UNKNOWN`。browser 与 adapter cleanup 分别记录；receipt 写盘失败仍保留并输出 authoritative result，不能据此重试。 |
 | ChatUp Playwright dependency | 已实现 | 有界依赖 `chatup>=0.2.4,<0.3.0`，只读调用 `chatup.playwright.resolve`。 |
 | 原始 CDP 扩展唤醒 | 已实现 | 通过启动时捕获的 browser WebSocket 执行 `Target.getTargets`、`Target.attachToTarget` 和扩展求值，不跟随后发现的 target-level WebSocket；bridge listener PID 必须属于本轮 Node 子进程。 |
-| Secret redaction | 已实现 | adapter 输出中的 env secret value 替换为 `[REDACTED]`；启动诊断还会遮蔽私密赋值、URL/连接信息与 ownership marker，私有 env 不可用时整段 fail-closed；receipt 不保存 token、Cookie 或 LocalStorage。 |
+| Secret redaction | 已实现 | adapter 输出遮蔽 env 精确值及动态私密赋值、WebSocket/loopback 连接和 ownership marker，同时保留知乎 review URL；启动诊断在私有 env 不可用时整段 fail-closed；receipt 不保存 token、Cookie 或 LocalStorage。 |
 
 ## 已验证事实
 

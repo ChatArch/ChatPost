@@ -43,6 +43,7 @@ _REVIEW_URL = re.compile(r"https://zhuanlan\.zhihu\.com/p/(?P<id>[0-9]+)/edit")
 _EXTENSION_ID = re.compile(r"^[a-p]{32}$")
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 _DIAGNOSTIC_URL = re.compile(r"(?i)\b(?:wss?|https?)://[^\s\"'<>;,]+")
+_ADAPTER_WEBSOCKET_URL = re.compile(r"(?i)\bwss?://[^\s\"'<>;,]+")
 _DIAGNOSTIC_LOOPBACK = re.compile(
     r"(?i)(?<![\w.])(?:localhost|127(?:\.\d{1,3}){3}|\[::1\]):\d{1,5}"
     r"(?:/[^\s\"'<>;,]*)?"
@@ -788,6 +789,16 @@ def _redact(text: str, values: Sequence[str]) -> str:
     redacted = text
     for value in sorted(values, key=len, reverse=True):
         redacted = redacted.replace(value, "[REDACTED]")
+    redacted = _ADAPTER_WEBSOCKET_URL.sub("[REDACTED]", redacted)
+    redacted = _DIAGNOSTIC_LOOPBACK.sub("[REDACTED]", redacted)
+    redacted = _DIAGNOSTIC_OWNERSHIP_MARKER.sub("[REDACTED]", redacted)
+    redacted = _DIAGNOSTIC_PRIVATE_ASSIGNMENT.sub(
+        lambda match: (
+            f"{match.group('quote')}{match.group('key')}{match.group('quote')}"
+            f"{match.group('separator')}[REDACTED]"
+        ),
+        redacted,
+    )
     return redacted
 
 
@@ -805,6 +816,35 @@ def _adapter_command(
     if mode == "dry-run":
         command.append("--dry-run")
     return command
+
+
+def _stop_adapter_after_failure(
+    process: subprocess.Popen[str],
+    *,
+    reason: str,
+) -> tuple[str, str, dict[str, str]]:
+    """Request one bounded stop and report when manual recovery is required."""
+
+    cleanup_error = (
+        f"{reason}; adapter process was left running for manual recovery"
+    )
+    if process.poll() is None:
+        try:
+            process.terminate()
+        except OSError:
+            if process.poll() is None:
+                return "", "", {
+                    "adapter_cleanup_status": "MANUAL_RECOVERY_REQUIRED",
+                    "adapter_cleanup_error": cleanup_error,
+                }
+    try:
+        stdout, stderr = process.communicate(timeout=10)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return "", "", {
+            "adapter_cleanup_status": "MANUAL_RECOVERY_REQUIRED",
+            "adapter_cleanup_error": cleanup_error,
+        }
+    return stdout or "", stderr or "", {"adapter_cleanup_status": "CLOSED"}
 
 
 def _run_adapter(
@@ -860,18 +900,10 @@ def _run_adapter(
         time.sleep(0.1)
 
     if not bridge_ready:
-        if process.poll() is None:
-            process.terminate()
-        try:
-            stdout, stderr = process.communicate(timeout=10)
-        except subprocess.TimeoutExpired as error:
-            message = "Wechatsync did not stop after the bridge startup timeout"
-            if mode == "create":
-                raise ResultUnknownError(
-                    message,
-                    receipt={"status": RESULT_UNKNOWN},
-                ) from error
-            raise RuntimeError(message) from error
+        stdout, stderr, adapter_cleanup = _stop_adapter_after_failure(
+            process,
+            reason="Bridge startup did not complete",
+        )
         result = subprocess.CompletedProcess(
             command,
             process.returncode,
@@ -880,15 +912,23 @@ def _run_adapter(
         )
         if mode == "create":
             if foreign_bridge:
-                raise ResultUnknownError(
+                message = (
                     "Bridge listener is not owned by this Wechatsync process; "
-                    "do not retry automatically",
-                    receipt={"status": RESULT_UNKNOWN},
+                    "do not retry automatically"
                 )
+            else:
+                message = (
+                    "Wechatsync create exited before the bridge became ready; "
+                    "do not retry automatically"
+                )
+            if "adapter_cleanup_error" in adapter_cleanup:
+                message = f"{message}; {adapter_cleanup['adapter_cleanup_error']}"
             raise ResultUnknownError(
-                "Wechatsync create exited before the bridge became ready; do not retry automatically",
-                receipt={"status": RESULT_UNKNOWN},
+                message,
+                receipt={"status": RESULT_UNKNOWN, **adapter_cleanup},
             )
+        if "adapter_cleanup_error" in adapter_cleanup:
+            raise RuntimeError(adapter_cleanup["adapter_cleanup_error"])
         return result
 
     try:
@@ -899,34 +939,44 @@ def _run_adapter(
         TypeError,
         ValueError,
         websocket.WebSocketException,
-    ) as error:
-        process.terminate()
-        try:
-            stdout, stderr = process.communicate(timeout=10)
-        except subprocess.TimeoutExpired as error:
-            raise RuntimeError(
-                "Wechatsync did not stop after extension wake failed"
-            ) from error
+    ) as wake_error:
+        stdout, stderr, adapter_cleanup = _stop_adapter_after_failure(
+            process,
+            reason="Extension wake failed",
+        )
         del stdout, stderr
-        message = f"Extension wake failed: {error}"
+        safe_error = _sanitize_browser_diagnostics(config, [str(wake_error)])
+        message = f"Extension wake failed: {safe_error}"
+        if "adapter_cleanup_error" in adapter_cleanup:
+            message = f"{message}; {adapter_cleanup['adapter_cleanup_error']}"
         if mode == "create":
-            raise ResultUnknownError(message, receipt={"status": RESULT_UNKNOWN})
-        raise RuntimeError(message)
+            raise ResultUnknownError(
+                message,
+                receipt={"status": RESULT_UNKNOWN, **adapter_cleanup},
+            ) from wake_error
+        raise RuntimeError(message) from wake_error
 
     try:
         stdout, stderr = process.communicate(timeout=180)
-    except subprocess.TimeoutExpired as error:
-        process.terminate()
-        try:
-            process.communicate(timeout=10)
-        except subprocess.TimeoutExpired:
-            pass
+    except subprocess.TimeoutExpired as timeout_error:
+        _stdout, _stderr, adapter_cleanup = _stop_adapter_after_failure(
+            process,
+            reason="Adapter execution timed out",
+        )
+        message = (
+            "Wechatsync create timed out after the bridge connected; "
+            "do not retry automatically"
+        )
+        if "adapter_cleanup_error" in adapter_cleanup:
+            message = f"{message}; {adapter_cleanup['adapter_cleanup_error']}"
         if mode == "create":
             raise ResultUnknownError(
-                "Wechatsync create timed out after the bridge connected; do not retry automatically",
-                receipt={"status": RESULT_UNKNOWN},
-            ) from error
-        raise RuntimeError("Wechatsync auth timed out") from error
+                message,
+                receipt={"status": RESULT_UNKNOWN, **adapter_cleanup},
+            ) from timeout_error
+        if "adapter_cleanup_error" in adapter_cleanup:
+            raise RuntimeError(adapter_cleanup["adapter_cleanup_error"]) from timeout_error
+        raise RuntimeError("Wechatsync auth timed out") from timeout_error
 
     return subprocess.CompletedProcess(
         command,
@@ -953,6 +1003,7 @@ def _result_unknown_receipt(
     receipt: dict[str, Any] = {
         "status": RESULT_UNKNOWN,
         "source_sha256": _source_sha256(source),
+        "adapter_cleanup_status": "CLOSED",
     }
     for key in ("cleanup_status", "cleanup_error"):
         if key in browser:
@@ -1055,6 +1106,7 @@ def execute_task(
         "draft_id": match.group("id"),
         "review_url": match.group(0),
         "source_sha256": _source_sha256(source_path),
+        "adapter_cleanup_status": "CLOSED",
         **browser,
     }
 

@@ -11,6 +11,7 @@ from typing import Any
 import click
 
 from chatpost.zhihu import (
+    RESULT_UNKNOWN,
     ResultUnknownError,
     execute_task,
     load_runner_config,
@@ -160,11 +161,27 @@ def create_command(
     try:
         payload = execute_task(load_runner_config(config_path), source, mode="create")
     except ResultUnknownError as error:
-        _write_receipt(receipt, error.receipt)
+        try:
+            _write_receipt(receipt, error.receipt)
+        except (OSError, TypeError, ValueError):
+            fallback_receipt = dict(error.receipt)
+            fallback_receipt.setdefault("status", RESULT_UNKNOWN)
+            _emit(fallback_receipt, output)
+            raise click.ClickException(
+                f"{RESULT_UNKNOWN}: {error}. Receipt could not be written; "
+                "do not retry automatically."
+            ) from error
         raise click.ClickException(str(error)) from error
     except (OSError, RuntimeError, TypeError, ValueError) as error:
         raise click.ClickException(str(error)) from error
-    _write_receipt(receipt, payload)
+    try:
+        _write_receipt(receipt, payload)
+    except (OSError, TypeError, ValueError) as receipt_error:
+        _emit(payload, output)
+        raise click.ClickException(
+            "DRAFT_CREATED result was obtained, but the receipt could not be written; "
+            "do not retry automatically."
+        ) from receipt_error
     _emit(payload, output)
 
 

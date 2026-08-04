@@ -11,10 +11,10 @@ This page separates real `ChatPost 0.1.0` behavior, verified external evidence, 
 | First-login checkpoint | Implemented | `chatpost zhihu login` keeps one Profile alive and polls read-only auth for manual QR/code login; it writes no article. |
 | Zhihu auth check | Implemented | `chatpost zhihu auth` starts the controlled Runner, performs read-only Wechatsync auth, and stops gracefully. |
 | Article dry-run | Implemented | `chatpost zhihu draft dry-run` starts no browser and writes nothing to Zhihu. |
-| One-shot draft create | Implemented | `chatpost zhihu draft create` invokes the adapter once; success writes a mode-`0600` receipt and ambiguity writes `RESULT_UNKNOWN`. |
+| One-shot draft create | Implemented | `chatpost zhihu draft create` invokes the adapter once; success writes a mode-`0600` receipt and ambiguity writes `RESULT_UNKNOWN`. Browser and adapter cleanup are recorded independently; receipt-write failure preserves and emits the authoritative result instead of inviting a retry. |
 | ChatUp Playwright dependency | Implemented | Bounded `chatup>=0.2.4,<0.3.0`; read-only `chatup.playwright.resolve`. |
 | Raw-CDP extension wake | Implemented | Uses the captured browser WebSocket for `Target.getTargets`, `Target.attachToTarget`, and extension evaluation; never follows a later target-level WebSocket. The bridge listener PID must belong to this task's Node subprocess. |
-| Secret redaction | Implemented | Environment secret values in adapter output become `[REDACTED]`; startup diagnostics also redact private assignments, URLs/connections, and ownership markers, and fail closed if the private env becomes unavailable; receipts contain no tokens, cookies, or local storage. |
+| Secret redaction | Implemented | Adapter output redacts exact environment values plus dynamic private assignments, WebSocket/loopback connections, and ownership markers while preserving the Zhihu review URL. Startup diagnostics additionally fail closed if the private env becomes unavailable; receipts contain no tokens, cookies, or local storage. |
 
 ## Verified Evidence
 
