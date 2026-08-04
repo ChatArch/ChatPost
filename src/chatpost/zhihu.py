@@ -55,7 +55,7 @@ _DIAGNOSTIC_PRIVATE_ASSIGNMENT = re.compile(
     r"(?im)(?<![\w])(?P<quote>[\"']?)(?P<key>(?:[A-Z0-9_-]*)(?:"
     r"TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|PRIVATE[_-]?KEY|"
     r"CREDENTIAL|AUTHORIZATION|COOKIE|SESSION|CSRF"
-    r")[A-Z0-9_-]*)(?P=quote)(?P<separator>\s*[:=]\s*).*$"
+    r")[A-Z0-9_-]*)(?P=quote)(?P<separator>\s*[:=]\s*)"
 )
 _PROTECTED_BROWSER_ARGS = (
     "--user-data-dir",
@@ -368,13 +368,6 @@ def _sanitize_browser_diagnostics(
     text = _DIAGNOSTIC_URL.sub("[REDACTED]", text)
     text = _DIAGNOSTIC_LOOPBACK.sub("[REDACTED]", text)
     text = _DIAGNOSTIC_OWNERSHIP_MARKER.sub("[REDACTED]", text)
-    text = _DIAGNOSTIC_PRIVATE_ASSIGNMENT.sub(
-        lambda match: (
-            f"{match.group('quote')}{match.group('key')}{match.group('quote')}"
-            f"{match.group('separator')}[REDACTED]"
-        ),
-        text,
-    )
     return _redact(text, private_values)[-2000:].strip()
 
 
@@ -861,20 +854,86 @@ def _adapter_environment(config: ZhihuRunnerConfig) -> tuple[dict[str, str], lis
     return environment, redactions
 
 
+def _quoted_private_value_end(text: str, start: int) -> int | None:
+    quote = text[start]
+    escaped = False
+    for index in range(start + 1, len(text)):
+        character = text[index]
+        if escaped:
+            escaped = False
+        elif character == "\\":
+            escaped = True
+        elif character == quote:
+            return index + 1
+    return None
+
+
+def _container_private_value_end(text: str, start: int) -> int | None:
+    pairs = {"{": "}", "[": "]"}
+    stack = [pairs[text[start]]]
+    quote: str | None = None
+    escaped = False
+    for index in range(start + 1, len(text)):
+        character = text[index]
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            continue
+        if character in {'"', "'"}:
+            quote = character
+        elif character in pairs:
+            stack.append(pairs[character])
+        elif character in {"}", "]"}:
+            if character != stack[-1]:
+                return None
+            stack.pop()
+            if not stack:
+                return index + 1
+    return None
+
+
+def _private_value_end(text: str, start: int) -> int | None:
+    if start >= len(text):
+        return start
+    if text[start] in {'"', "'"}:
+        return _quoted_private_value_end(text, start)
+    if text[start] in {"{", "["}:
+        return _container_private_value_end(text, start)
+    newline = text.find("\n", start)
+    return len(text) if newline < 0 else newline
+
+
+def _redact_private_assignments(text: str) -> str:
+    parts: list[str] = []
+    cursor = 0
+    while match := _DIAGNOSTIC_PRIVATE_ASSIGNMENT.search(text, cursor):
+        parts.append(text[cursor : match.end()])
+        parts.append("[REDACTED]")
+        value_end = _private_value_end(text, match.end())
+        if value_end is None:
+            cursor = len(text)
+            break
+        cursor = value_end
+    parts.append(text[cursor:])
+    return "".join(parts)
+
+
 def _redact(text: str, values: Sequence[str]) -> str:
     redacted = text
     for value in sorted(values, key=len, reverse=True):
         redacted = redacted.replace(value, "[REDACTED]")
+    review_urls = tuple(match.group(0) for match in _REVIEW_URL.finditer(redacted))
     redacted = _ADAPTER_WEBSOCKET_URL.sub("[REDACTED]", redacted)
     redacted = _DIAGNOSTIC_LOOPBACK.sub("[REDACTED]", redacted)
     redacted = _DIAGNOSTIC_OWNERSHIP_MARKER.sub("[REDACTED]", redacted)
-    redacted = _DIAGNOSTIC_PRIVATE_ASSIGNMENT.sub(
-        lambda match: (
-            f"{match.group('quote')}{match.group('key')}{match.group('quote')}"
-            f"{match.group('separator')}[REDACTED]"
-        ),
-        redacted,
-    )
+    redacted = _redact_private_assignments(redacted)
+    for review_url in review_urls:
+        if review_url not in redacted:
+            redacted = f"{redacted.rstrip()}\n{review_url}"
     return redacted
 
 

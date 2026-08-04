@@ -231,7 +231,7 @@ receipt 分别记录 browser `cleanup_status`、本轮 popup `extension_cleanup_
 
 如果 authoritative result 已经产生但 receipt 无法落盘，ChatPost 不会用普通文件系统异常覆盖主结果：明确成功时先输出 `DRAFT_CREATED`；歧义写入时继续明确 `RESULT_UNKNOWN`；随后报告 receipt 无法写入，并明确不得自动重试。
 
-adapter stdout/stderr 除了替换私有 env 的精确值，还会结构化遮蔽动态私密赋值（包括跨行结构化私密赋值）、WebSocket URL、loopback 连接信息和 ownership marker；用于 authoritative result 的知乎 `/edit` review URL 会保留。
+adapter stdout/stderr 除了替换私有 env 的精确值，还会结构化遮蔽动态私密赋值，包括跨行结构化私密赋值中的嵌套 object/array 与跨行 quoted value；若无法证明私密值的闭合边界，则丢弃其后的未知文本，只恢复用于 authoritative result 的严格知乎 `/edit` review URL 白名单。WebSocket URL、loopback 连接信息和 ownership marker 也会被遮蔽。
 
 图片上传失败可以与草稿创建成功同时发生；必须按编辑页实际内容报告，不能把 CLI exit 0 当成图片完整证明。
 

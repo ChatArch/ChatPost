@@ -202,7 +202,7 @@ Receipts record browser `cleanup_status`, per-run popup `extension_cleanup_statu
 
 If receipt persistence fails after an authoritative result exists, ChatPost does not replace that result with a generic filesystem error. It emits `DRAFT_CREATED` first for a definitive success, or keeps the explicit `RESULT_UNKNOWN` classification for an ambiguous write, then reports that the receipt could not be written and says not to retry automatically.
 
-Adapter stdout/stderr redaction covers exact private-env values plus dynamic private assignments (including multi-line structured private assignments), WebSocket URLs, loopback connection details, and ownership markers. The expected Zhihu `/edit` review URL remains available for the authoritative result.
+Adapter stdout/stderr redaction covers exact private-env values plus dynamic private assignments, including multi-line structured private assignments with nested objects/arrays and multi-line quoted values. If a private value has no provable closing boundary, ChatPost drops the unknown tail and restores only the strict Zhihu `/edit` review-URL allowlist needed for an authoritative result. WebSocket URLs, loopback connection details, and ownership markers are also redacted.
 
 Image-upload failure can coexist with successful draft creation. Report the actual editor content; exit code zero alone does not prove image completeness.
 

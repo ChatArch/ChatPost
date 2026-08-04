@@ -668,6 +668,53 @@ def test_browser_diagnostics_redact_multiline_json_private_value(tmp_path):
     assert '"oauth_token":\n  [REDACTED]' in message
 
 
+def test_browser_diagnostics_redact_nested_private_object(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+
+    message = zhihu._sanitize_browser_diagnostics(
+        config,
+        [
+            '{"credentials": {',
+            '  "value": "BROWSER-PRETTY-OBJECT-CANARY"',
+            "}}",
+        ],
+    )
+
+    assert "BROWSER-PRETTY-OBJECT-CANARY" not in message
+    assert '"credentials": [REDACTED]' in message
+
+
+def test_browser_diagnostics_redact_multiline_quoted_private_value(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+
+    message = zhihu._sanitize_browser_diagnostics(
+        config,
+        [
+            "oauth_token='BROWSER-FIRST-LINE-CANARY",
+            "BROWSER-MULTILINE-QUOTED-CANARY'",
+        ],
+    )
+
+    assert "BROWSER-FIRST-LINE-CANARY" not in message
+    assert "BROWSER-MULTILINE-QUOTED-CANARY" not in message
+    assert "oauth_token=[REDACTED]" in message
+
+
+def test_browser_diagnostics_fail_closed_on_unterminated_private_value(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+
+    message = zhihu._sanitize_browser_diagnostics(
+        config,
+        [
+            "safe-prefix",
+            "oauth_token='BROWSER-UNTERMINATED-FIRST-CANARY",
+            "BROWSER-UNKNOWN-TAIL-CANARY",
+        ],
+    )
+
+    assert message == "safe-prefix\noauth_token=[REDACTED]"
+
+
 def test_wait_for_extension_binds_the_popup_created_by_this_run(monkeypatch, tmp_path):
     config = load_runner_config(_config(tmp_path))
     endpoint = _endpoint(None)
@@ -1257,6 +1304,52 @@ def test_adapter_output_redaction_blocks_dynamic_credentials_but_keeps_review_ur
         assert canary not in redacted
     assert review_url in redacted
     assert redacted.count("[REDACTED]") >= 7
+
+
+def test_adapter_output_redacts_nested_private_object_and_keeps_review_url():
+    review_url = "https://zhuanlan.zhihu.com/p/2067000000000000001/edit"
+    output = (
+        '"credentials": {\n'
+        '  "value": "ADAPTER-PRETTY-OBJECT-CANARY"\n'
+        "}\n"
+        f"{review_url}"
+    )
+
+    redacted = zhihu._redact(output, [])
+
+    assert "ADAPTER-PRETTY-OBJECT-CANARY" not in redacted
+    assert '"credentials": [REDACTED]' in redacted
+    assert review_url in redacted
+
+
+def test_adapter_output_redacts_multiline_quoted_value_and_keeps_review_url():
+    review_url = "https://zhuanlan.zhihu.com/p/2067000000000000001/edit"
+    output = (
+        "oauth_token='ADAPTER-FIRST-LINE-CANARY\n"
+        "ADAPTER-MULTILINE-QUOTED-CANARY'\n"
+        f"{review_url}"
+    )
+
+    redacted = zhihu._redact(output, [])
+
+    assert "ADAPTER-FIRST-LINE-CANARY" not in redacted
+    assert "ADAPTER-MULTILINE-QUOTED-CANARY" not in redacted
+    assert "oauth_token=[REDACTED]" in redacted
+    assert review_url in redacted
+
+
+def test_adapter_output_fail_closed_but_restores_allowlisted_review_url():
+    review_url = "https://zhuanlan.zhihu.com/p/2067000000000000001/edit"
+    output = (
+        "safe-prefix\n"
+        "oauth_token='ADAPTER-UNTERMINATED-FIRST-CANARY\n"
+        "ADAPTER-UNKNOWN-TAIL-CANARY\n"
+        f"{review_url}"
+    )
+
+    redacted = zhihu._redact(output, [])
+
+    assert redacted == f"safe-prefix\noauth_token=[REDACTED]\n{review_url}"
 
 
 def test_dry_run_adapter_path_structurally_redacts_dynamic_credentials(
