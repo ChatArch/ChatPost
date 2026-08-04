@@ -506,6 +506,7 @@ def _extension_target_from_result(
     for target in targets:
         if (
             isinstance(target, dict)
+            and target.get("type") in {"page", "background_page"}
             and str(target.get("url", "")).startswith(expected)
             and isinstance(target.get("targetId"), str)
         ):

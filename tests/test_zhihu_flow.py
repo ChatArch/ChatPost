@@ -540,7 +540,16 @@ def test_extension_target_never_consumes_target_websocket(monkeypatch, tmp_path)
                     "result": {
                         "targetInfos": [
                             {
+                                "targetId": "extension-service-worker",
+                                "type": "service_worker",
+                                "url": (
+                                    f"chrome-extension://{config.extension_id}/"
+                                    "service-worker-loader.js"
+                                ),
+                            },
+                            {
                                 "targetId": "extension-owned-target",
+                                "type": "page",
                                 "url": (
                                     f"chrome-extension://{config.extension_id}/"
                                     "src/popup/index.html"
@@ -872,6 +881,7 @@ def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, t
                     "targetInfos": [
                         {
                             "targetId": "owned-extension-target",
+                            "type": "page",
                             "url": (
                                 f"chrome-extension://{config.extension_id}/"
                                 "src/popup/index.html"
