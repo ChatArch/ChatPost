@@ -12,7 +12,7 @@ ChatPost 是 ChatArch 的多平台内容发布控制面。这个文档站把已�
 | Review Chrome 安装、ChatEnv、URL、Profile 和 ledger | [配置、环境与状态](configuration.md) |
 | 用固定 MkDocs 博客稿理解知乎首次登录与草稿验收 | [知乎首次设置与草稿验收](zhihu-first-run.md) |
 | 第一次安装、运行命令行、确认包可用 | [CLI 树](cli-tree.md) |
-| Review 预期 CLI、Chrome runtime 与多账号隔离 | [Browser Runner 与账号隔离](browser-runners.md) |
+| Review 当前 CLI、Chrome runtime 与多账号隔离 | [Browser Runner 与账号隔离](browser-runners.md) |
 | 校对当前包有哪些一等能力和边界 | [能力地图](capability-map.md) |
 | 从 Python 代码调用包能力 | [Python 接口树](interface-tree.md) |
 

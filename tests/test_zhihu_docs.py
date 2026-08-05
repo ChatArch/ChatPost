@@ -7,6 +7,12 @@ def test_cli_tree_matches_registered_task_commands():
     for relative in ("docs/cli-tree.md", "docs/cli-tree.en.md"):
         text = (ROOT / relative).read_text(encoding="utf-8")
         for command in (
+            "chatpost account list",
+            "chatpost account show",
+            "chatpost login status",
+            "chatpost login qr",
+            "chatpost login code",
+            "chatpost post draft",
             "chatpost zhihu preflight",
             "chatpost zhihu login",
             "chatpost zhihu auth",
@@ -16,7 +22,35 @@ def test_cli_tree_matches_registered_task_commands():
             assert command in text
         assert "chatup playwright install 1.61.1" in text
         assert "chatup.playwright" in text
+        assert "chatbrowser>=0.1.2,<0.2.0" in text
+        assert "attach_existing_cdp = false" in text
+        assert "手机号" in text or "phone" in text
+        assert "验证码" in text or "verification code" in text
+        assert "post publish" in text
+        assert "final" in text or "最终" in text
         assert "chatup.chrome_for_testing" not in text
+
+
+def test_attach_existing_cdp_is_documented_as_runner_config_only():
+    for relative in ("docs/configuration.md", "docs/configuration.en.md"):
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        assert "attach_existing_cdp = false" in text
+        assert "手机号" in text or "phone" in text
+        assert "验证码" in text or "verification code" in text
+        runner_start = text.index("[runners.zhihu-personal]")
+        account_start = text.index('[accounts."zhihu@personal"]')
+        assert runner_start < text.index("attach_existing_cdp = false") < account_start
+        account_block = text[account_start : text.index("```", account_start)]
+        assert "attach_existing_cdp" not in account_block
+        assert "LEFT_RUNNING_EXISTING_CDP" in text
+
+
+def test_extension_bridge_wake_contract_is_documented():
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "mcpToken" in changelog
+    assert "MCP_SET_SERVER_URL" in changelog
+    assert "payload.url" in changelog
+    assert "MCP_WATCH_START" in changelog
 
 
 def test_quick_start_keeps_create_update_and_publish_boundaries_explicit():

@@ -64,6 +64,7 @@ _PROTECTED_BROWSER_ARGS = (
     "--disable-extensions-except",
     "--load-extension",
 )
+_LOGIN_METHODS = {"qr", "code"}
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,7 @@ class ZhihuRunnerConfig:
     extension_id: str
     headless: bool
     browser_args: tuple[str, ...]
+    attach_existing_cdp: bool
 
 
 @dataclass(frozen=True)
@@ -159,6 +161,9 @@ def load_runner_config(path: str | Path) -> ZhihuRunnerConfig:
     headless = table.get("headless", True)
     if not isinstance(headless, bool):
         raise TypeError("zhihu.headless must be a boolean")
+    attach_existing_cdp = table.get("attach_existing_cdp", False)
+    if not isinstance(attach_existing_cdp, bool):
+        raise TypeError("zhihu.attach_existing_cdp must be a boolean")
 
     return ZhihuRunnerConfig(
         playwright_version=_required(table, "playwright_version", str),
@@ -175,6 +180,7 @@ def load_runner_config(path: str | Path) -> ZhihuRunnerConfig:
         extension_id=extension_id,
         headless=headless,
         browser_args=tuple(browser_args_value),
+        attach_existing_cdp=attach_existing_cdp,
     )
 
 
@@ -300,7 +306,13 @@ def preflight(
     secrets = _read_env(config.env_file)
     if not secrets.get("WECHATSYNC_TOKEN"):
         raise ValueError("Environment file must contain WECHATSYNC_TOKEN")
-    if port_checker(config.cdp_host, config.cdp_port):
+    cdp_open = port_checker(config.cdp_host, config.cdp_port)
+    if config.attach_existing_cdp:
+        if not cdp_open:
+            raise ValueError(
+                f"Existing CDP endpoint is not listening: {config.cdp_host}:{config.cdp_port}"
+            )
+    elif cdp_open:
         raise ValueError(f"CDP port is already listening: {config.cdp_host}:{config.cdp_port}")
     if port_checker(config.bridge_host, config.bridge_port):
         raise ValueError(
@@ -325,6 +337,7 @@ def preflight(
         "cdp": f"{config.cdp_host}:{config.cdp_port}",
         "bridge": f"{config.bridge_host}:{config.bridge_port}",
         "extension_id": config.extension_id,
+        "browser_attachment": "EXISTING_CDP" if config.attach_existing_cdp else "OWNED_BROWSER",
     }
 
 
@@ -332,6 +345,32 @@ def _http_json(url: str, *, method: str = "GET") -> Any:
     request = urllib.request.Request(url, method=method)
     with urllib.request.urlopen(request, timeout=2) as response:
         return json.load(response)
+
+
+def _existing_cdp_endpoint(config: ZhihuRunnerConfig) -> _CdpEndpoint:
+    """Return a validated existing browser CDP endpoint without claiming browser ownership."""
+
+    base_url = f"http://{config.cdp_host}:{config.cdp_port}"
+    version = _http_json(f"{base_url}/json/version")
+    if not isinstance(version, dict):
+        raise TypeError("Existing CDP /json/version response must be an object")
+    websocket_url = version.get("webSocketDebuggerUrl")
+    if not isinstance(websocket_url, str) or not websocket_url:
+        raise TypeError("Existing CDP endpoint did not expose a browser WebSocket URL")
+    parsed = urllib.parse.urlparse(websocket_url)
+    if (
+        parsed.scheme != "ws"
+        or parsed.hostname != config.cdp_host
+        or parsed.port != config.cdp_port
+        or not parsed.path.startswith("/devtools/browser/")
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeError("Existing CDP browser WebSocket URL does not match the configured loopback endpoint")
+    return _CdpEndpoint(base_url=base_url, browser_websocket_url=websocket_url)
 
 
 def _sanitize_browser_diagnostics(
@@ -634,39 +673,60 @@ def _wake_extension(
         session_id = attached.get("sessionId")
         if not isinstance(session_id, str):
             raise TypeError("Extension CDP attach returned no session identity")
-        set_server = _cdp_evaluate(
+        token_saved = _cdp_evaluate(
             debug_socket,
             3,
+            "new Promise((resolve) => {"
+            "chrome.storage.local.set("
+            + json.dumps({"mcpToken": token}, ensure_ascii=False)
+            + ", () => resolve({ok: !chrome.runtime.lastError}));"
+            "})",
+            session_id=session_id,
+        )
+        set_server = _cdp_evaluate(
+            debug_socket,
+            4,
             "new Promise((resolve) => {"
             "chrome.runtime.sendMessage("
             + json.dumps(
                 {
                     "type": "MCP_SET_SERVER_URL",
-                    "url": server_url,
-                    "token": token,
+                    "payload": {"url": server_url},
                 },
                 ensure_ascii=False,
             )
             + ", (response) => resolve({ok: !chrome.runtime.lastError && "
-            "response?.ok !== false}));"
+            "response?.success !== false && response?.ok !== false}));"
             "})",
             session_id=session_id,
         )
         enabled = _cdp_evaluate(
             debug_socket,
-            4,
+            5,
             "new Promise((resolve) => {"
             "chrome.runtime.sendMessage({type: 'MCP_ENABLE'}, "
             "(response) => resolve({ok: !chrome.runtime.lastError && "
-            "response?.ok !== false}));"
+            "response?.success !== false && response?.ok !== false}));"
             "})",
             session_id=session_id,
         )
+        watched = _cdp_evaluate(
+            debug_socket,
+            6,
+            "new Promise((resolve) => {"
+            "chrome.runtime.sendMessage({type: 'MCP_WATCH_START'}, "
+            "(response) => resolve({ok: !chrome.runtime.lastError && "
+            "response?.success !== false && response?.ok !== false}));"
+            "})",
+            session_id=session_id,
+        )
+    token_ready = bool(isinstance(token_saved, dict) and token_saved.get("ok"))
+    watch_ready = bool(isinstance(watched, dict) and watched.get("ok"))
     result = {
         "server": bool(isinstance(set_server, dict) and set_server.get("ok")),
         "enabled": bool(isinstance(enabled, dict) and enabled.get("ok")),
     }
-    if not all(result.values()):
+    if not token_ready or not watch_ready or not all(result.values()):
         raise RuntimeError("Extension rejected the loopback bridge configuration")
     return result
 
@@ -736,7 +796,7 @@ def _close_browser(endpoint: _CdpEndpoint, process: subprocess.Popen[str]) -> No
 def browser_session(
     config: ZhihuRunnerConfig,
 ) -> Iterator[tuple[dict[str, Any], _CdpEndpoint]]:
-    """Start one owned browser process and stop it gracefully on exit."""
+    """Start one owned browser or attach to an explicitly configured existing CDP endpoint."""
 
     preflight(config)
     installation = resolve(
@@ -748,7 +808,52 @@ def browser_session(
         "browser_version": installation.browser_version,
         "browser_revision": installation.browser_revision,
         "playwright_version": installation.playwright_version,
+        "browser_attachment": "EXISTING_CDP" if config.attach_existing_cdp else "OWNED_BROWSER",
     }
+    if config.attach_existing_cdp:
+        endpoint = _existing_cdp_endpoint(config)
+        try:
+            version_info = _http_json(f"{endpoint.base_url}/json/version")
+        except (OSError, TypeError, ValueError, urllib.error.URLError):
+            version_info = {}
+        if isinstance(version_info, dict) and isinstance(version_info.get("Browser"), str):
+            browser["browser_cdp_product"] = version_info["Browser"]
+            browser["browser_version"] = version_info["Browser"].split("/", 1)[-1]
+            browser["browser_revision"] = "existing-cdp"
+        endpoint = _wait_for_extension(config, endpoint)
+        active_result_unknown: ResultUnknownError | None = None
+        try:
+            try:
+                yield browser, endpoint
+            except ResultUnknownError as error:
+                active_result_unknown = error
+                raise
+        finally:
+            try:
+                _close_extension_target(config, endpoint)
+                browser["extension_cleanup_status"] = "CLOSED"
+            except (
+                KeyError,
+                OSError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+                websocket.WebSocketException,
+            ) as error:
+                browser["extension_cleanup_status"] = "MANUAL_RECOVERY_REQUIRED"
+                browser["extension_cleanup_error"] = str(error)
+            browser["cleanup_status"] = "LEFT_RUNNING_EXISTING_CDP"
+            if active_result_unknown is not None:
+                active_result_unknown.receipt["cleanup_status"] = browser["cleanup_status"]
+                active_result_unknown.receipt["extension_cleanup_status"] = browser[
+                    "extension_cleanup_status"
+                ]
+                if "extension_cleanup_error" in browser:
+                    active_result_unknown.receipt["extension_cleanup_error"] = browser[
+                        "extension_cleanup_error"
+                    ]
+        return
+
     ownership_token = secrets.token_urlsafe(24)
     process = subprocess.Popen(
         _browser_command(config, installation, ownership_token),
@@ -1177,9 +1282,22 @@ def _result_unknown_receipt(
     return receipt
 
 
-def _open_login_page(config: ZhihuRunnerConfig, endpoint: _CdpEndpoint) -> None:
+def _login_checkpoint_url(method: str) -> str:
+    if method not in _LOGIN_METHODS:
+        raise ValueError(f"Unsupported Zhihu login method: {method}")
+    return "https://www.zhihu.com/signin?" + urllib.parse.urlencode(
+        {"login_method": method}
+    )
+
+
+def _open_login_page(
+    config: ZhihuRunnerConfig,
+    endpoint: _CdpEndpoint,
+    *,
+    method: str = "qr",
+) -> None:
     del config
-    login_url = "https://www.zhihu.com/signin"
+    login_url = _login_checkpoint_url(method)
     with _owned_browser_socket(endpoint) as debug_socket:
         _cdp_command(debug_socket, 1, "Target.createTarget", {"url": login_url})
 
@@ -1188,14 +1306,13 @@ def wait_for_login(
     config: ZhihuRunnerConfig,
     *,
     timeout: int = 900,
+    method: str = "qr",
     adapter_runner: Callable[
         [ZhihuRunnerConfig, Path | None, str, _CdpEndpoint | None],
         subprocess.CompletedProcess[str],
     ] = _run_adapter,
     browser_session_factory: Callable[[ZhihuRunnerConfig], Any] = browser_session,
-    login_page_opener: Callable[[ZhihuRunnerConfig, _CdpEndpoint], None] = (
-        _open_login_page
-    ),
+    login_page_opener: Callable[..., None] = _open_login_page,
     sleeper: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
@@ -1203,14 +1320,16 @@ def wait_for_login(
 
     if timeout < 1:
         raise ValueError("Login timeout must be at least one second")
+    if method not in _LOGIN_METHODS:
+        raise ValueError(f"Unsupported Zhihu login method: {method}")
     deadline = clock() + timeout
     with browser_session_factory(config) as session:
         browser, endpoint = session
-        login_page_opener(config, endpoint)
+        login_page_opener(config, endpoint, method=method)
         while clock() < deadline:
             result = adapter_runner(config, None, "auth", endpoint)
             if result.returncode == 0:
-                return {"status": "READY", **browser}
+                return {"status": "READY", "login_method": method, **browser}
             sleeper(3)
     raise RuntimeError("Zhihu login checkpoint timed out without a successful auth check")
 

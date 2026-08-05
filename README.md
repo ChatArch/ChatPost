@@ -41,6 +41,10 @@ ChatArch multi-platform content publishing infrastructure package.
 pip install -e ".[dev]"
 chatpost --help
 chatpost --version
+chatpost account --help
+chatpost login --help
+chatpost login code --help
+chatpost post --help
 chatpost zhihu --help
 python -m pytest -q
 python -m build
@@ -48,7 +52,7 @@ python -m build
 
 ## 命令行规范
 
-这个包依赖 `chatstyle>=0.1.1,<0.2.0`、`chatenv>=0.2.0,<0.3.0`、`chatup>=0.2.4,<0.3.0` 和 `websocket-client>=1.8,<2.0`。Playwright package/browser 安装由 ChatUp 负责；ChatPost 只解析 exact descriptor，并管理 Profile、扩展、loopback CDP/bridge 与单次草稿任务。
+这个包依赖 `chatstyle>=0.1.1,<0.2.0`、`chatenv>=0.2.0,<0.3.0`、`chatup>=0.2.4,<0.3.0`、`chatbrowser>=0.1.2,<0.2.0` 和 `websocket-client>=1.8,<2.0`。Playwright package/browser 安装由 ChatUp 负责；浏览器 runtime/Profile/CDP metadata 边界由 ChatBrowser 承担；ChatPost 只解析 exact descriptor、账号 alias 和发布任务，并管理 Profile、扩展、loopback CDP/bridge 与单次 review 草稿任务。
 
 - `CommandSchema` / `CommandField` 描述输入。
 - `add_interactive_option()` 提供统一 `-i/-I`。

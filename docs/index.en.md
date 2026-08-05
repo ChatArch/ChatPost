@@ -12,7 +12,7 @@ Site entry: <https://arch.gh.wzhecnu.cn/ChatPost/en/>
 | Review Chrome installation, ChatEnv, URLs, profiles, and ledger | [Configuration, Environment, and State](configuration.md) |
 | Follow first Zhihu login/draft acceptance with the fixed MkDocs article | [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md) |
 | Install the package, run the CLI, and confirm it works | [CLI Tree](cli-tree.md) |
-| Review the proposed CLI, Chrome runtime, and multi-account isolation | [Browser Runners and Account Isolation](browser-runners.md) |
+| Review the current CLI, Chrome runtime, and multi-account isolation | [Browser Runners and Account Isolation](browser-runners.md) |
 | Check first-class capabilities and current boundaries | [Capability Map](capability-map.md) |
 | Call package behavior directly from Python | [Python Interface Tree](interface-tree.md) |
 

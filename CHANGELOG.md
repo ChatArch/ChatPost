@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add common `chatpost account list/show`, `chatpost login status/qr/code`, and `chatpost post draft` commands on top of the existing Zhihu runner.
+- Add a non-sensitive account alias registry parser and tests for `platform@alias` resolution.
+- Add explicit `attach_existing_cdp = true` runner mode for a Profile already held by a known loopback CDP browser; this mode closes only the per-run extension popup and leaves the existing browser running.
+
+### Changed
+
+- Require `chatbrowser>=0.1.2,<0.2.0` alongside ChatUp, ChatEnv, ChatStyle, and websocket-client dependencies.
+- Fix Wechatsync extension bridge wake-up by writing the MCP token to extension local storage key `mcpToken`, sending `MCP_SET_SERVER_URL` with `payload.url`, and starting the active MCP watch with `MCP_WATCH_START` before adapter communication.
+- Update README, CLI tree, MkDocs pages, and capability maps so `account/login/post draft` and the SMS-code login checkpoint are documented as implemented while final publish and long-term publication commands remain proposals.
+
 ## 0.1.0 - 2026-08-04
 
 ### Added

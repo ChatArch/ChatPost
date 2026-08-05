@@ -41,6 +41,10 @@ Choose documentation by scenario:
 pip install -e ".[dev]"
 chatpost --help
 chatpost --version
+chatpost account --help
+chatpost login --help
+chatpost login code --help
+chatpost post --help
 chatpost zhihu --help
 python -m pytest -q
 python -m build
@@ -48,7 +52,7 @@ python -m build
 
 ## CLI Contract
 
-This package depends on `chatstyle>=0.1.1,<0.2.0`, `chatenv>=0.2.0,<0.3.0`, `chatup>=0.2.4,<0.3.0`, and `websocket-client>=1.8,<2.0`. ChatUp owns Playwright package/browser installation. ChatPost only resolves an exact descriptor and owns the Profile, extension, loopback CDP/bridge, and one-shot draft task.
+This package depends on `chatstyle>=0.1.1,<0.2.0`, `chatenv>=0.2.0,<0.3.0`, `chatup>=0.2.4,<0.3.0`, `chatbrowser>=0.1.2,<0.2.0`, and `websocket-client>=1.8,<2.0`. ChatUp owns Playwright package/browser installation. ChatBrowser owns the browser runtime, Profile metadata, and CDP metadata safety boundary. ChatPost resolves exact descriptors, account aliases, and publishing tasks, then owns the Profile, extension, loopback CDP/bridge, and one-shot review-draft task.
 
 - `CommandSchema` / `CommandField` for inputs.
 - `add_interactive_option()` for the shared `-i/-I` switch.

@@ -60,6 +60,7 @@ def _config(tmp_path: Path, **overrides) -> Path:
         "extension_id": "dipgimoobbhdefncjomgehikkbaklgii",
         "headless": True,
         "browser_args": ["--disable-dev-shm-usage"],
+        "attach_existing_cdp": False,
     }
     values.update(overrides)
     path = tmp_path / "runner.toml"
@@ -79,7 +80,8 @@ def _config(tmp_path: Path, **overrides) -> Path:
         f"bridge_port = {values['bridge_port']}\n"
         f"extension_id = {json.dumps(values['extension_id'])}\n"
         f"headless = {str(values['headless']).lower()}\n"
-        f"browser_args = [{browser_args}]\n",
+        f"browser_args = [{browser_args}]\n"
+        f"attach_existing_cdp = {str(values['attach_existing_cdp']).lower()}\n",
         encoding="utf-8",
     )
     return path
@@ -184,6 +186,61 @@ def test_preflight_resolves_exact_playwright_and_checks_static_inputs(tmp_path):
     assert result["browser_revision"] == "1228"
     assert result["browser_version"] == "149.0.7827.55"
     assert "WECHATSYNC_TOKEN" not in json.dumps(result)
+
+
+def test_attach_existing_preflight_requires_existing_cdp_and_free_bridge(tmp_path):
+    config = load_runner_config(_config(tmp_path, attach_existing_cdp=True))
+    installation = _installation(tmp_path)
+    checks = []
+
+    def port_checker(host, port):
+        checks.append((host, port))
+        return port == config.cdp_port
+
+    result = preflight(config, resolver=lambda *_args, **_kwargs: installation, port_checker=port_checker)
+
+    assert result["status"] == "READY"
+    assert result["browser_attachment"] == "EXISTING_CDP"
+    assert checks == [(config.cdp_host, config.cdp_port), (config.bridge_host, config.bridge_port)]
+
+
+def test_attach_existing_preflight_rejects_missing_cdp(tmp_path):
+    config = load_runner_config(_config(tmp_path, attach_existing_cdp=True))
+    installation = _installation(tmp_path)
+
+    with pytest.raises(ValueError, match="Existing CDP endpoint is not listening"):
+        preflight(config, resolver=lambda *_args, **_kwargs: installation, port_checker=lambda *_args: False)
+
+
+def test_attach_existing_browser_session_closes_only_current_popup(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path, attach_existing_cdp=True))
+    installation = _installation(tmp_path)
+    order = []
+    initial = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/existing",
+    )
+    popup = zhihu._CdpEndpoint(
+        base_url=initial.base_url,
+        browser_websocket_url=initial.browser_websocket_url,
+        extension_target_id="attach-popup",
+    )
+
+    monkeypatch.setattr(zhihu, "preflight", lambda _config: order.append("preflight"))
+    monkeypatch.setattr(zhihu, "resolve", lambda *_args, **_kwargs: installation)
+    monkeypatch.setattr(zhihu, "_existing_cdp_endpoint", lambda _config: initial)
+    monkeypatch.setattr(zhihu, "_wait_for_extension", lambda _config, endpoint: (order.append("extension"), popup)[1])
+    monkeypatch.setattr(zhihu, "_close_extension_target", lambda _config, endpoint: order.append(f"close:{endpoint.extension_target_id}"))
+    monkeypatch.setattr(zhihu, "_close_browser", lambda *_args: (_ for _ in ()).throw(AssertionError("attached browser must not close")))
+
+    with zhihu.browser_session(config) as (browser, endpoint):
+        assert endpoint is popup
+        order.append("yield")
+
+    assert order == ["preflight", "extension", "yield", "close:attach-popup"]
+    assert browser["browser_attachment"] == "EXISTING_CDP"
+    assert browser["extension_cleanup_status"] == "CLOSED"
+    assert browser["cleanup_status"] == "LEFT_RUNNING_EXISTING_CDP"
 
 
 def test_dry_run_does_not_start_browser(tmp_path):
@@ -911,6 +968,43 @@ def test_extension_cleanup_closes_only_the_popup_created_by_this_run(
     assert messages[1]["params"] == {"targetId": "extension-owned-target"}
 
 
+def test_open_login_page_supports_code_checkpoint(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id="extension-owned-target",
+    )
+    sent = []
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            if message["method"] == "Target.createTarget":
+                return json.dumps({"id": message["id"], "result": {"targetId": "login-target"}})
+            return json.dumps({"id": message["id"], "result": {}})
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    zhihu._open_login_page(config, endpoint, method="code")
+
+    assert sent[0]["method"] == "Target.createTarget"
+    assert "login_method=code" in sent[0]["params"]["url"]
+
+
+def test_wait_for_login_rejects_unknown_login_method(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+
+    with pytest.raises(ValueError, match="Unsupported Zhihu login method"):
+        wait_for_login(config, method="password")
+
+
 def test_cdp_ownership_timeout_requires_manual_recovery(monkeypatch, tmp_path):
     config = load_runner_config(_config(tmp_path))
 
@@ -1528,6 +1622,8 @@ def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, t
         "Target.attachToTarget",
         "Runtime.evaluate",
         "Runtime.evaluate",
+        "Runtime.evaluate",
+        "Runtime.evaluate",
     ]
     assert commands[1]["params"] == {
         "targetId": "owned-extension-target",
@@ -1535,11 +1631,20 @@ def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, t
     }
     assert commands[2]["sessionId"] == "owned-extension-session"
     assert commands[3]["sessionId"] == "owned-extension-session"
-    payload = json.dumps(messages, ensure_ascii=False)
-    assert "MCP_SET_SERVER_URL" in payload
-    assert "MCP_ENABLE" in payload
-    assert "ws://127.0.0.1:9527" in payload
-    assert "top-secret" in payload
+    assert commands[4]["sessionId"] == "owned-extension-session"
+    assert commands[5]["sessionId"] == "owned-extension-session"
+    expressions = [command["params"]["expression"] for command in commands[2:6]]
+    assert "chrome.storage.local.set" in expressions[0]
+    assert "mcpToken" in expressions[0]
+    assert "top-secret" in expressions[0]
+    assert "MCP_SET_SERVER_URL" in expressions[1]
+    assert "payload" in expressions[1]
+    assert "ws://127.0.0.1:9527" in expressions[1]
+    assert "MCP_ENABLE" in expressions[2]
+    assert "MCP_WATCH_START" in expressions[3]
+    assert "top-secret" not in expressions[1]
+    assert "top-secret" not in expressions[2]
+    assert "top-secret" not in expressions[3]
     assert "top-secret" not in json.dumps(result)
 
 
@@ -1567,16 +1672,20 @@ def test_login_checkpoint_repeats_only_read_only_auth_until_ready(tmp_path):
         timeout=60,
         adapter_runner=adapter,
         browser_session_factory=session,
-        login_page_opener=lambda _config, endpoint: calls.append(
-            (None, "open-login", endpoint)
+        login_page_opener=lambda _config, endpoint, *, method="qr": calls.append(
+            (None, f"open-login-{method}", endpoint)
         ),
         sleeper=lambda _seconds: None,
         clock=iter([0.0, 1.0, 2.0, 3.0]).__next__,
     )
 
-    assert result == {"status": "READY", "browser_version": "149.0.7827.55"}
+    assert result == {
+        "status": "READY",
+        "login_method": "qr",
+        "browser_version": "149.0.7827.55",
+    }
     assert calls == [
-        (None, "open-login", _endpoint()),
+        (None, "open-login-qr", _endpoint()),
         (None, "auth", _endpoint()),
         (None, "auth", _endpoint()),
         (None, "auth", _endpoint()),
