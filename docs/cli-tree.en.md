@@ -11,9 +11,13 @@ chatpost
 ├── account                         # non-sensitive account alias registry
 │   ├── list                         # list configured account aliases
 │   └── show                         # inspect one account alias
+├── qr                              # generic QR code artifact helpers
+│   └── encode                       # render DATA into a PNG artifact without echoing DATA
 ├── login                           # login status and manual login checkpoint
 │   ├── status                       # read-only auth check
 │   ├── qr                           # open login/QR checkpoint and wait for READY
+│   ├── qr-image                     # capture a live checkpoint image artifact and keep waiting
+│   ├── qr-link                      # create a clickable login URL QR artifact and receipt
 │   └── code                         # open SMS-code checkpoint and wait for READY; no phone/code args
 ├── post                            # review-draft post entrypoint
 │   └── draft                        # create one platform review draft; not final publish
@@ -31,6 +35,7 @@ Inspect the real help:
 ```bash
 chatpost --help
 chatpost account --help
+chatpost qr --help
 chatpost login --help
 chatpost post --help
 chatpost zhihu --help
@@ -62,6 +67,11 @@ chatpost account show zhihu@zhihu-test \
   --output json \
   -I
 
+chatpost qr encode 'https://www.zhihu.com/signin?login_method=qr' \
+  --artifact login-url.png \
+  --output json \
+  -I
+
 chatpost login status zhihu@zhihu-test \
   --registry accounts.toml \
   --output json \
@@ -70,6 +80,21 @@ chatpost login status zhihu@zhihu-test \
 chatpost login qr zhihu@zhihu-test \
   --registry accounts.toml \
   --timeout 900 \
+  --output json \
+  -I
+
+chatpost login qr-image zhihu@zhihu-test \
+  --registry accounts.toml \
+  --artifact live-login-qr.png \
+  --ready-receipt live-login-qr-ready.json \
+  --timeout 900 \
+  --output json \
+  -I
+
+chatpost login qr-link zhihu@zhihu-test \
+  --registry accounts.toml \
+  --artifact login-url.png \
+  --receipt login-url.json \
   --output json \
   -I
 
@@ -89,10 +114,13 @@ chatpost post draft zhihu@zhihu-test article.md \
 These common commands are ChatPost orchestration only:
 
 1. `account list/show` read the account alias registry only. They do not store or print cookies, local storage, tokens, passwords, credentials, or other secrets.
-2. `login status` resolves `platform@alias` and runs one read-only Zhihu auth check.
-3. `login qr` opens the QR login checkpoint and waits until the account becomes `READY`; the browser/Profile still owns login state and ChatPost never exports cookies.
-4. `login code` opens an SMS-code login checkpoint and waits for `READY`; phone numbers and verification codes are used only in the human browser flow, never as CLI arguments and never in the registry, config, receipt, or logs.
-5. `post draft` creates one review draft and writes a mode-`0600` receipt. It is the current safe acceptance path for “posting”; it is not final publish.
+2. `qr encode` renders caller-provided data into a PNG artifact and reports only artifact metadata by default.
+3. `login status` resolves `platform@alias` and runs one read-only Zhihu auth check.
+4. `login qr` opens the QR login checkpoint and waits until the account becomes `READY`; the browser/Profile still owns login state and ChatPost never exports cookies.
+5. `login qr-image` captures the live login checkpoint image into an artifact and writes a ready receipt before continuing to wait for `READY`; the conversation host decides how to deliver the image.
+6. `login qr-link` creates a QR image for the public login URL and emits that clickable URL plus a mode-`0600` receipt. It is a link handoff, not cookie/Profile export.
+7. `login code` opens an SMS-code login checkpoint and waits for `READY`; phone numbers and verification codes are used only in the human browser flow, never as CLI arguments and never in the registry, config, receipt, or logs.
+8. `post draft` creates one review draft and writes a mode-`0600` receipt. It is the current safe acceptance path for “posting”; it is not final publish.
 
 ## Lower-Level Zhihu Runner Commands
 
@@ -145,7 +173,7 @@ chatup playwright install 1.61.1 --browser chromium --output json -I
 chatup playwright doctor 1.61.1 --browser chromium --output json -I
 ```
 
-ChatPost depends on `chatup>=0.2.4,<0.3.0` and `chatbrowser>=0.1.2,<0.2.0`. The current Zhihu draft route still resolves the exact browser through ChatUp, then ChatPost owns the Profile, extension, loopback CDP/bridge, and Wechatsync process. The account registry stores only non-sensitive alias metadata. ChatBrowser owns the browser runtime, Profile metadata, and CDP session metadata safety boundary; richer session discovery should come through ChatBrowser rather than storing browser secrets in ChatPost.
+ChatPost depends on `chatup>=0.2.4,<0.3.0`, `chatbrowser>=0.1.2,<0.2.0`, and `qrcode[pil]>=7.4,<9.0`. The current Zhihu draft route still resolves the exact browser through ChatUp, then ChatPost owns the Profile, extension, loopback CDP/bridge, QR/link handoff artifacts, and Wechatsync process. The account registry stores only non-sensitive alias metadata. ChatBrowser owns the browser runtime, Profile metadata, and CDP session metadata safety boundary; richer session discovery should come through ChatBrowser rather than storing browser secrets in ChatPost.
 
 ```python
 from chatup.playwright import resolve

@@ -24,7 +24,8 @@ _SENSITIVE_KEY_MARKERS = (
     "localstorage",
     "indexeddb",
 )
-_ALLOWED_ACCOUNT_KEYS = {"platform", "runner_config", "profile", "label"}
+_ALLOWED_ACCOUNT_KEYS = {"platform", "runner_config", "profile", "label", "login_methods"}
+_SUPPORTED_LOGIN_METHODS = {"qr", "code"}
 
 
 def default_registry_path() -> Path:
@@ -45,11 +46,12 @@ class Account:
     runner_config: Path
     profile: str | None = None
     label: str | None = None
+    login_methods: tuple[str, ...] = ()
 
     def target(self) -> str:
         return f"{self.platform}@{self.alias}"
 
-    def to_payload(self) -> dict[str, str]:
+    def to_payload(self) -> dict[str, Any]:
         payload = {
             "alias": self.alias,
             "platform": self.platform,
@@ -59,6 +61,8 @@ class Account:
             payload["profile"] = self.profile
         if self.label:
             payload["label"] = self.label
+        if self.login_methods:
+            payload["login_methods"] = list(self.login_methods)
         return payload
 
 
@@ -107,19 +111,33 @@ def load_accounts(path: str | Path | None = None) -> dict[str, Account]:
         platform = _required_string(table, "platform", alias=alias)
         if platform != "zhihu":
             raise AccountRegistryError(f"unsupported account platform: {platform}")
-        runner_config = Path(_required_string(table, "runner_config", alias=alias)).expanduser().resolve()
+        raw_runner_config = Path(_required_string(table, "runner_config", alias=alias)).expanduser()
+        if not raw_runner_config.is_absolute():
+            raw_runner_config = registry_path.parent / raw_runner_config
+        runner_config = raw_runner_config.resolve()
         profile = table.get("profile")
         label = table.get("label")
+        raw_login_methods = table.get("login_methods", [])
         if profile is not None and not isinstance(profile, str):
             raise AccountRegistryError(f"account {alias!r} profile must be a string")
         if label is not None and not isinstance(label, str):
             raise AccountRegistryError(f"account {alias!r} label must be a string")
+        if not isinstance(raw_login_methods, list) or any(
+            not isinstance(method, str) or not method for method in raw_login_methods
+        ):
+            raise AccountRegistryError(f"account {alias!r} login_methods must be a string list")
+        unsupported_methods = sorted(set(raw_login_methods) - _SUPPORTED_LOGIN_METHODS)
+        if unsupported_methods:
+            raise AccountRegistryError(
+                f"account {alias!r} contains unsupported login method: {unsupported_methods[0]!r}"
+            )
         accounts[alias] = Account(
             alias=alias,
             platform=platform,
             runner_config=runner_config,
             profile=profile,
             label=label,
+            login_methods=tuple(raw_login_methods),
         )
     return accounts
 

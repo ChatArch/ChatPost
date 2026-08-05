@@ -9,8 +9,11 @@ def test_cli_tree_matches_registered_task_commands():
         for command in (
             "chatpost account list",
             "chatpost account show",
+            "chatpost qr encode",
             "chatpost login status",
             "chatpost login qr",
+            "chatpost login qr-image",
+            "chatpost login qr-link",
             "chatpost login code",
             "chatpost post draft",
             "chatpost zhihu preflight",

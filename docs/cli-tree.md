@@ -11,9 +11,13 @@ chatpost
 ├── account                         # 非敏感账号 alias registry
 │   ├── list                         # 查看已有账号 alias
 │   └── show                         # 查看一个账号 alias
+├── qr                              # 通用 QR code 图片 artifact 工具
+│   └── encode                       # 把 DATA 渲染为 PNG artifact，默认不回显 DATA
 ├── login                           # 登录状态与人工登录 checkpoint
 │   ├── status                       # read-only auth check
 │   ├── qr                           # 打开登录页/二维码 checkpoint 并等待 READY
+│   ├── qr-image                     # 截取 live checkpoint 图片 artifact 并继续等待
+│   ├── qr-link                      # 生成可点击登录 URL 的 QR artifact 和 receipt
 │   └── code                         # 打开验证码登录 checkpoint 并等待 READY；不接收手机号/验证码参数
 ├── post                            # 发 Post 的 review-draft 入口
 │   └── draft                        # 创建一个平台 review 草稿；不是最终发布
@@ -31,6 +35,7 @@ chatpost
 ```bash
 chatpost --help
 chatpost account --help
+chatpost qr --help
 chatpost login --help
 chatpost post --help
 chatpost zhihu --help
@@ -62,6 +67,11 @@ chatpost account show zhihu@zhihu-test \
   --output json \
   -I
 
+chatpost qr encode 'https://www.zhihu.com/signin?login_method=qr' \
+  --artifact login-url.png \
+  --output json \
+  -I
+
 chatpost login status zhihu@zhihu-test \
   --registry accounts.toml \
   --output json \
@@ -70,6 +80,21 @@ chatpost login status zhihu@zhihu-test \
 chatpost login qr zhihu@zhihu-test \
   --registry accounts.toml \
   --timeout 900 \
+  --output json \
+  -I
+
+chatpost login qr-image zhihu@zhihu-test \
+  --registry accounts.toml \
+  --artifact live-login-qr.png \
+  --ready-receipt live-login-qr-ready.json \
+  --timeout 900 \
+  --output json \
+  -I
+
+chatpost login qr-link zhihu@zhihu-test \
+  --registry accounts.toml \
+  --artifact login-url.png \
+  --receipt login-url.json \
   --output json \
   -I
 
@@ -89,10 +114,13 @@ chatpost post draft zhihu@zhihu-test article.md \
 这些常规入口只是 ChatPost 编排层：
 
 1. `account list/show` 只读账号 alias registry，不保存或回显 Cookie、LocalStorage、token、password、credential 等敏感值。
-2. `login status` 解析 `platform@alias`，对知乎账号调用一次只读 auth check。
-3. `login qr` 打开二维码登录 checkpoint 并等待账号变为 `READY`；当前仍由浏览器/Profile 承载登录态，ChatPost 不导出 Cookie。
-4. `login code` 打开验证码登录 checkpoint 并等待 `READY`；手机号和验证码只在浏览器人工流程中使用，不作为 CLI 参数、不写 registry、config、receipt 或日志。
-5. `post draft` 只创建一个 review 草稿并写 `0600` receipt。它是“发 Post”的当前安全验收入口，不是最终发布。
+2. `qr encode` 把调用方提供的数据渲染为 PNG artifact，默认只报告 artifact metadata，不回显原始数据。
+3. `login status` 解析 `platform@alias`，对知乎账号调用一次只读 auth check。
+4. `login qr` 打开二维码登录 checkpoint 并等待账号变为 `READY`；当前仍由浏览器/Profile 承载登录态，ChatPost 不导出 Cookie。
+5. `login qr-image` 把 live 登录 checkpoint 截成图片 artifact，先写 ready receipt，再继续等待 `READY`；图片如何发给用户由对话宿主/gateway 决定。
+6. `login qr-link` 为公开登录 URL 生成 QR 图片并输出可点击 URL 与 `0600` receipt；它是 link handoff，不导出 Cookie/Profile。
+7. `login code` 打开验证码登录 checkpoint 并等待 `READY`；手机号和验证码只在浏览器人工流程中使用，不作为 CLI 参数、不写 registry、config、receipt 或日志。
+8. `post draft` 只创建一个 review 草稿并写 `0600` receipt。它是“发 Post”的当前安全验收入口，不是最终发布。
 
 ## 低层知乎 runner 入口
 
@@ -145,7 +173,7 @@ chatup playwright install 1.61.1 --browser chromium --output json -I
 chatup playwright doctor 1.61.1 --browser chromium --output json -I
 ```
 
-ChatPost 依赖 `chatup>=0.2.4,<0.3.0` 和 `chatbrowser>=0.1.2,<0.2.0`。当前知乎写草稿路径仍直接通过 ChatUp resolve exact browser，再由 ChatPost 管理 Profile、扩展、loopback CDP/bridge 与 Wechatsync 进程；账号 registry 只保存非敏感 alias metadata。ChatBrowser 负责浏览器 runtime/profile/session metadata 的安全边界，后续更丰富的 session 发现应从 ChatBrowser 接入，而不是在 ChatPost 里保存浏览器秘密。
+ChatPost 依赖 `chatup>=0.2.4,<0.3.0`、`chatbrowser>=0.1.2,<0.2.0` 和 `qrcode[pil]>=7.4,<9.0`。当前知乎写草稿路径仍直接通过 ChatUp resolve exact browser，再由 ChatPost 管理 Profile、扩展、loopback CDP/bridge、QR/link handoff artifact 与 Wechatsync 进程；账号 registry 只保存非敏感 alias metadata。ChatBrowser 负责浏览器 runtime/profile/session metadata 的安全边界，后续更丰富的 session 发现应从 ChatBrowser 接入，而不是在 ChatPost 里保存浏览器秘密。
 
 ```python
 from chatup.playwright import resolve
@@ -157,7 +185,7 @@ installation = resolve("1.61.1", browser="chromium")
 
 - ChatUp：Playwright package、它声明的 browser revision、安装元数据和 executable path；
 - ChatBrowser：浏览器 runtime、Profile metadata、CDP session metadata；
-- ChatPost：账号 alias、发布任务编排、Profile/扩展/CDP/bridge/Wechatsync 单次任务与 receipt；
+- ChatPost：账号 alias、QR 图片 artifact、发布任务编排、Profile/扩展/CDP/bridge/Wechatsync 单次任务与 receipt；
 - Wechatsync：知乎 adapter 与草稿写入；
 - 人工：首次登录和最终发布确认。
 

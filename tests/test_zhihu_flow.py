@@ -992,10 +992,148 @@ def test_open_login_page_supports_code_checkpoint(monkeypatch, tmp_path):
 
     monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
 
-    zhihu._open_login_page(config, endpoint, method="code")
+    target_id = zhihu._open_login_page(config, endpoint, method="code")
 
     assert sent[0]["method"] == "Target.createTarget"
     assert "login_method=code" in sent[0]["params"]["url"]
+    assert target_id == "login-target"
+
+
+def test_capture_login_screenshot_writes_png_without_qr_payload(monkeypatch, tmp_path):
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id="extension-owned-target",
+    )
+    artifact = tmp_path / "checkpoint.png"
+    sent = []
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            if message["method"] == "Target.attachToTarget":
+                result = {"sessionId": "login-session"}
+            elif message["method"] == "Runtime.evaluate":
+                result = {"result": {"value": "complete"}}
+            elif message["method"] == "Page.captureScreenshot":
+                result = {"data": "iVBORw0KGgo="}
+            else:
+                result = {}
+            return json.dumps({"id": message["id"], "result": result})
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    payload = zhihu._capture_login_screenshot(
+        endpoint,
+        "login-target",
+        artifact,
+        clock=lambda: 10.0,
+        sleeper=lambda _seconds: None,
+    )
+
+    assert payload == {"artifact_path": str(artifact.resolve()), "artifact_mime": "image/png"}
+    assert artifact.read_bytes() == b"\x89PNG\r\n\x1a\n"
+    methods = [message["method"] for message in sent]
+    assert methods == [
+        "Target.attachToTarget",
+        "Page.enable",
+        "Runtime.evaluate",
+        "Page.captureScreenshot",
+        "Target.detachFromTarget",
+    ]
+    assert "qr" not in artifact.read_text(encoding="latin1").lower()
+
+
+def test_wait_for_login_can_emit_checkpoint_image_before_polling(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    artifact = tmp_path / "qr.png"
+    callbacks = []
+    adapter_calls = []
+
+    @contextmanager
+    def browser_session(_config):
+        yield ({"browser_version": "149.0.7827.55"}, _endpoint())
+
+    def opener(_config, _endpoint_value, *, method):
+        assert method == "qr"
+        return "login-target"
+
+    def capturer(_endpoint_value, target_id, destination, **_kwargs):
+        assert target_id == "login-target"
+        destination.write_bytes(b"PNG")
+        return {"artifact_path": str(destination), "artifact_mime": "image/png"}
+
+    def adapter(_config, _source, mode, _endpoint_value):
+        adapter_calls.append(mode)
+        return subprocess.CompletedProcess([], 0, "authenticated", "")
+
+    result = wait_for_login(
+        config,
+        timeout=30,
+        checkpoint_artifact=artifact,
+        checkpoint_callback=callbacks.append,
+        adapter_runner=adapter,
+        browser_session_factory=browser_session,
+        login_page_opener=opener,
+        screenshot_capturer=capturer,
+    )
+
+    assert callbacks == [
+        {
+            "status": "CHECKPOINT_IMAGE_READY",
+            "login_method": "qr",
+            "artifact_path": str(artifact),
+            "artifact_mime": "image/png",
+            "browser_version": "149.0.7827.55",
+        }
+    ]
+    assert adapter_calls == ["auth"]
+    assert result["status"] == "READY"
+    assert result["checkpoint_artifact_path"] == str(artifact)
+
+
+def test_wait_for_login_keeps_browser_open_after_auth_check_error(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    adapter_calls = []
+    browser_events = []
+    now = [0.0]
+
+    @contextmanager
+    def browser_session(_config):
+        browser_events.append("open")
+        try:
+            yield ({"browser_version": "149.0.7827.55"}, _endpoint())
+        finally:
+            browser_events.append("close")
+
+    def adapter(_config, _source, mode, _endpoint_value):
+        adapter_calls.append(mode)
+        if len(adapter_calls) == 1:
+            raise RuntimeError("Wechatsync auth timed out")
+        return subprocess.CompletedProcess([], 0, "authenticated", "")
+
+    def sleeper(seconds):
+        now[0] += seconds
+
+    result = wait_for_login(
+        config,
+        timeout=30,
+        adapter_runner=adapter,
+        browser_session_factory=browser_session,
+        login_page_opener=lambda *_args, **_kwargs: "login-target",
+        sleeper=sleeper,
+        clock=lambda: now[0],
+    )
+
+    assert adapter_calls == ["auth", "auth"]
+    assert browser_events == ["open", "close"]
+    assert result["status"] == "READY"
 
 
 def test_wait_for_login_rejects_unknown_login_method(tmp_path):

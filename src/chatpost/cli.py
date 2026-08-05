@@ -12,11 +12,13 @@ import click
 from chatpost import __version__
 from chatpost.accounts import AccountRegistryError, load_accounts, resolve_account
 from chatpost.commands.zhihu import zhihu_group
+from chatpost.qr import generate_qr_code_image
 from chatpost.zhihu import (
     RESULT_UNKNOWN,
     ResultUnknownError,
     execute_task,
     load_runner_config,
+    login_checkpoint_url,
     wait_for_login,
 )
 
@@ -28,7 +30,17 @@ def _emit(payload: dict[str, Any], output: str) -> None:
         click.echo(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
         return
     click.echo(f"status: {payload.get('status', 'UNKNOWN')}")
-    for key in ("target", "draft_id", "review_url"):
+    for key in (
+        "target",
+        "login_method",
+        "login_url",
+        "artifact_path",
+        "checkpoint_artifact_path",
+        "artifact_mime",
+        "data_length",
+        "draft_id",
+        "review_url",
+    ):
         if payload.get(key):
             click.echo(f"{key}: {payload[key]}")
 
@@ -121,6 +133,27 @@ def account_show_command(
     _emit({"status": "READY", "account": account.to_payload()}, output)
 
 
+@main.group("qr")
+def qr_group() -> None:
+    """Generate non-platform-specific QR code image artifacts."""
+
+
+@qr_group.command("encode")
+@click.argument("data")
+@click.option("--artifact", type=click.Path(path_type=Path), required=True)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def qr_encode_command(data: str, artifact: Path, output: str, no_interactive: bool) -> None:
+    """Render DATA into a PNG QR code without echoing DATA by default."""
+
+    del no_interactive
+    try:
+        payload = generate_qr_code_image(data, artifact)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    _emit({"status": "QR_CODE_READY", **payload}, output)
+
+
 @main.group("login")
 def login_group() -> None:
     """Run account login checkpoints and read-only status checks."""
@@ -174,6 +207,83 @@ def login_qr_command(
     except (OSError, RuntimeError, TypeError, ValueError) as error:
         raise click.ClickException(str(error)) from error
     _emit({"target": account.target(), **payload}, output)
+
+
+@login_group.command("qr-image")
+@click.argument("target")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--artifact", type=click.Path(path_type=Path), required=True)
+@click.option("--ready-receipt", type=click.Path(path_type=Path), required=True)
+@click.option("--timeout", type=click.IntRange(min=1), default=900, show_default=True)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def login_qr_image_command(
+    target: str,
+    registry: Path | None,
+    artifact: Path,
+    ready_receipt: Path,
+    timeout: int,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Capture a QR-login image artifact, then keep waiting for login readiness."""
+
+    del no_interactive
+    account = _account_or_click_error(registry, target)
+    if account.platform != "zhihu":
+        raise _unsupported_platform(account)
+    login_url = login_checkpoint_url("qr")
+
+    def ready_callback(payload: dict[str, Any]) -> None:
+        _write_receipt(ready_receipt, {"target": account.target(), "login_url": login_url, **payload})
+
+    try:
+        payload = wait_for_login(
+            load_runner_config(account.runner_config),
+            timeout=timeout,
+            method="qr",
+            checkpoint_artifact=artifact,
+            checkpoint_callback=ready_callback,
+        )
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    _emit({"target": account.target(), "login_url": login_url, **payload}, output)
+
+
+@login_group.command("qr-link")
+@click.argument("target")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--artifact", type=click.Path(path_type=Path), required=True)
+@click.option("--receipt", type=click.Path(path_type=Path), required=True)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def login_qr_link_command(
+    target: str,
+    registry: Path | None,
+    artifact: Path,
+    receipt: Path,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Write a QR image for the public login URL and emit that clickable URL."""
+
+    del no_interactive
+    account = _account_or_click_error(registry, target)
+    if account.platform != "zhihu":
+        raise _unsupported_platform(account)
+    login_url = login_checkpoint_url("qr")
+    try:
+        payload = {
+            "status": "CHECKPOINT_LINK_READY",
+            "target": account.target(),
+            "login_method": "qr",
+            "login_url": login_url,
+            **generate_qr_code_image(login_url, artifact),
+        }
+        _write_receipt(receipt, payload)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    _emit(payload, output)
 
 
 @login_group.command("code")

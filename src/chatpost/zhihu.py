@@ -8,6 +8,7 @@ binary directly and uses Wechatsync's loopback bridge.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -18,6 +19,7 @@ import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -1282,7 +1284,7 @@ def _result_unknown_receipt(
     return receipt
 
 
-def _login_checkpoint_url(method: str) -> str:
+def login_checkpoint_url(method: str) -> str:
     if method not in _LOGIN_METHODS:
         raise ValueError(f"Unsupported Zhihu login method: {method}")
     return "https://www.zhihu.com/signin?" + urllib.parse.urlencode(
@@ -1290,16 +1292,98 @@ def _login_checkpoint_url(method: str) -> str:
     )
 
 
+def _capture_login_screenshot(
+    endpoint: _CdpEndpoint,
+    target_id: str,
+    destination: Path,
+    *,
+    ready_timeout: float = 8.0,
+    clock: Callable[[], float] = time.monotonic,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> dict[str, str]:
+    """Capture a PNG screenshot of the login target without extracting QR payloads."""
+
+    output = destination.expanduser().resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    session_id: str | None = None
+    with _owned_browser_socket(endpoint) as debug_socket:
+        attach = _cdp_command(
+            debug_socket,
+            1,
+            "Target.attachToTarget",
+            {"targetId": target_id, "flatten": True},
+        )
+        raw_session_id = attach.get("sessionId")
+        if not isinstance(raw_session_id, str) or not raw_session_id:
+            raise TypeError("Login target attach did not return a session id")
+        session_id = raw_session_id
+        try:
+            _cdp_command(debug_socket, 2, "Page.enable", session_id=session_id)
+            deadline = clock() + ready_timeout
+            while True:
+                readiness = _cdp_command(
+                    debug_socket,
+                    3,
+                    "Runtime.evaluate",
+                    {"expression": "document.readyState", "returnByValue": True},
+                    session_id=session_id,
+                )
+                result = readiness.get("result", {})
+                ready_state = result.get("value") if isinstance(result, dict) else None
+                if ready_state in {"interactive", "complete"} or clock() >= deadline:
+                    break
+                sleeper(0.2)
+            screenshot = _cdp_command(
+                debug_socket,
+                4,
+                "Page.captureScreenshot",
+                {"format": "png", "fromSurface": True},
+                session_id=session_id,
+            )
+            encoded = screenshot.get("data")
+            if not isinstance(encoded, str) or not encoded:
+                raise TypeError("Login screenshot did not return PNG data")
+            image = base64.b64decode(encoded, validate=True)
+            with tempfile.NamedTemporaryFile(
+                "wb",
+                prefix=f".{output.name}.",
+                suffix=".tmp",
+                dir=output.parent,
+                delete=False,
+            ) as stream:
+                temporary = Path(stream.name)
+                stream.write(image)
+            try:
+                os.chmod(temporary, 0o600)
+                os.replace(temporary, output)
+                os.chmod(output, 0o600)
+            finally:
+                temporary.unlink(missing_ok=True)
+        finally:
+            if session_id is not None:
+                _cdp_command(
+                    debug_socket,
+                    5,
+                    "Target.detachFromTarget",
+                    {"sessionId": session_id},
+                )
+    return {"artifact_path": str(output), "artifact_mime": "image/png"}
+
+
 def _open_login_page(
     config: ZhihuRunnerConfig,
     endpoint: _CdpEndpoint,
     *,
     method: str = "qr",
-) -> None:
+) -> str:
     del config
-    login_url = _login_checkpoint_url(method)
+    login_url = login_checkpoint_url(method)
     with _owned_browser_socket(endpoint) as debug_socket:
-        _cdp_command(debug_socket, 1, "Target.createTarget", {"url": login_url})
+        result = _cdp_command(debug_socket, 1, "Target.createTarget", {"url": login_url})
+    target_id = result.get("targetId")
+    if not isinstance(target_id, str) or not target_id:
+        raise TypeError("Login target creation did not return a target id")
+    return target_id
 
 
 def wait_for_login(
@@ -1313,6 +1397,9 @@ def wait_for_login(
     ] = _run_adapter,
     browser_session_factory: Callable[[ZhihuRunnerConfig], Any] = browser_session,
     login_page_opener: Callable[..., None] = _open_login_page,
+    checkpoint_artifact: Path | None = None,
+    checkpoint_callback: Callable[[dict[str, Any]], None] | None = None,
+    screenshot_capturer: Callable[..., dict[str, str]] = _capture_login_screenshot,
     sleeper: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
@@ -1325,13 +1412,39 @@ def wait_for_login(
     deadline = clock() + timeout
     with browser_session_factory(config) as session:
         browser, endpoint = session
-        login_page_opener(config, endpoint, method=method)
+        target_id = login_page_opener(config, endpoint, method=method)
+        checkpoint_payload: dict[str, Any] = {}
+        if checkpoint_artifact is not None:
+            capture = screenshot_capturer(
+                endpoint,
+                target_id,
+                Path(checkpoint_artifact).expanduser().resolve(),
+            )
+            checkpoint_payload = {
+                "status": "CHECKPOINT_IMAGE_READY",
+                "login_method": method,
+                **capture,
+                **browser,
+            }
+            if checkpoint_callback is not None:
+                checkpoint_callback(dict(checkpoint_payload))
+        last_auth_error: Exception | None = None
         while clock() < deadline:
-            result = adapter_runner(config, None, "auth", endpoint)
-            if result.returncode == 0:
-                return {"status": "READY", "login_method": method, **browser}
+            try:
+                result = adapter_runner(config, None, "auth", endpoint)
+            except (OSError, RuntimeError, TypeError, ValueError) as error:
+                last_auth_error = error
+                result = None
+            if result is not None and result.returncode == 0:
+                payload = {"status": "READY", "login_method": method, **browser}
+                if checkpoint_payload.get("artifact_path"):
+                    payload["checkpoint_artifact_path"] = checkpoint_payload["artifact_path"]
+                return payload
             sleeper(3)
-    raise RuntimeError("Zhihu login checkpoint timed out without a successful auth check")
+    message = "Zhihu login checkpoint timed out without a successful auth check"
+    if last_auth_error is not None:
+        message = f"{message}; last auth check failed: {last_auth_error}"
+    raise RuntimeError(message)
 
 
 def execute_task(
@@ -1417,6 +1530,7 @@ __all__ = [
     "browser_session",
     "execute_task",
     "load_runner_config",
+    "login_checkpoint_url",
     "preflight",
     "wait_for_login",
 ]
