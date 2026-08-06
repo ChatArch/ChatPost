@@ -41,13 +41,12 @@ ChatArch multi-platform content publishing infrastructure package.
 pip install -e ".[dev]"
 chatpost --help
 chatpost --version
+chatpost --tree
 chatpost account --help
 chatpost qr --help
-chatpost login --help
-chatpost login qr-link --help
-chatpost login code --help
-chatpost post --help
 chatpost zhihu --help
+chatpost zhihu account login --help
+chatpost zhihu draft --help
 python -m pytest -q
 python -m build
 ```

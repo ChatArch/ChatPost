@@ -1050,6 +1050,158 @@ def test_capture_login_screenshot_writes_png_without_qr_payload(monkeypatch, tmp
     assert "qr" not in artifact.read_text(encoding="latin1").lower()
 
 
+def test_generate_login_qr_artifact_uses_zhihu_qrcode_api(monkeypatch, tmp_path):
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id="extension-owned-target",
+    )
+    artifact = tmp_path / "checkpoint.png"
+    sent = []
+    generated = []
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            if message["method"] == "Target.attachToTarget":
+                result = {"sessionId": "login-session"}
+            elif message["method"] == "Runtime.evaluate":
+                expression = message["params"]["expression"]
+                if "location.href" in expression:
+                    value = {
+                        "url": "https://www.zhihu.com/signin?login_method=qr",
+                        "ready": "complete",
+                    }
+                else:
+                    value = {
+                        "ok": True,
+                        "status": 200,
+                        "expires_at": 1785921540,
+                        "link": "https://www.zhihu.com/account/scan/login/short-lived?/api/login/qrcode",
+                        "token": "short-lived",
+                    }
+                result = {"result": {"value": value}}
+            else:
+                result = {}
+            return json.dumps({"id": message["id"], "result": result})
+
+        def close(self):
+            pass
+
+    def generate_qr(data, destination):
+        generated.append((data, destination))
+        destination.write_bytes(b"PNG")
+        return {"artifact_path": str(destination), "artifact_mime": "image/png", "data_length": len(data)}
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    payload = zhihu._generate_login_qr_artifact(
+        endpoint,
+        "login-target",
+        artifact,
+        qr_renderer=generate_qr,
+    )
+
+    assert payload == {
+        "artifact_path": str(artifact.resolve()),
+        "artifact_mime": "image/png",
+        "data_length": len("https://www.zhihu.com/account/scan/login/short-lived?/api/login/qrcode"),
+        "login_url": "https://www.zhihu.com/account/scan/login/short-lived?/api/login/qrcode",
+        "qr_expires_at": 1785921540,
+    }
+    assert generated == [
+        (
+            "https://www.zhihu.com/account/scan/login/short-lived?/api/login/qrcode",
+            artifact.resolve(),
+        )
+    ]
+    assert [message["method"] for message in sent] == [
+        "Target.attachToTarget",
+        "Runtime.evaluate",
+        "Runtime.evaluate",
+        "Target.detachFromTarget",
+    ]
+    assert "location.href" in sent[1]["params"]["expression"]
+    assert "/api/v3/account/api/login/qrcode" in sent[2]["params"]["expression"]
+    assert "short-lived" not in artifact.read_text(encoding="latin1")
+
+
+def test_generate_login_qr_artifact_waits_for_zhihu_origin_before_api(
+    monkeypatch, tmp_path
+):
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id="extension-owned-target",
+    )
+    artifact = tmp_path / "checkpoint.png"
+    state_checks = []
+    api_calls = []
+
+    class Socket:
+        def send(self, payload):
+            self.message = json.loads(payload)
+
+        def recv(self):
+            message = self.message
+            if message["method"] == "Target.attachToTarget":
+                result = {"sessionId": "login-session"}
+            elif message["method"] == "Runtime.evaluate":
+                expression = message["params"]["expression"]
+                if "location.href" in expression:
+                    state_checks.append(expression)
+                    value = (
+                        {"url": "about:blank", "ready": "complete"}
+                        if len(state_checks) == 1
+                        else {
+                            "url": "https://www.zhihu.com/signin?login_method=qr",
+                            "ready": "interactive",
+                        }
+                    )
+                else:
+                    api_calls.append(expression)
+                    value = (
+                        {"ok": True, "status": 200}
+                        if len(state_checks) < 2
+                        else {
+                            "ok": True,
+                            "status": 200,
+                            "expires_at": 1785921540,
+                            "link": "https://www.zhihu.com/account/scan/login/ready?/api/login/qrcode",
+                            "token": "ready",
+                        }
+                    )
+                result = {"result": {"value": value}}
+            else:
+                result = {}
+            return json.dumps({"id": message["id"], "result": result})
+
+        def close(self):
+            pass
+
+    def generate_qr(data, destination):
+        destination.write_bytes(b"PNG")
+        return {"artifact_path": str(destination), "artifact_mime": "image/png"}
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    payload = zhihu._generate_login_qr_artifact(
+        endpoint,
+        "login-target",
+        artifact,
+        qr_renderer=generate_qr,
+        sleeper=lambda _seconds: None,
+        clock=lambda: len(state_checks),
+    )
+
+    assert len(state_checks) == 2
+    assert len(api_calls) == 1
+    assert payload["login_url"] == "https://www.zhihu.com/account/scan/login/ready?/api/login/qrcode"
+
+
 def test_wait_for_login_can_emit_checkpoint_image_before_polling(tmp_path):
     config = load_runner_config(_config(tmp_path))
     artifact = tmp_path / "qr.png"

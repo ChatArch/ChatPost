@@ -1,50 +1,126 @@
+import json
+from pathlib import Path
+
 from click.testing import CliRunner
 
-import chatpost.commands.zhihu as command
+import chatpost.cli as command
 from chatpost.cli import main
 from chatpost.zhihu import RESULT_UNKNOWN, ResultUnknownError
 
 
-def test_zhihu_cli_exposes_only_proven_task_commands():
+def _registry(tmp_path: Path) -> Path:
+    runner = tmp_path / "runner.toml"
+    runner.write_text("[zhihu]\n", encoding="utf-8")
+    registry = tmp_path / "accounts.toml"
+    registry.write_text(
+        '[accounts."zhihu-test"]\n'
+        'platform = "zhihu"\n'
+        f'runner_config = {json.dumps(str(runner))}\n'
+        'profile = "zhihu-test"\n',
+        encoding="utf-8",
+    )
+    return registry
+
+
+def test_zhihu_cli_exposes_platform_scoped_task_commands():
     zhihu = main.commands["zhihu"]
-    assert set(zhihu.commands) == {"preflight", "login", "auth", "draft"}
+    assert set(zhihu.commands) == {"account", "draft"}
+    assert set(zhihu.commands["account"].commands) == {"preflight", "status", "login"}
+    assert set(zhihu.commands["account"].commands["login"].commands) == {
+        "qr",
+        "qr-artifact",
+        "code",
+    }
     assert set(zhihu.commands["draft"].commands) == {"dry-run", "create"}
 
 
 def test_preflight_json(monkeypatch, tmp_path):
-    config = tmp_path / "runner.toml"
-    config.write_text("[zhihu]\n", encoding="utf-8")
-    monkeypatch.setattr(command, "load_runner_config", lambda _path: object())
-    monkeypatch.setattr(command, "preflight", lambda _config: {"status": "READY"})
-
-    result = CliRunner().invoke(
-        main,
-        ["zhihu", "preflight", "--config", str(config), "--output", "json", "-I"],
-    )
-
-    assert result.exit_code == 0
-    assert '"status": "READY"' in result.output
-
-
-def test_login_cli_dispatches_read_only_checkpoint(monkeypatch, tmp_path):
-    config = tmp_path / "runner.toml"
-    config.write_text("[zhihu]", encoding="utf-8")
+    registry = _registry(tmp_path)
     sentinel = object()
     calls = []
     monkeypatch.setattr(command, "load_runner_config", lambda _path: sentinel)
     monkeypatch.setattr(
         command,
-        "wait_for_login",
-        lambda loaded, timeout: calls.append((loaded, timeout)) or {"status": "READY"},
+        "preflight",
+        lambda config: calls.append(config) or {"status": "READY"},
     )
 
     result = CliRunner().invoke(
         main,
         [
             "zhihu",
+            "account",
+            "preflight",
+            "zhihu@zhihu-test",
+            "--registry",
+            str(registry),
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [sentinel]
+    assert '"status": "READY"' in result.output
+    assert '"target": "zhihu@zhihu-test"' in result.output
+
+
+def test_status_json_dispatches_read_only_auth(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    sentinel = object()
+    calls = []
+    monkeypatch.setattr(command, "load_runner_config", lambda _path: sentinel)
+    monkeypatch.setattr(
+        command,
+        "execute_task",
+        lambda config, source, *, mode: calls.append((config, source, mode))
+        or {"status": "READY"},
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
+            "account",
+            "status",
+            "zhihu@zhihu-test",
+            "--registry",
+            str(registry),
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [(sentinel, None, "auth")]
+    assert '"status": "READY"' in result.output
+    assert '"target": "zhihu@zhihu-test"' in result.output
+
+
+def test_login_cli_dispatches_read_only_checkpoint(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    sentinel = object()
+    calls = []
+    monkeypatch.setattr(command, "load_runner_config", lambda _path: sentinel)
+    monkeypatch.setattr(
+        command,
+        "wait_for_login",
+        lambda loaded, *, timeout, method="qr": calls.append((loaded, timeout, method))
+        or {"status": "READY", "login_method": method},
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
+            "account",
             "login",
-            "--config",
-            str(config),
+            "qr",
+            "zhihu@zhihu-test",
+            "--registry",
+            str(registry),
             "--timeout",
             "60",
             "--output",
@@ -53,16 +129,16 @@ def test_login_cli_dispatches_read_only_checkpoint(monkeypatch, tmp_path):
         ],
     )
 
-    assert result.exit_code == 0
-    assert calls == [(sentinel, 60)]
+    assert result.exit_code == 0, result.output
+    assert calls == [(sentinel, 60, "qr")]
     assert '"status": "READY"' in result.output
+    assert '"login_method": "qr"' in result.output
 
 
 def test_create_writes_safe_receipt(monkeypatch, tmp_path):
-    config = tmp_path / "runner.toml"
+    registry = _registry(tmp_path)
     source = tmp_path / "article.md"
     receipt = tmp_path / "receipt.json"
-    config.write_text("[zhihu]\n", encoding="utf-8")
     source.write_text("# title", encoding="utf-8")
     monkeypatch.setattr(command, "load_runner_config", lambda _path: object())
     monkeypatch.setattr(
@@ -82,9 +158,10 @@ def test_create_writes_safe_receipt(monkeypatch, tmp_path):
             "zhihu",
             "draft",
             "create",
+            "zhihu@zhihu-test",
             str(source),
-            "--config",
-            str(config),
+            "--registry",
+            str(registry),
             "--receipt",
             str(receipt),
             "--output",
@@ -96,16 +173,16 @@ def test_create_writes_safe_receipt(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert receipt.is_file()
     assert "DRAFT_CREATED" in receipt.read_text(encoding="utf-8")
+    assert "zhihu@zhihu-test" in receipt.read_text(encoding="utf-8")
     assert "token" not in receipt.read_text(encoding="utf-8").lower()
 
 
 def test_unknown_receipt_write_failure_preserves_do_not_retry_result(
     monkeypatch, tmp_path
 ):
-    config = tmp_path / "runner.toml"
+    registry = _registry(tmp_path)
     source = tmp_path / "article.md"
     receipt = tmp_path / "receipt.json"
-    config.write_text("[zhihu]\n", encoding="utf-8")
     source.write_text("# title", encoding="utf-8")
     monkeypatch.setattr(command, "load_runner_config", lambda _path: object())
 
@@ -132,9 +209,10 @@ def test_unknown_receipt_write_failure_preserves_do_not_retry_result(
             "zhihu",
             "draft",
             "create",
+            "zhihu@zhihu-test",
             str(source),
-            "--config",
-            str(config),
+            "--registry",
+            str(registry),
             "--receipt",
             str(receipt),
             "--output",
@@ -151,10 +229,9 @@ def test_unknown_receipt_write_failure_preserves_do_not_retry_result(
 
 
 def test_created_result_is_emitted_before_receipt_write_failure(monkeypatch, tmp_path):
-    config = tmp_path / "runner.toml"
+    registry = _registry(tmp_path)
     source = tmp_path / "article.md"
     receipt = tmp_path / "receipt.json"
-    config.write_text("[zhihu]\n", encoding="utf-8")
     source.write_text("# title", encoding="utf-8")
     monkeypatch.setattr(command, "load_runner_config", lambda _path: object())
     monkeypatch.setattr(
@@ -179,9 +256,10 @@ def test_created_result_is_emitted_before_receipt_write_failure(monkeypatch, tmp
             "zhihu",
             "draft",
             "create",
+            "zhihu@zhihu-test",
             str(source),
-            "--config",
-            str(config),
+            "--registry",
+            str(registry),
             "--receipt",
             str(receipt),
             "--output",
