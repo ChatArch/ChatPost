@@ -16,11 +16,11 @@ ChatPost's current user-visible focus is the **pure browser login foundation**: 
 ```bash
 chatpost --tree
 chatpost platforms
-chatpost profiles --platform zhihu --registry accounts.toml
-chatpost zhihu profiles --registry accounts.toml
-chatpost zhihu status PROFILE --registry accounts.toml
-chatpost zhihu login PROFILE --registry accounts.toml
-chatpost zhihu logout PROFILE --registry accounts.toml
+chatpost profiles --platform zhihu
+chatpost zhihu profiles
+chatpost zhihu status PROFILE
+chatpost zhihu login PROFILE
+chatpost zhihu logout PROFILE
 ```
 
-`login/status/logout` are browser-level only: no publishing adapter, no publishing extension, no publishing token, and no reading/exporting cookies/local storage/IndexedDB/sessions/tokens.
+The default registry is `~/.chatarch/chatpost/accounts.toml` (override explicitly with `CHATPOST_ACCOUNT_REGISTRY` or `--registry PATH`). `login/status/logout` are browser-level only: no publishing adapter, no publishing extension, no publishing token, and no reading/exporting cookies/local storage/IndexedDB/sessions/tokens.

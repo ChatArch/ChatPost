@@ -47,6 +47,8 @@ Cookie、Local Storage、密码和验证码不属于任何 ChatPost 配置层。
 
 Chrome installation 是 ChatUp 机器级资源；Profile 是 ChatPost Runner 状态；文章映射是 workspace 级状态。三者分开，避免把可移动内容仓库与某台机器或登录态绑定。
 
+当前已实现的登录基础层默认使用 `~/.chatarch/chatpost/` 作为 ChatArch-owned state root：`CHATPOST_HOME` 可覆盖 state root，`CHATPOST_ACCOUNT_REGISTRY` 或 CLI `--registry PATH` 可覆盖 registry 文件；默认 registry 是 `~/.chatarch/chatpost/accounts.toml`。普通用户不需要在仓库根目录、当前工作目录或临时 project 目录放 `accounts.toml`。
+
 ## ChatUp Playwright dependency
 
 ChatPost 通过已发布的有界依赖消费 ChatUp 与 ChatBrowser：
@@ -198,17 +200,18 @@ PID 不能单独证明身份。`runner stop` 还必须匹配 user-data-dir、bin
 
 ## Account registry
 
-`accounts.toml` 保存逻辑映射与最近只读验证结果：
+当前已实现的 `accounts.toml` 保存非秘密 Profile metadata 和 runner config 引用；默认位置是 `~/.chatarch/chatpost/accounts.toml`：
 
 ```toml
-[accounts."zhihu@personal"]
+[accounts."zhihu-personal"]
 platform = "zhihu"
-runner = "zhihu-personal"
-auth_state = "READY"
-last_auth_check = "<timestamp>"
+runner_config = "runners/zhihu-personal/runner.toml"
+profile = "zhihu-personal"
+label = "Personal Zhihu browser Profile"
+login_methods = ["qr"]
 ```
 
-它不保存用户名、手机号、密码、Cookie 或验证码。平台返回的公开 display name 只能作为诊断结果，不应成为目标主键。
+相对 `runner_config` 路径按 registry 所在目录解析，因此默认会落在 `~/.chatarch/chatpost/runners/...`。它不保存用户名、手机号、密码、Cookie、LocalStorage、IndexedDB、session、token 或验证码。平台返回的公开 display name 只能作为诊断结果，不应成为目标主键。
 
 ## Publication ledger
 

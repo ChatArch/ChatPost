@@ -16,11 +16,11 @@ ChatPost 当前用户可见重点是 **纯浏览器登录基础层**：发现平
 ```bash
 chatpost --tree
 chatpost platforms
-chatpost profiles --platform zhihu --registry accounts.toml
-chatpost zhihu profiles --registry accounts.toml
-chatpost zhihu status PROFILE --registry accounts.toml
-chatpost zhihu login PROFILE --registry accounts.toml
-chatpost zhihu logout PROFILE --registry accounts.toml
+chatpost profiles --platform zhihu
+chatpost zhihu profiles
+chatpost zhihu status PROFILE
+chatpost zhihu login PROFILE
+chatpost zhihu logout PROFILE
 ```
 
-`login/status/logout` 只做 browser-level 事情：不调用发布适配器，不加载发布扩展，不要求发布 token，不读取或导出 Cookie/LocalStorage/IndexedDB/session/token。
+默认 registry 是 `~/.chatarch/chatpost/accounts.toml`（可用 `CHATPOST_ACCOUNT_REGISTRY` 或 `--registry PATH` 显式覆盖）。`login/status/logout` 只做 browser-level 事情：不调用发布适配器，不加载发布扩展，不要求发布 token，不读取或导出 Cookie/LocalStorage/IndexedDB/session/token。

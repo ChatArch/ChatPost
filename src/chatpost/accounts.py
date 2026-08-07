@@ -28,13 +28,22 @@ _ALLOWED_ACCOUNT_KEYS = {"platform", "runner_config", "profile", "label", "login
 _SUPPORTED_LOGIN_METHODS = {"qr", "code"}
 
 
+def default_chatpost_home() -> Path:
+    """Return the ChatArch-owned ChatPost state root."""
+
+    configured = os.environ.get("CHATPOST_HOME")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return Path("~/.chatarch/chatpost").expanduser().resolve()
+
+
 def default_registry_path() -> Path:
     """Return the default non-sensitive account registry path."""
 
     configured = os.environ.get("CHATPOST_ACCOUNT_REGISTRY")
     if configured:
         return Path(configured).expanduser().resolve()
-    return Path("~/.chatarch/chatpost/accounts.toml").expanduser().resolve()
+    return default_chatpost_home() / "accounts.toml"
 
 
 @dataclass(frozen=True)
@@ -166,6 +175,7 @@ def resolve_account(target: str, accounts: dict[str, Account]) -> Account:
 __all__ = [
     "Account",
     "AccountRegistryError",
+    "default_chatpost_home",
     "default_registry_path",
     "load_accounts",
     "resolve_account",

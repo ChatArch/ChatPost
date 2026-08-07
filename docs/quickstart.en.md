@@ -6,11 +6,14 @@ This page covers only ChatPost's login foundation: discover Profiles, check Zhih
 
 ```bash
 CHATPOST=chatpost
-REGISTRY=/absolute/path/to/accounts.toml
+CHATPOST_HOME="${CHATPOST_HOME:-$HOME/.chatarch/chatpost}"
+REGISTRY="${CHATPOST_ACCOUNT_REGISTRY:-$CHATPOST_HOME/accounts.toml}"
 PROFILE=zhihu-personal
 ```
 
-`accounts.toml` stores only non-sensitive Profile metadata such as alias, platform, runner_config, profile, and label. Never write cookies, local storage, QR payloads, verification codes, phone numbers, passwords, tokens, or WebSocket UUIDs into the registry, config, logs, or docs.
+ChatPost stores local state under the ChatArch-owned state root `~/.chatarch/chatpost/` by default: the default registry is `~/.chatarch/chatpost/accounts.toml`, and later runner/Profile/receipt state should live under the same root. Use `--registry` only for an explicit override or task-local experiment; do not place the default `accounts.toml` in the repository root, current working directory, or a temporary project directory.
+
+`accounts.toml` stores only non-sensitive Profile metadata such as alias, platform, runner_config, profile, and label. Never write cookies, local storage, QR payloads, verification codes, phone numbers, passwords, tokens, or WebSocket UUIDs into the registry, config, logs, or docs. Relative `runner_config` paths resolve from the registry directory, so the default layout keeps them inside `~/.chatarch/chatpost/` too.
 
 ## 1. Confirm CLI and Profile
 
