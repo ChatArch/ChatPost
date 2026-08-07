@@ -303,7 +303,9 @@ stdout:
 }
 ```
 
-### practice_login
+### practice_login_timeout_smoke
+
+This short timeout smoke proves the command emits the page-owned login handoff immediately even when the user does not finish authorization inside the short test window.
 
 ```bash
 $ chatpost zhihu login zhihu-practice-quickstart --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml --timeout 5 --output json -I
@@ -311,4 +313,39 @@ exit: 0
 stdout:
 {"browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "login_url", "handoff_kind": "page_owned_login_url", "login_url": "[LIVE_LOGIN_URL_OMITTED_FROM_PUBLIC_DOC]", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGIN_REQUIRED", "target": "zhihu@zhihu-practice-quickstart"}
 {"browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "login_timeout", "handoff_kind": "page_owned_login_url", "login_url": "[LIVE_LOGIN_URL_OMITTED_FROM_PUBLIC_DOC]", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGIN_TIMEOUT", "target": "zhihu@zhihu-practice-quickstart"}
+```
+
+### practice_login_authorized_end_to_end
+
+This run keeps the same CLI command alive while the user authorizes the page-owned Zhihu login URL. The live tokenized `login_url` is omitted from the public documentation; the CLI output below is otherwise the real command result.
+
+When this login URL is delivered through Feishu/Lark, do not treat a URL button click as observable completion. A URL button only navigates. Pair it with explicit callback buttons such as `I opened the link / authorization done` and `Cancel`, then verify completion by running `chatpost zhihu status PROFILE` or by waiting for this long-running `login` command to emit `LOGGED_IN`.
+
+```bash
+$ chatpost zhihu login zhihu-practice-quickstart --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml --timeout 900 --output json -I
+exit: 0
+stdout:
+{"browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "login_url", "handoff_kind": "page_owned_login_url", "login_url": "[LIVE_LOGIN_URL_OMITTED_FROM_PUBLIC_DOC]", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGIN_REQUIRED", "target": "zhihu@zhihu-practice-quickstart"}
+{"account_name": "致宏Rex", "account_url": "https://www.zhihu.com/people/rexwzh", "browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "logged_in", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGGED_IN", "target": "zhihu@zhihu-practice-quickstart"}
+```
+
+### practice_status_after_authorization
+
+```bash
+$ chatpost zhihu status zhihu-practice-quickstart --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml --output json -I
+exit: 0
+stdout:
+{
+  "account_name": "致宏Rex",
+  "account_url": "https://www.zhihu.com/people/rexwzh",
+  "browser_attachment": "OWNED_BROWSER",
+  "browser_revision": "1228",
+  "browser_version": "149.0.7827.55",
+  "check_method": "browser_page",
+  "platform": "zhihu",
+  "playwright_version": "1.61.1",
+  "profile": "zhihu-practice-quickstart",
+  "status": "LOGGED_IN",
+  "target": "zhihu@zhihu-practice-quickstart"
+}
 ```
