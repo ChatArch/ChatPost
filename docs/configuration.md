@@ -49,10 +49,10 @@ Chrome installation 是 ChatUp 机器级资源；Profile 是 ChatPost Runner 状
 
 ## ChatUp Playwright dependency
 
-ChatPost 通过已发布的有界依赖消费 ChatUp：
+ChatPost 通过已发布的有界依赖消费 ChatUp 与 ChatBrowser：
 
 ```toml
-dependencies = ["chatup>=0.2.4,<0.3.0"]
+dependencies = ["chatup>=0.2.4,<0.3.0", "chatbrowser>=0.1.2,<0.2.0"]
 ```
 
 环境准备由 ChatUp 独立完成：
@@ -74,6 +74,7 @@ schema_version = 1
 runtime = "host"
 visible = true
 profile_mode = "managed"
+attach_existing_cdp = false
 
 [runners.zhihu-personal.cdp]
 bind = "127.0.0.1"
@@ -91,7 +92,7 @@ platform = "zhihu"
 runner = "zhihu-personal"
 ```
 
-`binary_path`/Chrome version 来自 ChatUp descriptor；`user_data_dir` 和已分配端口由 ChatPost Runner 目录派生。只有 adopt 现有 Profile 或接入外部 Runner 时才需要显式路径/URL。
+`attach_existing_cdp = false` 是默认值：ChatPost 启动并拥有一个 browser process，结束时通过启动时捕获的 browser CDP endpoint 关闭它。如果一个已知 browser 已经持有该 Profile 且暴露 loopback CDP，可设置 `attach_existing_cdp = true` 并让 `cdp_port` 指向现有 endpoint。attach 模式只创建/关闭本轮 extension popup，保留现有 browser 运行，并在 receipt 中记录 `cleanup_status=LEFT_RUNNING_EXISTING_CDP`。
 
 ## ChatEnv 只存秘密
 
@@ -275,7 +276,7 @@ command options
 
 提案中的 `config validate` / `doctor` 至少检查：
 
-1. 已安装 `chatup>=0.2.4,<0.3.0`，且 ChatPost 兼容版本可由 `chatup.playwright.resolve` 解析并执行；验证过程不触发安装；
+1. 已安装 `chatup>=0.2.4,<0.3.0` 和 `chatbrowser>=0.1.2,<0.2.0`，且 ChatPost 兼容版本可由 `chatup.playwright.resolve` 解析并执行；验证过程不触发安装；
 2. Runner 名称、Profile 路径和端口租约唯一；
 3. CDP/bridge bind address 为 loopback，本地 control transport 默认 stdio；
 4. token profile 引用存在但不读取/打印值；

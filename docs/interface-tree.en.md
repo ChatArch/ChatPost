@@ -1,8 +1,15 @@
 # Python Interface Tree
 
-The CLI only parses arguments. Substantive behavior lives in `chatpost.zhihu`.
+The CLI only parses arguments. Substantive behavior lives in `chatpost.accounts` and `chatpost.zhihu`.
 
 ```text
+chatpost.accounts
+├── Account
+├── AccountRegistryError
+├── default_registry_path()
+├── load_accounts(path=None)
+└── resolve_account(target, accounts)
+
 chatpost.zhihu
 ├── ZhihuRunnerConfig
 ├── load_runner_config(path)
@@ -14,20 +21,24 @@ chatpost.zhihu
 └── RESULT_UNKNOWN
 ```
 
-## ChatUp Dependency
+## ChatUp / ChatBrowser Dependency
 
 ```python
 from chatup.playwright import PlaywrightBrowserInstallation, resolve
+import chatbrowser
 ```
 
-ChatPost resolves an existing exact Playwright browser installation. It never installs or upgrades one implicitly.
+ChatPost resolves an existing exact Playwright browser installation. It never installs or upgrades one implicitly. ChatBrowser owns the browser runtime, Profile metadata, and CDP session metadata safety boundary; ChatPost does not store cookies, local storage, or QR payloads.
 
 ## Example
 
 ```python
+from chatpost.accounts import load_accounts, resolve_account
 from chatpost.zhihu import execute_task, load_runner_config, preflight
 
-config = load_runner_config("runner.toml")
+accounts = load_accounts("accounts.toml")
+account = resolve_account("zhihu@zhihu-test", accounts)
+config = load_runner_config(account.runner_config)
 status = preflight(config)
 result = execute_task(config, "article.md", mode="dry-run")
 ```

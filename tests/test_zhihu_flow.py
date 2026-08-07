@@ -60,6 +60,7 @@ def _config(tmp_path: Path, **overrides) -> Path:
         "extension_id": "dipgimoobbhdefncjomgehikkbaklgii",
         "headless": True,
         "browser_args": ["--disable-dev-shm-usage"],
+        "attach_existing_cdp": False,
     }
     values.update(overrides)
     path = tmp_path / "runner.toml"
@@ -79,7 +80,8 @@ def _config(tmp_path: Path, **overrides) -> Path:
         f"bridge_port = {values['bridge_port']}\n"
         f"extension_id = {json.dumps(values['extension_id'])}\n"
         f"headless = {str(values['headless']).lower()}\n"
-        f"browser_args = [{browser_args}]\n",
+        f"browser_args = [{browser_args}]\n"
+        f"attach_existing_cdp = {str(values['attach_existing_cdp']).lower()}\n",
         encoding="utf-8",
     )
     return path
@@ -184,6 +186,61 @@ def test_preflight_resolves_exact_playwright_and_checks_static_inputs(tmp_path):
     assert result["browser_revision"] == "1228"
     assert result["browser_version"] == "149.0.7827.55"
     assert "WECHATSYNC_TOKEN" not in json.dumps(result)
+
+
+def test_attach_existing_preflight_requires_existing_cdp_and_free_bridge(tmp_path):
+    config = load_runner_config(_config(tmp_path, attach_existing_cdp=True))
+    installation = _installation(tmp_path)
+    checks = []
+
+    def port_checker(host, port):
+        checks.append((host, port))
+        return port == config.cdp_port
+
+    result = preflight(config, resolver=lambda *_args, **_kwargs: installation, port_checker=port_checker)
+
+    assert result["status"] == "READY"
+    assert result["browser_attachment"] == "EXISTING_CDP"
+    assert checks == [(config.cdp_host, config.cdp_port), (config.bridge_host, config.bridge_port)]
+
+
+def test_attach_existing_preflight_rejects_missing_cdp(tmp_path):
+    config = load_runner_config(_config(tmp_path, attach_existing_cdp=True))
+    installation = _installation(tmp_path)
+
+    with pytest.raises(ValueError, match="Existing CDP endpoint is not listening"):
+        preflight(config, resolver=lambda *_args, **_kwargs: installation, port_checker=lambda *_args: False)
+
+
+def test_attach_existing_browser_session_closes_only_current_popup(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path, attach_existing_cdp=True))
+    installation = _installation(tmp_path)
+    order = []
+    initial = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/existing",
+    )
+    popup = zhihu._CdpEndpoint(
+        base_url=initial.base_url,
+        browser_websocket_url=initial.browser_websocket_url,
+        extension_target_id="attach-popup",
+    )
+
+    monkeypatch.setattr(zhihu, "preflight", lambda _config: order.append("preflight"))
+    monkeypatch.setattr(zhihu, "resolve", lambda *_args, **_kwargs: installation)
+    monkeypatch.setattr(zhihu, "_existing_cdp_endpoint", lambda _config: initial)
+    monkeypatch.setattr(zhihu, "_wait_for_extension", lambda _config, endpoint: (order.append("extension"), popup)[1])
+    monkeypatch.setattr(zhihu, "_close_extension_target", lambda _config, endpoint: order.append(f"close:{endpoint.extension_target_id}"))
+    monkeypatch.setattr(zhihu, "_close_browser", lambda *_args: (_ for _ in ()).throw(AssertionError("attached browser must not close")))
+
+    with zhihu.browser_session(config) as (browser, endpoint):
+        assert endpoint is popup
+        order.append("yield")
+
+    assert order == ["preflight", "extension", "yield", "close:attach-popup"]
+    assert browser["browser_attachment"] == "EXISTING_CDP"
+    assert browser["extension_cleanup_status"] == "CLOSED"
+    assert browser["cleanup_status"] == "LEFT_RUNNING_EXISTING_CDP"
 
 
 def test_dry_run_does_not_start_browser(tmp_path):
@@ -911,6 +968,411 @@ def test_extension_cleanup_closes_only_the_popup_created_by_this_run(
     assert messages[1]["params"] == {"targetId": "extension-owned-target"}
 
 
+def test_open_login_page_supports_code_checkpoint(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id="extension-owned-target",
+    )
+    sent = []
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            if message["method"] == "Target.createTarget":
+                return json.dumps({"id": message["id"], "result": {"targetId": "login-target"}})
+            return json.dumps({"id": message["id"], "result": {}})
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    target_id = zhihu._open_login_page(config, endpoint, method="code")
+
+    assert sent[0]["method"] == "Target.createTarget"
+    assert "login_method=code" in sent[0]["params"]["url"]
+    assert target_id == "login-target"
+
+
+def test_capture_login_screenshot_writes_png_without_qr_payload(monkeypatch, tmp_path):
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id="extension-owned-target",
+    )
+    artifact = tmp_path / "checkpoint.png"
+    sent = []
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            if message["method"] == "Target.attachToTarget":
+                result = {"sessionId": "login-session"}
+            elif message["method"] == "Runtime.evaluate":
+                result = {"result": {"value": "complete"}}
+            elif message["method"] == "Page.captureScreenshot":
+                result = {"data": "iVBORw0KGgo="}
+            else:
+                result = {}
+            return json.dumps({"id": message["id"], "result": result})
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    payload = zhihu._capture_login_screenshot(
+        endpoint,
+        "login-target",
+        artifact,
+        clock=lambda: 10.0,
+        sleeper=lambda _seconds: None,
+    )
+
+    assert payload == {"artifact_path": str(artifact.resolve()), "artifact_mime": "image/png"}
+    assert artifact.read_bytes() == b"\x89PNG\r\n\x1a\n"
+    methods = [message["method"] for message in sent]
+    assert methods == [
+        "Target.attachToTarget",
+        "Page.enable",
+        "Runtime.evaluate",
+        "Page.captureScreenshot",
+        "Target.detachFromTarget",
+    ]
+    assert "qr" not in artifact.read_text(encoding="latin1").lower()
+
+
+def test_generate_login_qr_artifact_uses_page_owned_qrcode_token(monkeypatch, tmp_path):
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id="extension-owned-target",
+    )
+    artifact = tmp_path / "checkpoint.png"
+    sent = []
+    generated = []
+    reload_events = [
+        {
+            "sessionId": "login-session",
+            "method": "Network.requestWillBeSent",
+            "params": {
+                "request": {
+                    "url": "https://www.zhihu.com/api/v3/account/api/login/qrcode/page-owned-token"
+                }
+            },
+        }
+    ]
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            if message["method"] == "Target.attachToTarget":
+                result = {"sessionId": "login-session"}
+            elif message["method"] == "Page.reload" and reload_events:
+                return json.dumps(reload_events.pop(0))
+            else:
+                result = {}
+            return json.dumps({"id": message["id"], "result": result})
+
+        def close(self):
+            pass
+
+    def generate_qr(data, destination):
+        generated.append((data, destination))
+        destination.write_bytes(b"PNG")
+        return {"artifact_path": str(destination), "artifact_mime": "image/png", "data_length": len(data)}
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    payload = zhihu._generate_login_qr_artifact(
+        endpoint,
+        "login-target",
+        artifact,
+        qr_renderer=generate_qr,
+    )
+
+    assert payload == {
+        "artifact_path": str(artifact.resolve()),
+        "artifact_mime": "image/png",
+        "data_length": len("https://www.zhihu.com/account/scan/login/page-owned-token?/api/login/qrcode"),
+        "handoff_kind": "page_owned_login_url",
+        "login_url": "https://www.zhihu.com/account/scan/login/page-owned-token?/api/login/qrcode",
+    }
+    assert generated == [
+        (
+            "https://www.zhihu.com/account/scan/login/page-owned-token?/api/login/qrcode",
+            artifact.resolve(),
+        )
+    ]
+    assert [message["method"] for message in sent] == [
+        "Target.attachToTarget",
+        "Network.enable",
+        "Page.enable",
+        "Page.reload",
+        "Target.detachFromTarget",
+    ]
+    assert "page-owned-token" not in artifact.read_text(encoding="latin1")
+
+
+def test_generate_login_qr_artifact_ignores_other_session_qrcode_events(
+    monkeypatch, tmp_path
+):
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id="extension-owned-target",
+    )
+    artifact = tmp_path / "checkpoint.png"
+    token_events = [
+        {
+            "sessionId": "other-session",
+            "method": "Network.requestWillBeSent",
+            "params": {
+                "request": {"url": "https://www.zhihu.com/api/v3/account/api/login/qrcode/wrong"}
+            },
+        },
+        {
+            "sessionId": "login-session",
+            "method": "Network.responseReceived",
+            "params": {
+                "response": {"url": "https://www.zhihu.com/api/v3/account/api/login/qrcode/ready"}
+            },
+        },
+    ]
+
+    class Socket:
+        def send(self, payload):
+            self.message = json.loads(payload)
+
+        def recv(self):
+            message = self.message
+            if message["method"] == "Target.attachToTarget":
+                result = {"sessionId": "login-session"}
+            elif message["method"] == "Page.reload" and token_events:
+                return json.dumps(token_events.pop(0))
+            elif message["method"] == "Page.reload":
+                result = {}
+            else:
+                result = {}
+            return json.dumps({"id": message["id"], "result": result})
+
+        def close(self):
+            pass
+
+    def generate_qr(data, destination):
+        destination.write_bytes(b"PNG")
+        return {"artifact_path": str(destination), "artifact_mime": "image/png"}
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    payload = zhihu._generate_login_qr_artifact(
+        endpoint,
+        "login-target",
+        artifact,
+        qr_renderer=generate_qr,
+        sleeper=lambda _seconds: None,
+        clock=lambda: 0.0,
+    )
+
+    assert payload["login_url"] == "https://www.zhihu.com/account/scan/login/ready?/api/login/qrcode"
+    assert payload["handoff_kind"] == "page_owned_login_url"
+
+
+def test_generate_login_qr_artifact_fails_without_page_owned_login_url(
+    monkeypatch, tmp_path
+):
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id="extension-owned-target",
+    )
+    artifact = tmp_path / "checkpoint.png"
+    sent = []
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            if message["method"] == "Target.attachToTarget":
+                result = {"sessionId": "login-session"}
+            else:
+                result = {}
+            return json.dumps({"id": message["id"], "result": result})
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    now = [0.0]
+
+    def clock():
+        now[0] += 20.0
+        return now[0]
+
+    with pytest.raises(RuntimeError, match="page-owned QR token"):
+        zhihu._generate_login_qr_artifact(
+            endpoint,
+            "login-target",
+            artifact,
+            sleeper=lambda _seconds: None,
+            clock=clock,
+            ready_timeout=1.0,
+        )
+
+    assert not artifact.exists()
+    assert "Page.captureScreenshot" not in [message["method"] for message in sent]
+
+
+def test_wait_for_login_returns_ready_without_checkpoint_when_already_authenticated(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    artifact = tmp_path / "qr.png"
+    opened = []
+    captured = []
+    adapter_calls = []
+
+    @contextmanager
+    def browser_session(_config):
+        yield ({"browser_version": "149.0.7827.55"}, _endpoint())
+
+    def opener(_config, _endpoint_value, *, method):
+        opened.append(method)
+        return "login-target"
+
+    def capturer(_endpoint_value, target_id, destination, **_kwargs):
+        captured.append((target_id, destination))
+        destination.write_bytes(b"PNG")
+        return {"artifact_path": str(destination), "artifact_mime": "image/png"}
+
+    def adapter(_config, _source, mode, _endpoint_value):
+        adapter_calls.append(mode)
+        return subprocess.CompletedProcess([], 0, "authenticated", "")
+
+    result = wait_for_login(
+        config,
+        timeout=30,
+        checkpoint_artifact=artifact,
+        adapter_runner=adapter,
+        browser_session_factory=browser_session,
+        login_page_opener=opener,
+        screenshot_capturer=capturer,
+    )
+
+    assert result["status"] == "READY"
+    assert adapter_calls == ["auth"]
+    assert opened == []
+    assert captured == []
+    assert not artifact.exists()
+
+
+def test_wait_for_login_can_emit_checkpoint_image_before_polling(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    artifact = tmp_path / "qr.png"
+    callbacks = []
+    adapter_calls = []
+
+    @contextmanager
+    def browser_session(_config):
+        yield ({"browser_version": "149.0.7827.55"}, _endpoint())
+
+    def opener(_config, _endpoint_value, *, method):
+        assert method == "qr"
+        return "login-target"
+
+    def capturer(_endpoint_value, target_id, destination, **_kwargs):
+        assert target_id == "login-target"
+        destination.write_bytes(b"PNG")
+        return {"artifact_path": str(destination), "artifact_mime": "image/png"}
+
+    def adapter(_config, _source, mode, _endpoint_value):
+        adapter_calls.append(mode)
+        if len(adapter_calls) == 1:
+            return subprocess.CompletedProcess([], 1, "", "not authenticated")
+        return subprocess.CompletedProcess([], 0, "authenticated", "")
+
+    result = wait_for_login(
+        config,
+        timeout=30,
+        checkpoint_artifact=artifact,
+        checkpoint_callback=callbacks.append,
+        adapter_runner=adapter,
+        browser_session_factory=browser_session,
+        login_page_opener=opener,
+        screenshot_capturer=capturer,
+    )
+
+    assert callbacks == [
+        {
+            "status": "CHECKPOINT_IMAGE_READY",
+            "login_method": "qr",
+            "artifact_path": str(artifact),
+            "artifact_mime": "image/png",
+            "browser_version": "149.0.7827.55",
+        }
+    ]
+    assert adapter_calls == ["auth", "auth"]
+    assert result["status"] == "READY"
+    assert result["checkpoint_artifact_path"] == str(artifact)
+
+
+def test_wait_for_login_keeps_browser_open_after_auth_check_error(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    adapter_calls = []
+    browser_events = []
+    now = [0.0]
+
+    @contextmanager
+    def browser_session(_config):
+        browser_events.append("open")
+        try:
+            yield ({"browser_version": "149.0.7827.55"}, _endpoint())
+        finally:
+            browser_events.append("close")
+
+    def adapter(_config, _source, mode, _endpoint_value):
+        adapter_calls.append(mode)
+        if len(adapter_calls) == 1:
+            raise RuntimeError("Wechatsync auth timed out")
+        return subprocess.CompletedProcess([], 0, "authenticated", "")
+
+    def sleeper(seconds):
+        now[0] += seconds
+
+    result = wait_for_login(
+        config,
+        timeout=30,
+        adapter_runner=adapter,
+        browser_session_factory=browser_session,
+        login_page_opener=lambda *_args, **_kwargs: "login-target",
+        sleeper=sleeper,
+        clock=lambda: now[0],
+    )
+
+    assert adapter_calls == ["auth", "auth"]
+    assert browser_events == ["open", "close"]
+    assert result["status"] == "READY"
+
+
+def test_wait_for_login_rejects_unknown_login_method(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+
+    with pytest.raises(ValueError, match="Unsupported Zhihu login method"):
+        wait_for_login(config, method="password")
+
+
 def test_cdp_ownership_timeout_requires_manual_recovery(monkeypatch, tmp_path):
     config = load_runner_config(_config(tmp_path))
 
@@ -1528,6 +1990,8 @@ def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, t
         "Target.attachToTarget",
         "Runtime.evaluate",
         "Runtime.evaluate",
+        "Runtime.evaluate",
+        "Runtime.evaluate",
     ]
     assert commands[1]["params"] == {
         "targetId": "owned-extension-target",
@@ -1535,11 +1999,20 @@ def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, t
     }
     assert commands[2]["sessionId"] == "owned-extension-session"
     assert commands[3]["sessionId"] == "owned-extension-session"
-    payload = json.dumps(messages, ensure_ascii=False)
-    assert "MCP_SET_SERVER_URL" in payload
-    assert "MCP_ENABLE" in payload
-    assert "ws://127.0.0.1:9527" in payload
-    assert "top-secret" in payload
+    assert commands[4]["sessionId"] == "owned-extension-session"
+    assert commands[5]["sessionId"] == "owned-extension-session"
+    expressions = [command["params"]["expression"] for command in commands[2:6]]
+    assert "chrome.storage.local.set" in expressions[0]
+    assert "mcpToken" in expressions[0]
+    assert "top-secret" in expressions[0]
+    assert "MCP_SET_SERVER_URL" in expressions[1]
+    assert "payload" in expressions[1]
+    assert "ws://127.0.0.1:9527" in expressions[1]
+    assert "MCP_ENABLE" in expressions[2]
+    assert "MCP_WATCH_START" in expressions[3]
+    assert "top-secret" not in expressions[1]
+    assert "top-secret" not in expressions[2]
+    assert "top-secret" not in expressions[3]
     assert "top-secret" not in json.dumps(result)
 
 
@@ -1567,17 +2040,367 @@ def test_login_checkpoint_repeats_only_read_only_auth_until_ready(tmp_path):
         timeout=60,
         adapter_runner=adapter,
         browser_session_factory=session,
-        login_page_opener=lambda _config, endpoint: calls.append(
-            (None, "open-login", endpoint)
+        login_page_opener=lambda _config, endpoint, *, method="qr": calls.append(
+            (None, f"open-login-{method}", endpoint)
         ),
         sleeper=lambda _seconds: None,
         clock=iter([0.0, 1.0, 2.0, 3.0]).__next__,
     )
 
-    assert result == {"status": "READY", "browser_version": "149.0.7827.55"}
+    assert result == {
+        "status": "READY",
+        "login_method": "qr",
+        "browser_version": "149.0.7827.55",
+    }
     assert calls == [
-        (None, "open-login", _endpoint()),
+        (None, "auth", _endpoint()),
+        (None, "open-login-qr", _endpoint()),
         (None, "auth", _endpoint()),
         (None, "auth", _endpoint()),
-        (None, "auth", _endpoint()),
+    ]
+
+
+def test_logout_noops_without_storage_clear_when_auth_precheck_is_not_ready(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    calls = []
+
+    @contextmanager
+    def session(_config):
+        yield {"browser_version": "149.0.7827.55"}, _endpoint()
+
+    def adapter(_config, source, mode, endpoint):
+        calls.append((source, mode, endpoint))
+        return subprocess.CompletedProcess([], 1, "", "not logged in")
+
+    def forbidden_socket(_endpoint_value):
+        raise AssertionError("logout must not clear storage when auth precheck is not READY")
+
+    monkeypatch.setattr(zhihu, "_owned_browser_socket", forbidden_socket)
+
+    result = zhihu.logout(
+        config,
+        adapter_runner=adapter,
+        browser_session_factory=session,
+    )
+
+    assert calls == [(None, "auth", _endpoint())]
+    assert result == {
+        "status": "ALREADY_LOGGED_OUT",
+        "logout_method": "auth_precheck",
+        "browser_version": "149.0.7827.55",
+    }
+
+
+def test_logout_clears_storage_only_after_ready_auth_precheck(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    calls = []
+    sent = []
+
+    @contextmanager
+    def session(_config):
+        yield {"browser_version": "149.0.7827.55"}, _endpoint()
+
+    def adapter(_config, source, mode, endpoint):
+        calls.append((source, mode, endpoint))
+        return subprocess.CompletedProcess([], 0, "logged in", "")
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            return json.dumps({"id": message["id"], "result": {}})
+
+    @contextmanager
+    def socket(_endpoint_value):
+        yield Socket()
+
+    monkeypatch.setattr(zhihu, "_owned_browser_socket", socket)
+
+    result = zhihu.logout(
+        config,
+        adapter_runner=adapter,
+        browser_session_factory=session,
+    )
+
+    assert calls == [(None, "auth", _endpoint())]
+    assert [message["method"] for message in sent] == [
+        "Storage.clearDataForOrigin",
+        "Storage.clearDataForOrigin",
+    ]
+    assert result["status"] == "LOGGED_OUT"
+    assert result["logout_method"] == "clear_origin_storage"
+
+
+
+def _browser_login_config_file(tmp_path: Path) -> Path:
+    profile = tmp_path / "profile-login-only"
+    playwright_home = tmp_path / "playwright-login-only"
+    profile.mkdir()
+    profile.chmod(0o700)
+    path = tmp_path / "browser-runner.toml"
+    path.write_text(
+        "[zhihu]\n"
+        "playwright_version = \"1.61.1\"\n"
+        f"playwright_home = {json.dumps(str(playwright_home))}\n"
+        f"profile_dir = {json.dumps(str(profile))}\n"
+        "cdp_host = \"127.0.0.1\"\n"
+        "cdp_port = 9333\n"
+        "headless = true\n"
+        "browser_args = [\"--disable-dev-shm-usage\"]\n"
+        "attach_existing_cdp = false\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_load_browser_config_accepts_login_only_runner_without_adapter_fields(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+
+    assert config.profile_dir == tmp_path / "profile-login-only"
+    assert config.cdp_host == "127.0.0.1"
+    assert config.cdp_port == 9333
+    serialized = json.dumps(config.__dict__, default=str).lower()
+    assert "wechatsync" not in serialized
+    assert "extension" not in serialized
+    assert "env_file" not in serialized
+    assert "token" not in serialized
+
+
+def test_browser_login_command_does_not_load_extension_or_bridge(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+    command = zhihu._browser_login_command(config, _installation(tmp_path), "owned-token")
+    joined = " ".join(command).lower()
+
+    assert f"--user-data-dir={config.profile_dir}" in command
+    assert f"--remote-debugging-port={config.cdp_port}" in command
+    assert "--load-extension" not in joined
+    assert "--disable-extensions-except" not in joined
+    assert "wechatsync" not in joined
+    assert "bridge" not in joined
+
+
+def test_visible_page_state_waits_for_navigation_after_target_creation(monkeypatch):
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+    )
+    sent = []
+    readiness = [
+        {"readyState": "complete", "href": "about:blank"},
+        {"readyState": "complete", "href": "https://www.zhihu.com/people/me"},
+    ]
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            if message["method"] == "Target.attachToTarget":
+                result = {"sessionId": "status-session"}
+            elif message["method"] == "Runtime.evaluate":
+                expression = message["params"]["expression"]
+                if "document.readyState" in expression and "location.href" in expression:
+                    value = readiness.pop(0)
+                elif expression == "document.readyState":
+                    value = "complete"
+                else:
+                    value = {
+                        "href": "https://www.zhihu.com/people/me"
+                        if not readiness
+                        else "about:blank"
+                    }
+                result = {"result": {"value": value}}
+            else:
+                result = {}
+            return json.dumps({"id": message["id"], "result": result})
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    state = zhihu._evaluate_visible_page_state(
+        endpoint,
+        "status-target",
+        "(() => ({href: location.href}))()",
+        clock=lambda: 0.0,
+        sleeper=lambda _seconds: None,
+    )
+
+    assert state == {"href": "https://www.zhihu.com/people/me"}
+    assert readiness == []
+
+
+def test_status_from_visible_state_uses_browser_page_me_api_public_identity():
+    payload = zhihu._status_from_visible_state(
+        {
+            "href": "https://www.zhihu.com/people/me",
+            "title": "知乎 - 知乎",
+            "hasLoginPrompt": False,
+            "apiMe": {
+                "ok": True,
+                "name": "RexWang",
+                "urlToken": "rexwang",
+                "url": "https://www.zhihu.com/people/rexwang",
+            },
+        }
+    )
+
+    assert payload == {
+        "status": "LOGGED_IN",
+        "check_method": "browser_page",
+        "account_name": "RexWang",
+        "account_url": "https://www.zhihu.com/people/rexwang",
+    }
+    assert "id" not in payload
+
+
+def test_browser_status_uses_page_visible_reader_only(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+    calls = []
+
+    @contextmanager
+    def session_factory(_config):
+        calls.append(("session", _config))
+        yield ({"browser_version": "149.0.7827.55", "browser_attachment": "OWNED_BROWSER"}, _endpoint(None))
+
+    def status_reader(endpoint):
+        calls.append(("reader", endpoint))
+        return {
+            "status": "LOGGED_IN",
+            "account_name": "RexWang",
+            "account_url": "https://www.zhihu.com/people/rexwang",
+            "check_method": "browser_page",
+        }
+
+    result = zhihu.browser_status(
+        config,
+        browser_session_factory=session_factory,
+        status_reader=status_reader,
+    )
+
+    assert result == {
+        "status": "LOGGED_IN",
+        "account_name": "RexWang",
+        "account_url": "https://www.zhihu.com/people/rexwang",
+        "check_method": "browser_page",
+        "browser_version": "149.0.7827.55",
+        "browser_attachment": "OWNED_BROWSER",
+    }
+    assert calls[0] == ("session", config)
+    assert calls[1][0] == "reader"
+
+
+def test_browser_login_emits_page_owned_login_url_before_waiting(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+    events = []
+    now = [0.0]
+    checks = iter(
+        [
+            {"status": "LOGGED_OUT", "check_method": "browser_page"},
+            {"status": "LOGGED_IN", "account_name": "RexWang", "check_method": "browser_page"},
+        ]
+    )
+    calls = []
+
+    @contextmanager
+    def session_factory(_config):
+        yield ({"browser_version": "149.0.7827.55"}, _endpoint(None))
+
+    def status_reader(endpoint):
+        calls.append(("status", endpoint))
+        return next(checks)
+
+    def handoff_opener(endpoint):
+        calls.append(("open", endpoint))
+        return {
+            "target_id": "login-target",
+            "login_url": "https://www.zhihu.com/account/scan/login/page-owned",
+            "handoff_kind": "page_owned_login_url",
+        }
+
+    def sleeper(seconds):
+        now[0] += seconds
+
+    result = zhihu.browser_login(
+        config,
+        timeout=30,
+        browser_session_factory=session_factory,
+        status_reader=status_reader,
+        login_handoff_opener=handoff_opener,
+        event_callback=events.append,
+        sleeper=sleeper,
+        clock=lambda: now[0],
+    )
+
+    assert events == [
+        {
+            "event": "login_url",
+            "status": "LOGIN_REQUIRED",
+            "login_url": "https://www.zhihu.com/account/scan/login/page-owned",
+            "handoff_kind": "page_owned_login_url",
+            "check_method": "browser_page",
+            "browser_version": "149.0.7827.55",
+        }
+    ]
+    assert result["status"] == "LOGGED_IN"
+    assert result["account_name"] == "RexWang"
+    assert calls[0][0] == "status"
+    assert calls[1][0] == "open"
+    assert calls[2][0] == "status"
+
+
+def test_browser_logout_noops_when_browser_page_status_is_logged_out(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+    clears = []
+
+    @contextmanager
+    def session_factory(_config):
+        yield ({"browser_version": "149.0.7827.55"}, _endpoint(None))
+
+    result = zhihu.browser_logout(
+        config,
+        browser_session_factory=session_factory,
+        status_reader=lambda _endpoint: {"status": "LOGGED_OUT", "check_method": "browser_page"},
+        storage_clearer=lambda *_args: clears.append(_args),
+    )
+
+    assert result == {
+        "status": "ALREADY_LOGGED_OUT",
+        "check_method": "browser_page",
+        "logout_method": "browser_status_precheck",
+        "browser_version": "149.0.7827.55",
+    }
+    assert clears == []
+
+
+def test_browser_logout_clears_zhihu_origins_only_after_logged_in_precheck(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+    clears = []
+
+    @contextmanager
+    def session_factory(_config):
+        yield ({"browser_version": "149.0.7827.55"}, _endpoint(None))
+
+    result = zhihu.browser_logout(
+        config,
+        browser_session_factory=session_factory,
+        status_reader=lambda _endpoint: {"status": "LOGGED_IN", "check_method": "browser_page"},
+        storage_clearer=lambda endpoint, origins: clears.append((endpoint, origins)),
+    )
+
+    assert result == {
+        "status": "LOGGED_OUT",
+        "check_method": "browser_page",
+        "logout_method": "clear_origin_storage",
+        "browser_version": "149.0.7827.55",
+    }
+    assert clears == [
+        (
+            _endpoint(None),
+            ("https://www.zhihu.com", "https://zhuanlan.zhihu.com"),
+        )
     ]

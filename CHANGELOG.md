@@ -1,10 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add a login-only visible CLI surface: `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, and `chatpost zhihu login/status/logout PROFILE`.
+- Add browser-only Zhihu runner loading via `load_browser_config`; login/status/logout require only Chromium/Profile/CDP fields and do not require adapter env, extension files, bridge ports, or publishing tokens.
+- Add browser-page status, login handoff, and logout helpers that infer login state from page-visible URL/DOM/account entrypoints without reading or exporting Cookie, LocalStorage, IndexedDB, session, or token values.
+
+### Changed
+
+- Remove unreleased user-facing `account`, `qr`, `zhihu account ...`, and `zhihu draft ...` commands from the registered CLI tree for this login-foundation PR.
+- Update README, CLI tree, Quickstart, MkDocs home, and capability map to describe the login-only boundary.
+- Preserve publishing-adapter code/tests as an internal historical path, but keep it out of `login/status/logout` and out of the current user-visible CLI.
+
 ## 0.1.0 - 2026-08-04
 
 ### Added
 
-- Add task-oriented `chatpost zhihu preflight`, `login`, `auth`, `draft dry-run`, and `draft create` commands.
+- Add task-oriented `chatpost zhihu preflight`, `login`, `auth`, `draft` command with `--dry-run` and receipt-backed create mode.
 - Resolve exact Playwright browser installations through `chatup.playwright.resolve` while keeping Profile and publication state in ChatPost.
 - Launch the proven direct-browser route with a persistent Profile, exact unpacked extension, loopback CDP/bridge, and internal raw-CDP extension wake.
 - Write mode-`0600` success or `RESULT_UNKNOWN` receipts and prohibit automatic retry after ambiguous writes.

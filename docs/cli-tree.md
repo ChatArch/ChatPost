@@ -1,135 +1,75 @@
 # CLI 树
 
-`ChatPost 0.1.0` 首先提供一条任务导向的知乎草稿链路。通用 `runner`、`account`、`publication` 和文章更新命令仍是后续设计，不能当作当前接口。
+`ChatPost 0.1.x` 当前只暴露浏览器级登录基础层：平台发现、Profile 发现，以及知乎 `profiles/login/status/logout`。本轮不注册草稿、发布、QR artifact、account helper 或发布适配器命令。
+
+这里的 `PROFILE` 是 registry alias / 浏览器用户数据目录 / 登录态容器，不是知乎账号 ID、Cookie、LocalStorage、IndexedDB、session 或 token。
 
 ## 当前真实命令
 
+`chatpost --tree` 会打印真实注册 CLI 树：
+
 ```text
-chatpost
-├── --help
-├── --version
-└── zhihu
-    ├── preflight
-    ├── login
-    ├── auth
-    └── draft
-        ├── dry-run
-        └── create
+chatpost  # browser-level platform login manager
+├── --help  # Show help for the current command.
+├── --version  # Show package version.
+├── --tree  # Print the registered CLI tree with command purpose and IO shape.
+├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.
+├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.
+└── zhihu  # Zhihu browser login capabilities
+    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.
+    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.
+    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only.
+    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.
 ```
 
 查看真实 help：
 
 ```bash
+chatpost --tree
 chatpost --help
+chatpost platforms --help
+chatpost profiles --help
 chatpost zhihu --help
-chatpost zhihu draft --help
+chatpost zhihu profiles --help
+chatpost zhihu login --help
+chatpost zhihu status --help
+chatpost zhihu logout --help
 ```
 
-## 任务顺序
+## 命令注释
 
-```bash
-chatpost zhihu preflight \
-  --config runner.toml \
-  --output json \
-  -I
+- `chatpost platforms`：列出支持的平台；不启动浏览器，不读取登录态，不接发布适配器。
+- `chatpost profiles [--platform zhihu]`：列出 registry 中的浏览器 Profile；不启动浏览器，不读取登录态，不接发布适配器。
+- `chatpost zhihu profiles`：只列知乎 Profile；不启动浏览器，不读取登录态。
+- `chatpost zhihu status PROFILE`：启动/连接受控 Chromium Profile，用知乎网页 DOM/URL/可见菜单判断 `LOGGED_IN`、`LOGGED_OUT` 或 `UNKNOWN`；不读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token。
+- `chatpost zhihu login PROFILE`：先做 browser-page status；已登录直接返回 `LOGGED_IN`；未登录时打开知乎登录页，尽快输出 page-owned `login_url` 或 `browser_opened` handoff，然后保持浏览器等待登录完成。
+- `chatpost zhihu logout PROFILE`：先做 browser-page status；未登录返回 `ALREADY_LOGGED_OUT`；已登录才清理知乎 origins 登录态。清理不会读取任何 session 原值。
 
-chatpost zhihu login \
-  --config runner.toml \
-  --timeout 900 \
-  --output json \
-  -I
+## 登录 Runner 配置
 
-chatpost zhihu auth \
-  --config runner.toml \
-  --output json \
-  -I
-
-chatpost zhihu draft dry-run article.md \
-  --config runner.toml \
-  --output json \
-  -I
-
-chatpost zhihu draft create article.md \
-  --config runner.toml \
-  --receipt receipt.json \
-  --output json \
-  -I
-```
-
-五道门的职责不同：
-
-1. `preflight` 只读检查 exact Playwright install、Profile 权限、扩展、Node、Wechatsync CLI、secret 文件和 loopback 端口；不会安装、启动或写知乎。
-2. `login` 保持同一个浏览器/Profile，打开知乎登录页并循环只读 auth；适合扫码或验证码的人工 checkpoint，不写文章。
-3. `auth` 启动同一个 Runner，调用 Wechatsync 的一次只读知乎登录检查，然后优雅停止浏览器。
-4. `draft dry-run` 只解析文章，不启动浏览器，不连接扩展，不写知乎。
-5. `draft create` 只调用一次 Wechatsync create 路径。成功时写入权限 `0600` 的 receipt；结果不明确时写 `RESULT_UNKNOWN`，禁止自动重试。
-
-`ChatPost 0.1.0` **没有最终发布命令**，也没有文章更新命令。
-
-## ChatUp 边界
-
-机器级制品先由 ChatUp 显式准备：
-
-```bash
-chatup nodejs -I
-chatup playwright install 1.61.1 --browser chromium --output json -I
-chatup playwright doctor 1.61.1 --browser chromium --output json -I
-```
-
-ChatPost 依赖 `chatup>=0.2.4,<0.3.0`，并只调用：
-
-```python
-from chatup.playwright import resolve
-
-installation = resolve("1.61.1", browser="chromium")
-```
-
-责任边界：
-
-- ChatUp：Playwright package、它声明的 browser revision、安装元数据和 executable path；
-- ChatPost：持久 Profile、扩展、CDP、loopback bridge、Wechatsync 进程、单次任务与 receipt；
-- Wechatsync：知乎 adapter 与草稿写入；
-- 人工：首次登录和最终发布确认。
-
-这里的 Playwright 能力是**安装和解析 substrate**。当前成功路径仍直接启动浏览器二进制，并通过原始 CDP 唤醒扩展；没有使用 Playwright `Page`、Locator 或 `launchPersistentContext()`。
-
-## 非秘密 Runner 配置
+登录基础层只需要浏览器字段：
 
 ```toml
 [zhihu]
 playwright_version = "1.61.1"
 playwright_home = "/absolute/path/to/.chatarch/playwright"
 profile_dir = "/absolute/path/to/zhihu-profile"
-extension_dir = "/absolute/path/to/Wechatsync/packages/extension/dist"
-node_bin = "/absolute/path/to/node"
-wechatsync_cli = "/absolute/path/to/Wechatsync/packages/cli/dist/index.js"
-env_file = "/absolute/path/to/chatpost-zhihu.env"
 cdp_host = "127.0.0.1"
 cdp_port = 9227
-bridge_host = "127.0.0.1"
-bridge_port = 9527
-extension_id = "dipgimoobbhdefncjomgehikkbaklgii"
 headless = true
 browser_args = ["--disable-dev-shm-usage"]
+attach_existing_cdp = false
 ```
 
-安全约束：
+安全边界：
 
 - `profile_dir` 必须存在且不得向 group/other 开放；
-- `env_file` 必须是 `0600` 或更严格，并包含 `WECHATSYNC_TOKEN`；
-- CDP 与 bridge 只能绑定 loopback；
-- `browser_args` 不能覆盖 Profile、CDP 或扩展所有权参数；
-- 配置文件只保存路径和非秘密值，不保存 Cookie、LocalStorage 或知乎凭据。
+- CDP 只能绑定数值 IPv4 loopback `127.0.0.1`；
+- `browser_args` 不能覆盖 Profile、CDP 或 extension 所有权参数；
+- registry/config/output 不保存 Cookie、LocalStorage、IndexedDB、session、验证码、手机号、密码或 token。
 
-## 仍属提案的命令
+## 明确不在本轮 CLI 中
 
-以下资源边界仍有价值，但命令尚未实现：
+account helper、QR helper、知乎 account helper、draft、verify、doctor 都不是本轮登录基础层，不注册为当前用户可见或隐藏命令。
 
-```text
-runner add|start|status|doctor|stop
-account add|login|status
-publication list|show|retry
-article update
-```
-
-实现这些命令前，文档必须持续标为提案；不得把它们写进可执行 Quick Start。
+以后如果要做发布、草稿或发布适配器验证，应作为独立 PR 和独立命令面设计，不能污染 `login/status/logout` 的纯浏览器语义。

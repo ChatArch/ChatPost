@@ -49,10 +49,10 @@ The Chrome installation is a ChatUp machine resource. A profile is ChatPost runn
 
 ## ChatUp Playwright Dependency
 
-ChatPost consumes a bounded released ChatUp dependency:
+ChatPost consumes bounded released ChatUp and ChatBrowser dependencies:
 
 ```toml
-dependencies = ["chatup>=0.2.4,<0.3.0"]
+dependencies = ["chatup>=0.2.4,<0.3.0", "chatbrowser>=0.1.2,<0.2.0"]
 ```
 
 Environment preparation is an independent ChatUp command:
@@ -74,6 +74,7 @@ schema_version = 1
 runtime = "host"
 visible = true
 profile_mode = "managed"
+attach_existing_cdp = false
 
 [runners.zhihu-personal.cdp]
 bind = "127.0.0.1"
@@ -91,7 +92,7 @@ platform = "zhihu"
 runner = "zhihu-personal"
 ```
 
-`binary_path`/Chrome version come from the ChatUp descriptor. `user_data_dir` and allocated ports derive from ChatPost runner directories. Explicit paths or URLs are needed only for adopted profiles or external runners.
+When `attach_existing_cdp = false` (the default), ChatPost launches and owns one browser process, then closes it through the captured browser CDP endpoint. If a known browser already owns the Profile and exposes loopback CDP, set `attach_existing_cdp = true` and point `cdp_port` at that existing endpoint. Attach mode creates and closes only the per-run extension popup; it leaves the existing browser running and records `cleanup_status=LEFT_RUNNING_EXISTING_CDP`.
 
 ## ChatEnv Stores Secrets Only
 
@@ -275,7 +276,7 @@ Migration does not copy `.env` or a profile. ChatUp first supplies the Chrome de
 
 Proposed `config validate` / `doctor` checks at least:
 
-1. `chatup>=0.2.4,<0.3.0` is installed and the ChatPost-compatible version resolves through `chatup.playwright.resolve` to an executable; validation never installs it;
+1. `chatup>=0.2.4,<0.3.0` and `chatbrowser>=0.1.2,<0.2.0` are installed, and the ChatPost-compatible version resolves through `chatup.playwright.resolve` to an executable; validation never installs it;
 2. runner names, profile paths, and port leases are unique;
 3. CDP/bridge listeners bind to loopback and local control defaults to stdio;
 4. token profile references exist without reading/printing values;

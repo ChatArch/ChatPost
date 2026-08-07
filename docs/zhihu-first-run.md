@@ -1,6 +1,6 @@
 # 知乎首次设置与草稿验收
 
-本页是 `ChatPost 0.1.0` 的可执行 Quick Start。它复刻已验证的 Playwright-cache + Profile + Wechatsync 路线，并把制品与任务责任拆到 ChatUp/ChatPost。
+本页是 `ChatPost 0.1.0` 的完整验收 runbook。日常最短路径请先看 [Quickstart：从登录到发送草稿](quickstart.md)；本页用于复刻已验证的 Playwright-cache + Profile + Wechatsync 路线，并把制品与任务责任拆到 ChatUp/ChatPost。
 
 ## 最终边界
 
@@ -194,8 +194,9 @@ macOS 通常可把 `browser_args` 设为空数组。Linux 是否需要额外参�
 
 ```bash
 ARTICLE=/absolute/path/to/article.md
-"$CHATPOST" zhihu draft dry-run "$ARTICLE" \
-  --config "$RUNNER_HOME/runner.toml" \
+"$CHATPOST" zhihu draft zhihu-personal "$ARTICLE" \
+  --registry "$RUNNER_HOME/accounts.toml" \
+  --dry-run \
   --output json \
   -I
 ```
@@ -206,8 +207,8 @@ ARTICLE=/absolute/path/to/article.md
 
 ```bash
 RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
-"$CHATPOST" zhihu draft create "$ARTICLE" \
-  --config "$RUNNER_HOME/runner.toml" \
+"$CHATPOST" zhihu draft zhihu-personal "$ARTICLE" \
+  --registry "$RUNNER_HOME/accounts.toml" \
   --receipt "$RECEIPT" \
   --output json \
   -I
@@ -245,7 +246,7 @@ adapter stdout/stderr 除了替换私有 env 的精确值，还会结构化遮�
 
 立即停止自动化：
 
-1. 不重新运行 `draft create`；
+1. 不重新运行不带 `--dry-run` 的 `draft`；
 2. 在同一知乎账号草稿箱按标题、marker 与时间查找；
 3. 找到后补录唯一 draft ID/review URL；
 4. 确认不存在后也要人工决定是否重新创建。

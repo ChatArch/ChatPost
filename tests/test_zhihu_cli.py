@@ -1,50 +1,143 @@
+import json
+from pathlib import Path
+
 from click.testing import CliRunner
 
-import chatpost.commands.zhihu as command
+import chatpost.cli as command
 from chatpost.cli import main
-from chatpost.zhihu import RESULT_UNKNOWN, ResultUnknownError
 
 
-def test_zhihu_cli_exposes_only_proven_task_commands():
-    zhihu = main.commands["zhihu"]
-    assert set(zhihu.commands) == {"preflight", "login", "auth", "draft"}
-    assert set(zhihu.commands["draft"].commands) == {"dry-run", "create"}
-
-
-def test_preflight_json(monkeypatch, tmp_path):
-    config = tmp_path / "runner.toml"
-    config.write_text("[zhihu]\n", encoding="utf-8")
-    monkeypatch.setattr(command, "load_runner_config", lambda _path: object())
-    monkeypatch.setattr(command, "preflight", lambda _config: {"status": "READY"})
-
-    result = CliRunner().invoke(
-        main,
-        ["zhihu", "preflight", "--config", str(config), "--output", "json", "-I"],
+def _registry(tmp_path: Path) -> Path:
+    runner = tmp_path / "runner.toml"
+    runner.write_text("[zhihu]\n", encoding="utf-8")
+    registry = tmp_path / "accounts.toml"
+    registry.write_text(
+        '[accounts."zhihu-test"]\n'
+        'platform = "zhihu"\n'
+        f'runner_config = {json.dumps(str(runner))}\n'
+        'profile = "zhihu-test"\n',
+        encoding="utf-8",
     )
-
-    assert result.exit_code == 0
-    assert '"status": "READY"' in result.output
+    return registry
 
 
-def test_login_cli_dispatches_read_only_checkpoint(monkeypatch, tmp_path):
-    config = tmp_path / "runner.toml"
-    config.write_text("[zhihu]", encoding="utf-8")
+def _json(result):
+    assert result.exit_code == 0, result.output
+    return json.loads(result.output)
+
+
+def _json_lines(result):
+    assert result.exit_code == 0, result.output
+    return [json.loads(line) for line in result.output.splitlines() if line.strip()]
+
+
+def test_zhihu_cli_registers_login_only_surface_without_unreleased_compatibility():
+    zhihu = main.commands["zhihu"]
+
+    assert set(zhihu.commands) == {"profiles", "login", "status", "logout"}
+    assert all(command.hidden is False for command in zhihu.commands.values())
+    assert "draft" not in zhihu.commands
+    assert "account" not in zhihu.commands
+    assert "qr" not in main.commands
+    assert "account" not in main.commands
+
+
+def test_removed_unreleased_surfaces_fail_as_commands():
+    runner = CliRunner()
+
+    for args in (
+        ["qr", "encode", "https://example.com", "--artifact", "x.png"],
+        ["account", "list"],
+        ["zhihu", "account", "status", "zhihu-test"],
+        ["zhihu", "draft", "zhihu-test", "article.md"],
+    ):
+        result = runner.invoke(main, args)
+        assert result.exit_code != 0, (args, result.output)
+
+
+def test_status_dispatches_browser_level_status_without_adapter_auth(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
     sentinel = object()
     calls = []
-    monkeypatch.setattr(command, "load_runner_config", lambda _path: sentinel)
+    monkeypatch.setattr(command, "load_browser_config", lambda _path: sentinel)
     monkeypatch.setattr(
         command,
-        "wait_for_login",
-        lambda loaded, timeout: calls.append((loaded, timeout)) or {"status": "READY"},
+        "browser_status",
+        lambda config: calls.append(config)
+        or {
+            "status": "LOGGED_IN",
+            "account_name": "RexWang",
+            "account_url": "https://www.zhihu.com/people/rexwang",
+            "check_method": "browser_page",
+        },
     )
 
     result = CliRunner().invoke(
         main,
         [
             "zhihu",
+            "status",
+            "zhihu-test",
+            "--registry",
+            str(registry),
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+    payload = _json(result)
+
+    assert calls == [sentinel]
+    assert payload == {
+        "target": "zhihu@zhihu-test",
+        "profile": "zhihu-test",
+        "platform": "zhihu",
+        "status": "LOGGED_IN",
+        "account_name": "RexWang",
+        "account_url": "https://www.zhihu.com/people/rexwang",
+        "check_method": "browser_page",
+    }
+    lower = result.output.lower()
+    assert "wechatsync" not in lower
+    assert "token" not in lower
+    assert "cookie" not in lower
+
+
+def test_login_dispatches_browser_level_handoff_and_streams_login_url(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    sentinel = object()
+    calls = []
+    monkeypatch.setattr(command, "load_browser_config", lambda _path: sentinel)
+
+    def fake_browser_login(config, *, timeout, event_callback=None):
+        calls.append((config, timeout, event_callback))
+        assert event_callback is not None
+        event_callback(
+            {
+                "event": "login_url",
+                "status": "LOGIN_REQUIRED",
+                "login_url": "https://www.zhihu.com/account/scan/login/page-owned",
+                "check_method": "browser_page",
+            }
+        )
+        return {
+            "event": "logged_in",
+            "status": "LOGGED_IN",
+            "account_name": "RexWang",
+            "account_url": "https://www.zhihu.com/people/rexwang",
+            "check_method": "browser_page",
+        }
+
+    monkeypatch.setattr(command, "browser_login", fake_browser_login)
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
             "login",
-            "--config",
-            str(config),
+            "zhihu-test",
+            "--registry",
+            str(registry),
             "--timeout",
             "60",
             "--output",
@@ -52,145 +145,73 @@ def test_login_cli_dispatches_read_only_checkpoint(monkeypatch, tmp_path):
             "-I",
         ],
     )
+    events = _json_lines(result)
 
-    assert result.exit_code == 0
-    assert calls == [(sentinel, 60)]
-    assert '"status": "READY"' in result.output
-
-
-def test_create_writes_safe_receipt(monkeypatch, tmp_path):
-    config = tmp_path / "runner.toml"
-    source = tmp_path / "article.md"
-    receipt = tmp_path / "receipt.json"
-    config.write_text("[zhihu]\n", encoding="utf-8")
-    source.write_text("# title", encoding="utf-8")
-    monkeypatch.setattr(command, "load_runner_config", lambda _path: object())
-    monkeypatch.setattr(
-        command,
-        "execute_task",
-        lambda *_args, **_kwargs: {
-            "status": "DRAFT_CREATED",
-            "draft_id": "2067000000000000001",
-            "review_url": "https://zhuanlan.zhihu.com/p/2067000000000000001/edit",
-            "source_sha256": "abc",
+    assert calls == [(sentinel, 60, calls[0][2])]
+    assert events == [
+        {
+            "event": "login_url",
+            "target": "zhihu@zhihu-test",
+            "profile": "zhihu-test",
+            "platform": "zhihu",
+            "status": "LOGIN_REQUIRED",
+            "login_url": "https://www.zhihu.com/account/scan/login/page-owned",
+            "check_method": "browser_page",
         },
-    )
-
-    result = CliRunner().invoke(
-        main,
-        [
-            "zhihu",
-            "draft",
-            "create",
-            str(source),
-            "--config",
-            str(config),
-            "--receipt",
-            str(receipt),
-            "--output",
-            "json",
-            "-I",
-        ],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert receipt.is_file()
-    assert "DRAFT_CREATED" in receipt.read_text(encoding="utf-8")
-    assert "token" not in receipt.read_text(encoding="utf-8").lower()
-
-
-def test_unknown_receipt_write_failure_preserves_do_not_retry_result(
-    monkeypatch, tmp_path
-):
-    config = tmp_path / "runner.toml"
-    source = tmp_path / "article.md"
-    receipt = tmp_path / "receipt.json"
-    config.write_text("[zhihu]\n", encoding="utf-8")
-    source.write_text("# title", encoding="utf-8")
-    monkeypatch.setattr(command, "load_runner_config", lambda _path: object())
-
-    def ambiguous(*_args, **_kwargs):
-        raise ResultUnknownError(
-            "adapter result is ambiguous; do not retry automatically",
-            receipt={
-                "status": RESULT_UNKNOWN,
-                "cleanup_status": "CLOSED",
-                "adapter_cleanup_status": "MANUAL_RECOVERY_REQUIRED",
-            },
-        )
-
-    monkeypatch.setattr(command, "execute_task", ambiguous)
-    monkeypatch.setattr(
-        command,
-        "_write_receipt",
-        lambda *_args: (_ for _ in ()).throw(OSError("receipt unavailable")),
-    )
-
-    result = CliRunner().invoke(
-        main,
-        [
-            "zhihu",
-            "draft",
-            "create",
-            str(source),
-            "--config",
-            str(config),
-            "--receipt",
-            str(receipt),
-            "--output",
-            "json",
-            "-I",
-        ],
-    )
-
-    assert result.exit_code != 0
-    assert RESULT_UNKNOWN in result.output
-    assert "MANUAL_RECOVERY_REQUIRED" in result.output
-    assert "receipt could not be written" in result.output.lower()
-    assert "do not retry automatically" in result.output.lower()
-
-
-def test_created_result_is_emitted_before_receipt_write_failure(monkeypatch, tmp_path):
-    config = tmp_path / "runner.toml"
-    source = tmp_path / "article.md"
-    receipt = tmp_path / "receipt.json"
-    config.write_text("[zhihu]\n", encoding="utf-8")
-    source.write_text("# title", encoding="utf-8")
-    monkeypatch.setattr(command, "load_runner_config", lambda _path: object())
-    monkeypatch.setattr(
-        command,
-        "execute_task",
-        lambda *_args, **_kwargs: {
-            "status": "DRAFT_CREATED",
-            "draft_id": "2067000000000000001",
-            "review_url": "https://zhuanlan.zhihu.com/p/2067000000000000001/edit",
-            "source_sha256": "abc",
+        {
+            "event": "logged_in",
+            "target": "zhihu@zhihu-test",
+            "profile": "zhihu-test",
+            "platform": "zhihu",
+            "status": "LOGGED_IN",
+            "account_name": "RexWang",
+            "account_url": "https://www.zhihu.com/people/rexwang",
+            "check_method": "browser_page",
         },
-    )
+    ]
+    lower = result.output.lower()
+    assert "wechatsync" not in lower
+    assert "artifact" not in lower
+    assert "receipt" not in lower
+    assert "media:ssh" not in lower
+
+
+def test_logout_dispatches_browser_level_logout_without_adapter_auth(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    sentinel = object()
+    calls = []
+    monkeypatch.setattr(command, "load_browser_config", lambda _path: sentinel)
     monkeypatch.setattr(
         command,
-        "_write_receipt",
-        lambda *_args: (_ for _ in ()).throw(OSError("receipt unavailable")),
+        "browser_logout",
+        lambda config: calls.append(config)
+        or {"status": "LOGGED_OUT", "logout_method": "clear_origin_storage"},
     )
 
     result = CliRunner().invoke(
         main,
         [
             "zhihu",
-            "draft",
-            "create",
-            str(source),
-            "--config",
-            str(config),
-            "--receipt",
-            str(receipt),
+            "logout",
+            "zhihu-test",
+            "--registry",
+            str(registry),
             "--output",
             "json",
             "-I",
         ],
     )
+    payload = _json(result)
 
-    assert result.exit_code != 0
-    assert '"status": "DRAFT_CREATED"' in result.output
-    assert "receipt could not be written" in result.output.lower()
-    assert "do not retry automatically" in result.output.lower()
+    assert calls == [sentinel]
+    assert payload == {
+        "target": "zhihu@zhihu-test",
+        "profile": "zhihu-test",
+        "platform": "zhihu",
+        "status": "LOGGED_OUT",
+        "logout_method": "clear_origin_storage",
+    }
+    lower = result.output.lower()
+    assert "wechatsync" not in lower
+    assert "cookie" not in lower
+    assert "token" not in lower

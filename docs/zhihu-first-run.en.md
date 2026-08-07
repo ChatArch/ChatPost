@@ -1,6 +1,6 @@
 # Zhihu First Setup and Draft Acceptance
 
-This is the executable `ChatPost 0.1.0` Quick Start. It reproduces the verified Playwright-cache + Profile + Wechatsync route while separating artifact and task ownership between ChatUp and ChatPost.
+This is the full `ChatPost 0.1.0` acceptance runbook. For the daily shortest path, start with [Quickstart: From Login to Draft Creation](quickstart.md). This page reproduces the verified Playwright-cache + Profile + Wechatsync route while separating artifact and task ownership between ChatUp and ChatPost.
 
 ## Boundary
 
@@ -171,8 +171,9 @@ Run `auth` once more after login. ChatPost never reads cookies from the Profile.
 
 ```bash
 ARTICLE=/absolute/path/to/article.md
-"$CHATPOST" zhihu draft dry-run "$ARTICLE" \
-  --config "$RUNNER_HOME/runner.toml" \
+"$CHATPOST" zhihu draft zhihu-personal "$ARTICLE" \
+  --registry "$RUNNER_HOME/accounts.toml" \
+  --dry-run \
   --output json \
   -I
 ```
@@ -183,8 +184,8 @@ Confirm the title, body, asset references, and fixed marker from the JSON `previ
 
 ```bash
 RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
-"$CHATPOST" zhihu draft create "$ARTICLE" \
-  --config "$RUNNER_HOME/runner.toml" \
+"$CHATPOST" zhihu draft zhihu-personal "$ARTICLE" \
+  --registry "$RUNNER_HOME/accounts.toml" \
   --receipt "$RECEIPT" \
   --output json \
   -I

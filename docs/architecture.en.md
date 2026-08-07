@@ -38,11 +38,11 @@ ChatPost never reads platform cookies and does not treat a browser profile as or
 | Chrome for Testing host binary | Verified | The successful path ran a local binary directly; Docker was not involved. |
 | Dedicated persistent profile | Verified | Zhihu authentication remained in a dedicated user-data-dir; cookies were not exported. |
 | Zhihu QR-scan login | Verified | The visible isolated browser completed QR login and the profile retained the session. |
-| Zhihu SMS-code login | Needs separate acceptance | This is a standard manual alternative, but current end-to-end evidence must not claim it has passed. |
+| Zhihu SMS-code login | Hidden compatibility checkpoint implemented; needs separate acceptance | `chatpost zhihu account login code` remains callable as a hidden compatibility checkpoint. Phone numbers and verification codes are used only in the later human browser flow, and current evidence must not claim new-account SMS login has passed. |
 | Loopback bridge and token | Verified | The extension and CLI communicated over local WebSocket; the token was not a Zhihu credential. |
 | ChatUp Playwright environment | Released dependency | `chatup 0.2.4` provides `chatup playwright` and `chatup.playwright.resolve`; ChatPost does not duplicate downloads. |
 | ChatPost task-specific Zhihu Runner | Implemented | `preflight/auth/draft`, persistent Profile, exact extension, loopback CDP/bridge, and receipts have code and tests. |
-| Generic runner/account CLI | Proposed | Generic registries, commands, and schemas are not implemented. |
+| Profile-based Zhihu CLI | Implemented | `chatpost platforms/profiles` discover platforms and non-sensitive Profile targets; `chatpost zhihu login/status/logout PROFILE` handles QR login, read-only status, and logout; `chatpost zhihu draft PROFILE SOURCE` either preflights with `--dry-run` or creates a review draft in receipt-required create mode. |
 | Multi-account scheduling and publication ledger | Proposed | This page defines the resource and state boundaries for later implementation. |
 
 ## Core Resources
@@ -147,11 +147,11 @@ A remote runner exposes a separate authenticated control API. It never maps the 
 CHROME_DEPENDENCY_MISSING
   -> user runs chatup playwright install <tested-version> --browser chromium
 CHROME_DEPENDENCY_READY
-  -> runner add/start
+  -> runner config selected and startup requested
 RUNNER_STARTING
   -> process + CDP + exact extension + bridge checks
 RUNNER_READY
-  -> account add/login
+  -> account registry selected and login checkpoint requested
 NEEDS_LOGIN
   -> visible human login checkpoint
 AUTH_CHECKING
@@ -159,7 +159,7 @@ AUTH_CHECKING
 ACCOUNT_READY
   -> plan
 PLANNED
-  -> explicit draft create/update
+  -> one explicit receipt-backed draft create-mode run; update/publish stay unsupported
 RUNNING
   -> DRAFT_CREATED -> AWAITING_REVIEW
   -> RESULT_UNKNOWN
@@ -195,7 +195,7 @@ It includes headings, lists, a table, fenced code, a link, a local PNG, and stab
 
 1. select an isolated, authorized Zhihu runner;
 2. require successful auth and plan;
-3. issue exactly one explicit `draft create`;
+3. issue exactly one explicit `draft` create-mode run without `--dry-run`;
 4. read back draft ID, title, marker, code, and image;
 5. write the ledger receipt;
 6. stop at human review without final publish.
@@ -206,13 +206,13 @@ See [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md).
 
 The first release includes:
 
-- a bounded dependency on released `chatup>=0.2.4,<0.3.0` plus read-only Chrome descriptor resolution;
+- a bounded dependency on released `chatup>=0.2.4,<0.3.0` and `chatbrowser>=0.1.2,<0.2.0`, plus read-only Chrome descriptor / browser metadata resolution;
 - host runner lifecycle and health checks;
 - one dedicated user-data-dir per runner;
 - ChatEnv bridge secret references;
-- account registration, human login checkpoint, and read-only auth;
-- plan, explicit draft create, and fail-closed draft update;
-- publication ledger, open, status, and reconcile;
+- non-sensitive account registries, human login checkpoints, and read-only auth;
+- plan, one explicit receipt-backed draft create-mode run, and fail-closed boundaries for unsupported update/publish paths;
+- review-draft receipts;
 - Zhihu as the first adapter.
 
 Later work includes Docker/remote runners, a multiplexing broker, more adapters, stronger tenant isolation, and separately authorized final-publish capabilities.
