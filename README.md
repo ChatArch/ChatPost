@@ -28,8 +28,8 @@ ChatArch multi-platform content publishing infrastructure package.
 | --- | --- |
 | 理解 ChatPost 总体资源和数据流 | [总体架构](docs/architecture.md) |
 | Review ChatUp Chrome dependency、ChatEnv 与状态边界 | [配置、环境与状态](docs/configuration.md) |
-| 查看知乎首次登录和固定博客草稿验收 | [知乎首次设置与草稿验收](docs/zhihu-first-run.md) |
-| 最快打通 Playwright + Wechatsync 知乎草稿 | [知乎首次设置与草稿验收](docs/zhihu-first-run.md) |
+| 从登录到发送知乎草稿 | [Quickstart：从登录到发送草稿](docs/quickstart.md) |
+| 查看固定博客草稿的完整验收手册 | [知乎首次设置与草稿验收](docs/zhihu-first-run.md) |
 | 查看当前真实命令 | [CLI 树](docs/cli-tree.md) |
 | Review 预期 CLI、ChatUp runtime dependency 与多账号隔离 | [Browser Runner 与账号隔离](docs/browser-runners.md) |
 | 校对当前包有哪些一等能力和边界 | [能力地图](docs/capability-map.md) |

@@ -59,9 +59,42 @@ def test_extension_bridge_wake_contract_is_documented():
     assert "MCP_WATCH_START" in changelog
 
 
+def test_mkdocs_quickstart_is_the_daily_login_to_draft_entrypoint():
+    mkdocs = (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
+    assert "快速开始: quickstart.md" in mkdocs
+    assert "快速开始: Quickstart" in mkdocs
+
+    zh_home = (ROOT / "docs/index.md").read_text(encoding="utf-8")
+    en_home = (ROOT / "docs/index.en.md").read_text(encoding="utf-8")
+    zh_readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    en_readme = (ROOT / "README.en.md").read_text(encoding="utf-8")
+    assert "[Quickstart：从登录到发送草稿](quickstart.md)" in zh_home
+    assert "[Quickstart: From Login to Draft Creation](quickstart.md)" in en_home
+    assert "[Quickstart：从登录到发送草稿](docs/quickstart.md)" in zh_readme
+    assert "[Quickstart: From Login to Draft Creation](docs/quickstart.en.md)" in en_readme
+
+    for relative in ("docs/quickstart.md", "docs/quickstart.en.md"):
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        assert "chatpost zhihu draft dry-run" not in text
+        assert "chatpost zhihu draft create" not in text
+        assert "--dry-run" in text
+        assert "--receipt" in text
+        assert "READY" in text
+        assert "RESULT_UNKNOWN" in text
+        assert "page-owned `login_url`" in text
+        assert "screenshot" in text or "截图" in text
+        assert "not final-publish" in text or "不点击最终发布" in text
+        assert "--phone" in text
+        assert "--sms-code" in text
+        assert "Cookie" in text or "cookies" in text
+        assert "LocalStorage" in text or "local storage" in text
+        assert "review URL" in text
+
+
 def test_quick_start_keeps_create_update_and_publish_boundaries_explicit():
     for relative in ("docs/zhihu-first-run.md", "docs/zhihu-first-run.en.md"):
         text = (ROOT / relative).read_text(encoding="utf-8")
+        assert "quickstart.md" in text
         assert "RESULT_UNKNOWN" in text
         assert "--dry-run" in text
         assert "--receipt" in text

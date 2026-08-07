@@ -10,7 +10,8 @@ Site entry: <https://arch.gh.wzhecnu.cn/ChatPost/en/>
 | --- | --- |
 | Understand the control plane, Browser Runner, Account, and Publication model | [Overall Architecture](architecture.md) |
 | Review Chrome installation, ChatEnv, URLs, profiles, and ledger | [Configuration, Environment, and State](configuration.md) |
-| Follow first Zhihu login/draft acceptance with the fixed MkDocs article | [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md) |
+| Go from login to creating a Zhihu review draft | [Quickstart: From Login to Draft Creation](quickstart.md) |
+| Review the full fixed-article acceptance runbook | [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md) |
 | Install the package, run the CLI, and confirm it works | [CLI Tree](cli-tree.md) |
 | Review the current CLI, Chrome runtime, and multi-account isolation | [Browser Runners and Account Isolation](browser-runners.md) |
 | Check first-class capabilities and current boundaries | [Capability Map](capability-map.md) |
@@ -22,7 +23,8 @@ This site keeps durable documentation entry points instead of a generic roadmap:
 
 - **Overall architecture**: control-plane, execution-plane, and core-resource ownership.
 - **Configuration, environment, and state**: Chrome installation, ChatEnv secrets, runner state, and publication ledger.
-- **Zhihu first setup and acceptance**: a fixed article defines visible login and one draft-create acceptance.
+- **Quickstart**: the shortest daily path from Profile discovery and login-state checks to `draft --dry-run` and Zhihu draft creation.
+- **Zhihu first setup and acceptance**: the full acceptance runbook for Runner, Profile, receipt, cleanup, and `RESULT_UNKNOWN` behavior.
 - **CLI tree**: the most direct command entry point, including the real command tree, status, and update checklist.
 - **Browser runners and account isolation**: host binaries, Docker, user-data-dir isolation, and bridge boundaries.
 - **Capability map**: first-class capabilities, boundaries, and out-of-scope areas.
@@ -44,11 +46,17 @@ This site keeps durable documentation entry points instead of a generic roadmap:
 
     [Open Configuration Design](configuration.md)
 
+- **Quickstart: From Login to Draft Creation**
+
+    Confirm the Profile, log in or reuse auth, dry-run the article, and create a Zhihu review draft through the shortest path.
+
+    [Open Quickstart](quickstart.md)
+
 - **Zhihu First Setup and Draft Acceptance**
 
-    Follow visible login, planning, one receipt-backed draft create-mode run, and readback using the fixed MkDocs article.
+    Review the full Runner, Profile, receipt, cleanup, and RESULT_UNKNOWN acceptance contract using the fixed MkDocs article.
 
-    [Open Zhihu Task Flow](zhihu-first-run.md)
+    [Open Acceptance Runbook](zhihu-first-run.md)
 
 - **CLI Tree**
 

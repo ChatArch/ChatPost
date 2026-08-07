@@ -1,6 +1,6 @@
 # 知乎首次设置与草稿验收
 
-本页是 `ChatPost 0.1.0` 的可执行 Quick Start。它复刻已验证的 Playwright-cache + Profile + Wechatsync 路线，并把制品与任务责任拆到 ChatUp/ChatPost。
+本页是 `ChatPost 0.1.0` 的完整验收 runbook。日常最短路径请先看 [Quickstart：从登录到发送草稿](quickstart.md)；本页用于复刻已验证的 Playwright-cache + Profile + Wechatsync 路线，并把制品与任务责任拆到 ChatUp/ChatPost。
 
 ## 最终边界
 

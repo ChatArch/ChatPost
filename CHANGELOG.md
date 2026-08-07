@@ -13,6 +13,7 @@
 
 - Require `chatbrowser>=0.1.2,<0.2.0` and `qrcode[pil]>=7.4,<9.0` alongside ChatUp, ChatEnv, ChatStyle, and websocket-client dependencies.
 - Fix Wechatsync extension bridge wake-up by writing the MCP token to extension local storage key `mcpToken`, sending `MCP_SET_SERVER_URL` with `payload.url`, and starting the active MCP watch with `MCP_WATCH_START` before adapter communication.
+- Add a dedicated MkDocs Quickstart for the daily Zhihu path from Profile discovery through login, `draft --dry-run`, and receipt-backed review-draft creation.
 - Update README, CLI tree, MkDocs pages, and capability maps so the Profile-based `chatpost zhihu login/status/logout/draft` surface is documented as implemented, older account/QR helpers are hidden compatibility, and final publish plus long-term publication commands remain proposals.
 
 ## 0.1.0 - 2026-08-04

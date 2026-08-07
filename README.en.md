@@ -28,8 +28,8 @@ Choose documentation by scenario:
 | --- | --- |
 | Understand ChatPost resources and data flow | [Overall Architecture](docs/architecture.en.md) |
 | Review the ChatUp Chrome dependency, ChatEnv, and state ownership | [Configuration, Environment, and State](docs/configuration.en.md) |
-| Follow first Zhihu login and fixed-article draft acceptance | [Zhihu First Setup and Draft Acceptance](docs/zhihu-first-run.en.md) |
-| Run the fastest Playwright + Wechatsync Zhihu draft path | [Zhihu First Setup and Draft Acceptance](docs/zhihu-first-run.en.md) |
+| Go from login to creating a Zhihu review draft | [Quickstart: From Login to Draft Creation](docs/quickstart.en.md) |
+| Review the full fixed-article draft acceptance runbook | [Zhihu First Setup and Draft Acceptance](docs/zhihu-first-run.en.md) |
 | Inspect the current real commands | [CLI Tree](docs/cli-tree.en.md) |
 | Review the proposed CLI, ChatUp runtime dependency, and multi-account isolation | [Browser Runners and Account Isolation](docs/browser-runners.en.md) |
 | Check first-class capabilities and current boundaries | [Capability Map](docs/capability-map.en.md) |

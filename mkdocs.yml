@@ -35,6 +35,7 @@ plugins:
           site_name: ChatPost Documentation
           nav_translations:
             首页: Home
+            快速开始: Quickstart
             设计: Design
             总体架构: Overall Architecture
             配置、环境与状态: Configuration, Environment, and State
@@ -67,6 +68,7 @@ extra:
       lang: en
 nav:
   - 首页: index.md
+  - 快速开始: quickstart.md
   - 设计:
       - 总体架构: architecture.md
       - 配置、环境与状态: configuration.md

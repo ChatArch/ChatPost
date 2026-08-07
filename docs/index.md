@@ -10,7 +10,8 @@ ChatPost 是 ChatArch 的多平台内容发布控制面。这个文档站把已�
 | --- | --- |
 | 先理解 control plane、Browser Runner、Account 和 Publication | [总体架构](architecture.md) |
 | Review Chrome 安装、ChatEnv、URL、Profile 和 ledger | [配置、环境与状态](configuration.md) |
-| 用固定 MkDocs 博客稿理解知乎首次登录与草稿验收 | [知乎首次设置与草稿验收](zhihu-first-run.md) |
+| 从登录到发送知乎草稿 | [Quickstart：从登录到发送草稿](quickstart.md) |
+| 用固定 MkDocs 博客稿审查完整验收链路 | [知乎首次设置与草稿验收](zhihu-first-run.md) |
 | 第一次安装、运行命令行、确认包可用 | [CLI 树](cli-tree.md) |
 | Review 当前 CLI、Chrome runtime 与多账号隔离 | [Browser Runner 与账号隔离](browser-runners.md) |
 | 校对当前包有哪些一等能力和边界 | [能力地图](capability-map.md) |
@@ -22,7 +23,8 @@ ChatPost 是 ChatArch 的多平台内容发布控制面。这个文档站把已�
 
 - **总体架构**：控制面、执行面和核心资源的责任边界。
 - **配置、环境与状态**：Chrome 安装、ChatEnv secrets、Runner state 和 publication ledger。
-- **知乎首次设置与草稿验收**：用固定博客稿定义可验证的首次登录和单次带 receipt 的 draft create mode。
+- **Quickstart**：从 Profile 发现、登录状态判断、`draft --dry-run` 到创建知乎草稿的日常最短路径。
+- **知乎首次设置与草稿验收**：用固定博客稿定义可验证的完整验收手册，覆盖 Runner、Profile、receipt、cleanup 与 `RESULT_UNKNOWN`。
 - **CLI 树**：最直观的命令展示入口，包含真实命令树、状态和更新清单。
 - **Browser Runner 与账号隔离**：解释 host binary、Docker、多账号 user-data-dir 和 bridge 边界。
 - **能力地图**：当前一等能力、边界和不负责的范围。
@@ -44,11 +46,17 @@ ChatPost 是 ChatArch 的多平台内容发布控制面。这个文档站把已�
 
     [查看配置设计](configuration.md)
 
+- **Quickstart：从登录到发送草稿**
+
+    用最短路径确认 Profile、登录或复用登录态、dry-run 文章，并创建知乎草稿。
+
+    [打开 Quickstart](quickstart.md)
+
 - **知乎首次设置与草稿验收**
 
-    从固定 MkDocs 博客稿出发，查看首次登录、plan、单次带 receipt 的 draft create mode 和回读契约。
+    从固定 MkDocs 博客稿出发，审查 Runner、Profile、receipt、cleanup 与 RESULT_UNKNOWN 等完整验收契约。
 
-    [查看知乎任务流](zhihu-first-run.md)
+    [查看验收手册](zhihu-first-run.md)
 
 - **CLI 树**
 
