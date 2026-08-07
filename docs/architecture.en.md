@@ -38,11 +38,11 @@ ChatPost never reads platform cookies and does not treat a browser profile as or
 | Chrome for Testing host binary | Verified | The successful path ran a local binary directly; Docker was not involved. |
 | Dedicated persistent profile | Verified | Zhihu authentication remained in a dedicated user-data-dir; cookies were not exported. |
 | Zhihu QR-scan login | Verified | The visible isolated browser completed QR login and the profile retained the session. |
-| Zhihu SMS-code login | CLI checkpoint implemented; needs separate acceptance | `chatpost login code` can open the SMS-code checkpoint. Phone numbers and verification codes are used only in the later human browser flow, and current evidence must not claim new-account SMS login has passed. |
+| Zhihu SMS-code login | Hidden compatibility checkpoint implemented; needs separate acceptance | `chatpost zhihu account login code` remains callable as a hidden compatibility checkpoint. Phone numbers and verification codes are used only in the later human browser flow, and current evidence must not claim new-account SMS login has passed. |
 | Loopback bridge and token | Verified | The extension and CLI communicated over local WebSocket; the token was not a Zhihu credential. |
 | ChatUp Playwright environment | Released dependency | `chatup 0.2.4` provides `chatup playwright` and `chatup.playwright.resolve`; ChatPost does not duplicate downloads. |
 | ChatPost task-specific Zhihu Runner | Implemented | `preflight/auth/draft`, persistent Profile, exact extension, loopback CDP/bridge, and receipts have code and tests. |
-| Common account/login/post CLI | Implemented | `chatpost account list/show` reads a non-sensitive alias registry; `chatpost login status/qr/code` performs status checks, QR checkpoints, and SMS-code checkpoints; `chatpost post draft` creates a review draft from `platform@alias` and writes a receipt. |
+| Profile-based Zhihu CLI | Implemented | `chatpost platforms/profiles` discover platforms and non-sensitive Profile targets; `chatpost zhihu login/status/logout PROFILE` handles QR login, read-only status, and logout; `chatpost zhihu draft create PROFILE SOURCE` creates a review draft and writes a receipt. |
 | Multi-account scheduling and publication ledger | Proposed | This page defines the resource and state boundaries for later implementation. |
 
 ## Core Resources

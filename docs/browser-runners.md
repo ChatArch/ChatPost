@@ -1,7 +1,7 @@
 # Browser Runner 与账号隔离
 
 !!! warning "状态：部分实现，部分提案"
-    `ChatPost 0.1.x` 已实现 task-specific 知乎 Runner 生命周期、非敏感账号 registry 读取和通用 `account/login/post draft` 入口。文中通用 `runner` 管理、多账号调度和远端模型仍是提案。
+    `ChatPost 0.1.x` 已实现 task-specific 知乎 Runner 生命周期、非敏感 Profile registry 读取和 `chatpost zhihu login/status/logout/draft` 入口。文中通用 `runner` 管理、多账号调度和远端模型仍是提案。
 
 总体资源关系见 [总体架构设计](architecture.md)，持久化 schema 见 [配置、环境与状态设计](configuration.md)，具体任务见 [知乎首次设置与草稿验收](zhihu-first-run.md)。
 

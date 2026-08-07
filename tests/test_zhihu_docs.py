@@ -8,18 +8,18 @@ def test_cli_tree_matches_registered_task_commands():
         text = (ROOT / relative).read_text(encoding="utf-8")
         for command in (
             "chatpost --tree",
-            "chatpost account list",
-            "chatpost account show",
-            "chatpost qr encode",
-            "chatpost zhihu account status",
-            "chatpost zhihu account preflight",
-            "chatpost zhihu account login qr",
-            "chatpost zhihu account login qr-artifact",
-            "chatpost zhihu account login code",
+            "chatpost platforms",
+            "chatpost profiles",
+            "chatpost zhihu profiles",
+            "chatpost zhihu login",
+            "chatpost zhihu logout",
+            "chatpost zhihu status",
             "chatpost zhihu draft dry-run",
             "chatpost zhihu draft create",
         ):
             assert command in text
+        assert "Hidden compatibility" in text
+        assert "chatpost zhihu account status/preflight/login qr/login qr-artifact/login code" in text
         assert "chatpost login --help" not in text
         assert "chatpost post --help" not in text
         assert "chatpost login qr-image" not in text

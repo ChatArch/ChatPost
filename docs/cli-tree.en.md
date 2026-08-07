@@ -1,6 +1,8 @@
 # CLI Tree
 
-`ChatPost 0.1.x` now organizes commands as “platform-neutral capabilities plus platform-specific capabilities.” Top-level commands only expose the account alias registry, generic QR artifacts, and concrete platform names. Login, drafts, and platform runners live under their platform, so there is no global `chatpost login` or `chatpost post` surface.
+`ChatPost 0.1.x` now organizes the user-visible command surface as “discovery entrypoints plus platform-specific capabilities.” The top level exposes only platform discovery, Profile discovery, and concrete platform names. Zhihu login, logout, status, and drafts live under `chatpost zhihu ...`, so there is no global `chatpost login` or `chatpost post` surface.
+
+Here `profile` means a non-sensitive Chrome/Profile target configuration: it binds alias, platform, runner_config, profile name, and label so `login/status/logout/draft` can find the right browser Profile. It is not cookies, local storage, Zhihu account details, or credentials.
 
 ## Current Commands
 
@@ -11,22 +13,16 @@ chatpost  # platform content publishing and draft orchestration
 ├── --help  # Show help for the current command.
 ├── --version  # Show package version.
 ├── --tree  # Print the registered CLI tree with command purpose and IO shape.
-├── account  # account alias registry; metadata only
-│   ├── list [--registry PATH] [--output text|json] [-I/--no-interactive]  # List account aliases; never reads cookies/tokens/session.
-│   └── show TARGET [--registry PATH] [--output text|json] [-I/--no-interactive]  # Show one account alias by ALIAS or PLATFORM@ALIAS.
-├── qr  # platform-neutral QR artifact tools
-│   └── encode DATA --artifact PATH [--output text|json] [-I/--no-interactive]  # Render DATA into PNG without echoing DATA by default.
+├── platforms [--output text|json] [-I/--no-interactive]  # List supported publishing platforms.
+├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Chrome/profile targets.
 └── zhihu  # Zhihu platform capabilities
-    ├── account  # Zhihu account status, preflight, and login checkpoints
-    │   ├── status TARGET [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check.
-    │   ├── preflight TARGET [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check runner/profile/browser/extension readiness.
-    │   └── login  # Zhihu manual login checkpoints; no phone/code/cookie arguments.
-    │       ├── qr TARGET [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open QR login checkpoint and wait for READY.
-    │       ├── qr-artifact TARGET [--registry PATH] --artifact PATH --receipt PATH [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Create live QR PNG + receipt, return immediately.
-    │       └── code TARGET [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open SMS-code checkpoint without accepting phone/code values.
+    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu Chrome/profile targets.
+    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open live QR login, emit link/QR/receipt, and wait for READY.
+    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Clear Zhihu login state for this profile; does not read session values.
+    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check.
     └── draft  # Zhihu review-draft operations
-        ├── dry-run TARGET SOURCE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Parse SOURCE without starting browser or writing Zhihu.
-        └── create TARGET SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft.
+        ├── dry-run PROFILE SOURCE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Parse SOURCE without starting browser or writing Zhihu.
+        └── create PROFILE SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft.
 ```
 
 Inspect the real help:
@@ -34,17 +30,19 @@ Inspect the real help:
 ```bash
 chatpost --tree
 chatpost --help
-chatpost account --help
-chatpost qr --help
+chatpost platforms --help
+chatpost profiles --help
 chatpost zhihu --help
-chatpost zhihu account --help
-chatpost zhihu account login --help
+chatpost zhihu profiles --help
+chatpost zhihu login --help
+chatpost zhihu logout --help
+chatpost zhihu status --help
 chatpost zhihu draft --help
 ```
 
 ## Common Task Order
 
-Create a registry that contains only non-sensitive metadata:
+Create a Profile registry that contains only non-sensitive metadata:
 
 ```toml
 [accounts."zhihu-test"]
@@ -54,60 +52,42 @@ profile = "zhihu-test"
 label = "Zhihu test account"
 ```
 
-Then use the platform-scoped entrypoints:
+Then use the visible platform entrypoints:
 
 ```bash
-chatpost account list \
+chatpost platforms \
+  --output json \
+  -I
+
+chatpost zhihu profiles \
   --registry accounts.toml \
   --output json \
   -I
 
-chatpost account show zhihu@zhihu-test \
+chatpost zhihu login zhihu-test \
   --registry accounts.toml \
-  --output json \
-  -I
-
-chatpost qr encode 'https://www.zhihu.com/signin?login_method=qr' \
-  --artifact login-url.png \
-  --output json \
-  -I
-
-chatpost zhihu account status zhihu@zhihu-test \
-  --registry accounts.toml \
-  --output json \
-  -I
-
-chatpost zhihu account preflight zhihu@zhihu-test \
-  --registry accounts.toml \
-  --output json \
-  -I
-
-chatpost zhihu account login qr zhihu@zhihu-test \
-  --registry accounts.toml \
-  --timeout 900 \
-  --output json \
-  -I
-
-chatpost zhihu account login qr-artifact zhihu@zhihu-test \
-  --registry accounts.toml \
-  --artifact live-login-qr.png \
+  --qr live-login-qr.png \
   --receipt live-login-qr-ready.json \
-  --timeout 60 \
-  --output json \
-  -I
-
-chatpost zhihu account login code zhihu@zhihu-test \
-  --registry accounts.toml \
   --timeout 900 \
   --output json \
   -I
 
-chatpost zhihu draft dry-run zhihu@zhihu-test article.md \
+chatpost zhihu status zhihu-test \
   --registry accounts.toml \
   --output json \
   -I
 
-chatpost zhihu draft create zhihu@zhihu-test article.md \
+chatpost zhihu logout zhihu-test \
+  --registry accounts.toml \
+  --output json \
+  -I
+
+chatpost zhihu draft dry-run zhihu-test article.md \
+  --registry accounts.toml \
+  --output json \
+  -I
+
+chatpost zhihu draft create zhihu-test article.md \
   --registry accounts.toml \
   --receipt receipt.json \
   --output json \
@@ -116,17 +96,28 @@ chatpost zhihu draft create zhihu@zhihu-test article.md \
 
 These entrypoints are ChatPost orchestration only:
 
-1. `account list/show` read only the account alias registry. They do not store or print cookies, local storage, tokens, passwords, credentials, or other secrets.
-2. `qr encode` renders caller-provided data into a PNG artifact and reports only artifact metadata by default.
-3. `zhihu account status` resolves `platform@alias` and runs one read-only Zhihu auth check.
-4. `zhihu account preflight` checks the exact Playwright install, Profile permissions, extension, Node, Wechatsync CLI, secret file, and loopback ports. It does not install, launch, or write to Zhihu.
-5. `zhihu account login qr` opens the QR login checkpoint and waits until the account becomes `READY`; the browser/Profile still owns login state and ChatPost never exports cookies.
-6. `zhihu account login qr-artifact` opens the live login checkpoint, creates a fresh Zhihu scan-login link in the browser context, renders the extracted `login_url` as a QR PNG, writes a mode-`0600` receipt, and returns immediately. The conversation host decides how to deliver the image.
-7. `zhihu account login code` opens an SMS-code checkpoint and waits for `READY`; phone numbers and verification codes are used only in the human browser flow, never as CLI arguments and never in the registry, config, receipt, or logs.
-8. `zhihu draft dry-run` parses the article without starting a browser, connecting the extension, or writing to Zhihu.
-9. `zhihu draft create` invokes the Wechatsync create path exactly once. Success writes a mode-`0600` receipt. An ambiguous result writes `RESULT_UNKNOWN` and must never be retried automatically. It creates a review draft, not final publish.
+1. `platforms` lists first-class platforms and recommended entrypoints.
+2. `profiles` / `zhihu profiles` read only the Profile registry. They do not store or print cookies, local storage, tokens, passwords, credentials, or other secrets.
+3. `zhihu login` is a QR login handoff: it opens the Zhihu login page in the same browser Profile, waits until the page QR is scannable, renders the **same login page's page-owned `login_url`** into a QR image/writes a mode-`0600` receipt, then keeps the browser open until the Profile becomes `READY`. The browser/Profile still owns login state and ChatPost never exports cookies.
+4. `zhihu status` resolves `PROFILE` and runs one read-only Zhihu auth check without reading cookies, local storage, or IndexedDB.
+5. `zhihu logout` clears Zhihu origin login state for that Profile. It sends browser storage-clear commands but does not read or export session values.
+6. `zhihu draft dry-run` parses the article without starting a browser, connecting the extension, or writing to Zhihu.
+7. `zhihu draft create` invokes the Wechatsync create path exactly once. Success writes a mode-`0600` receipt. An ambiguous result writes `RESULT_UNKNOWN` and must never be retried automatically. It creates a review draft, not final publish.
+8. Phone numbers and verification codes are human browser-flow inputs only. ChatPost does not expose `--phone`, `--code`, `--otp`, or `--sms-code`, and never writes those values to the registry, config, receipt, or logs.
 
 `ChatPost 0.1.x` has **no final-publish command** and no article-update command.
+
+## Hidden compatibility
+
+Older script entrypoints remain callable, but are not shown in `--help` or `--tree`:
+
+```text
+chatpost account list/show
+chatpost qr encode
+chatpost zhihu account status/preflight/login qr/login qr-artifact/login code
+```
+
+These hidden compatibility commands exist for older automation, not for the new daily-use docs path. Platform delivery remains the host/gateway's responsibility, and ChatPost CLI does not output `MEDIA:ssh://...` or `[media attachment]`.
 
 ## ChatUp / ChatBrowser Boundary
 
@@ -138,7 +129,7 @@ chatup playwright install 1.61.1 --browser chromium --output json -I
 chatup playwright doctor 1.61.1 --browser chromium --output json -I
 ```
 
-ChatPost depends on `chatup>=0.2.4,<0.3.0`, `chatbrowser>=0.1.2,<0.2.0`, and `qrcode[pil]>=7.4,<9.0`. The current Zhihu draft route still resolves the exact browser through ChatUp, then ChatPost owns the Profile, extension, loopback CDP/bridge, QR/link handoff artifacts, and Wechatsync process. The account registry stores only non-sensitive alias metadata. ChatBrowser owns the browser runtime, Profile metadata, and CDP session metadata safety boundary; richer session discovery should come through ChatBrowser rather than storing browser secrets in ChatPost.
+ChatPost depends on `chatup>=0.2.4,<0.3.0`, `chatbrowser>=0.1.2,<0.2.0`, and `qrcode[pil]>=7.4,<9.0`. The current Zhihu draft route still resolves the exact browser through ChatUp, then ChatPost owns the Profile, extension, loopback CDP/bridge, QR/link handoff artifacts, and Wechatsync process. The Profile registry stores only non-sensitive alias metadata. ChatBrowser owns the browser runtime, Profile metadata, and CDP session metadata safety boundary; richer session discovery should come through ChatBrowser rather than storing browser secrets in ChatPost.
 
 ```python
 from chatup.playwright import resolve
@@ -150,7 +141,7 @@ Ownership:
 
 - ChatUp: the Playwright package, its declared browser revision, installation metadata, and executable path;
 - ChatBrowser: browser runtime, Profile metadata, and CDP session metadata;
-- ChatPost: account aliases, QR image artifacts, publishing task orchestration, Profile/extension/CDP/bridge/Wechatsync one-shot tasks, and receipts;
+- ChatPost: Profile aliases, QR image artifacts, publishing task orchestration, Profile/extension/CDP/bridge/Wechatsync one-shot tasks, and receipts;
 - Wechatsync: the Zhihu adapter and draft write;
 - human: first login and final publication approval.
 

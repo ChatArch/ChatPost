@@ -27,51 +27,63 @@ def _json(result):
     return json.loads(result.output)
 
 
-def test_task_cli_exposes_platform_scoped_zhihu_groups_and_tree():
-    assert set(main.commands) == {"account", "qr", "zhihu"}
-    assert {"list", "show"}.issubset(main.commands["account"].commands)
-    assert {"encode"}.issubset(main.commands["qr"].commands)
+def test_task_cli_exposes_profile_based_zhihu_surface_and_hides_advanced_helpers():
+    assert set(main.commands) == {"account", "platforms", "profiles", "qr", "zhihu"}
+    assert main.commands["account"].hidden is True
+    assert main.commands["qr"].hidden is True
+    assert main.commands["platforms"].hidden is False
+    assert main.commands["profiles"].hidden is False
 
     zhihu = main.commands["zhihu"]
-    assert set(zhihu.commands) == {"account", "draft"}
+    assert {"profiles", "login", "logout", "status", "draft"}.issubset(zhihu.commands)
+    assert zhihu.commands["profiles"].hidden is False
+    assert zhihu.commands["login"].hidden is False
+    assert zhihu.commands["logout"].hidden is False
+    assert zhihu.commands["status"].hidden is False
+    assert set(zhihu.commands["draft"].commands) == {"dry-run", "create"}
+
+    # Keep low-level/legacy account helpers callable for scripts, but not as the daily-use CLI.
+    assert "account" in zhihu.commands
+    assert zhihu.commands["account"].hidden is True
     assert set(zhihu.commands["account"].commands) == {"preflight", "status", "login"}
     assert set(zhihu.commands["account"].commands["login"].commands) == {
         "qr",
         "qr-artifact",
         "code",
     }
-    assert set(zhihu.commands["draft"].commands) == {"dry-run", "create"}
 
 
-def test_top_level_tree_prints_platform_scoped_registered_cli_tree():
+def test_top_level_tree_prints_profile_based_registered_cli_tree():
     result = CliRunner().invoke(main, ["--tree"])
 
     assert result.exit_code == 0, result.output
     assert "chatpost  # platform content publishing and draft orchestration" in result.output
-    assert "├── account  # account alias registry; metadata only" in result.output
-    assert "├── qr  # platform-neutral QR artifact tools" in result.output
+    assert "├── platforms [--output text|json] [-I/--no-interactive]  # List supported publishing platforms." in result.output
+    assert "├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Chrome/profile targets." in result.output
     assert "└── zhihu  # Zhihu platform capabilities" in result.output
-    assert "    ├── account  # Zhihu account status, preflight, and login checkpoints" in result.output
-    assert "    │   ├── status TARGET [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check." in result.output
-    assert "    │       ├── qr TARGET [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open QR login checkpoint and wait for READY." in result.output
-    assert "    │       ├── qr-artifact TARGET [--registry PATH] --artifact PATH --receipt PATH [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Create live QR PNG + receipt, return immediately." in result.output
+    assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu Chrome/profile targets." in result.output
+    assert "    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open live QR login, emit link/QR/receipt, and wait for READY." in result.output
+    assert "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Clear Zhihu login state for this profile; does not read session values." in result.output
+    assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check." in result.output
     assert "    └── draft  # Zhihu review-draft operations" in result.output
-    assert "        └── create TARGET SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft." in result.output
-    assert "chatpost login" not in result.output
-    assert "chatpost post" not in result.output
+    assert "        └── create PROFILE SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft." in result.output
+    assert "account login qr" not in result.output
+    assert "qr-artifact" not in result.output
     assert "MEDIA:ssh" not in result.output
     assert "[media attachment]" not in result.output
 
 
-def test_top_level_help_hides_old_global_login_and_post_groups():
+def test_top_level_help_shows_discovery_and_platform_groups_only():
     result = CliRunner().invoke(main, ["--help"])
 
     assert result.exit_code == 0, result.output
-    assert "account" in result.output
-    assert "qr" in result.output
+    assert "platforms" in result.output
+    assert "profiles" in result.output
     assert "zhihu" in result.output
-    assert "login" not in result.output
-    assert "post" not in result.output
+    assert "\n  account" not in result.output
+    assert "\n  qr" not in result.output
+    assert "\n  login" not in result.output
+    assert "\n  post" not in result.output
     assert "--tree" in result.output
 
 
@@ -119,6 +131,191 @@ def test_account_show_resolves_platform_target(tmp_path):
     assert payload["status"] == "READY"
     assert payload["account"]["alias"] == "zhihu-test"
     assert payload["account"]["platform"] == "zhihu"
+
+
+def test_platforms_lists_supported_platforms():
+    result = CliRunner().invoke(main, ["platforms", "--output", "json", "-I"])
+    payload = _json(result)
+
+    assert payload == {
+        "status": "READY",
+        "platforms": [
+            {
+                "name": "zhihu",
+                "profiles_command": "chatpost zhihu profiles",
+                "login_command": "chatpost zhihu login PROFILE",
+                "status_command": "chatpost zhihu status PROFILE",
+                "logout_command": "chatpost zhihu logout PROFILE",
+            }
+        ],
+    }
+
+
+def test_profiles_lists_chrome_profile_configs_and_filters_platform(tmp_path):
+    registry = _registry(tmp_path)
+
+    result = CliRunner().invoke(
+        main,
+        ["profiles", "--platform", "zhihu", "--registry", str(registry), "--output", "json", "-I"],
+    )
+    payload = _json(result)
+
+    assert payload["status"] == "READY"
+    assert payload["profiles"] == [
+        {
+            "alias": "zhihu-test",
+            "platform": "zhihu",
+            "profile": "zhihu-test",
+            "label": "Zhihu test account",
+            "runner_config": str(tmp_path / "runner.toml"),
+        }
+    ]
+    assert "cookie" not in result.output.lower()
+    assert "localstorage" not in result.output.lower()
+
+
+def test_zhihu_profiles_lists_zhihu_profile_configs(tmp_path):
+    registry = _registry(tmp_path)
+
+    result = CliRunner().invoke(
+        main,
+        ["zhihu", "profiles", "--registry", str(registry), "--output", "json", "-I"],
+    )
+    payload = _json(result)
+
+    assert payload["status"] == "READY"
+    assert payload["platform"] == "zhihu"
+    assert payload["profiles"][0]["alias"] == "zhihu-test"
+
+
+def test_zhihu_status_dispatches_read_only_auth(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    calls = []
+    monkeypatch.setattr(cli, "load_runner_config", lambda path: ("config", Path(path)))
+    monkeypatch.setattr(
+        cli,
+        "execute_task",
+        lambda config, source, *, mode: calls.append((config, source, mode))
+        or {"status": "READY"},
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
+            "status",
+            "zhihu-test",
+            "--registry",
+            str(registry),
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+    payload = _json(result)
+
+    assert calls == [(("config", tmp_path / "runner.toml"), None, "auth")]
+    assert payload["status"] == "READY"
+    assert payload["target"] == "zhihu@zhihu-test"
+
+
+def test_zhihu_login_dispatches_single_qr_handoff_command(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    qr = tmp_path / "login.png"
+    receipt_path = tmp_path / "login.json"
+    scan_link = "https://www.zhihu.com/account/scan/login/waiting?/api/login/qrcode"
+    calls = []
+    monkeypatch.setattr(cli, "load_runner_config", lambda path: ("config", Path(path)))
+
+    def fake_wait_for_login(
+        config,
+        *,
+        timeout,
+        method="qr",
+        checkpoint_artifact=None,
+        checkpoint_callback=None,
+    ):
+        calls.append((config, timeout, method, checkpoint_artifact, checkpoint_callback))
+        assert checkpoint_callback is not None
+        checkpoint_callback(
+            {
+                "status": "CHECKPOINT_IMAGE_READY",
+                "login_method": method,
+                "artifact_path": str(checkpoint_artifact),
+                "artifact_mime": "image/png",
+                "login_url": scan_link,
+            }
+        )
+        return {"status": "READY", "login_method": method, "login_url": scan_link}
+
+    monkeypatch.setattr(cli, "wait_for_login", fake_wait_for_login)
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
+            "login",
+            "zhihu-test",
+            "--registry",
+            str(registry),
+            "--qr",
+            str(qr),
+            "--receipt",
+            str(receipt_path),
+            "--timeout",
+            "60",
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+    payload = _json(result)
+
+    assert calls == [(("config", tmp_path / "runner.toml"), 60, "qr", qr, calls[0][4])]
+    assert payload["status"] == "READY"
+    assert payload["target"] == "zhihu@zhihu-test"
+    assert payload["login_url"] == scan_link
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["status"] == "CHECKPOINT_IMAGE_READY"
+    assert receipt["target"] == "zhihu@zhihu-test"
+    assert receipt["login_url"] == scan_link
+    assert receipt["artifact_path"] == str(qr)
+    assert receipt_path.stat().st_mode & 0o077 == 0
+    assert "media:ssh" not in result.output.lower()
+
+
+def test_zhihu_logout_dispatches_profile_logout_without_reading_session(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    calls = []
+    monkeypatch.setattr(cli, "load_runner_config", lambda path: ("config", Path(path)))
+    monkeypatch.setattr(
+        cli,
+        "logout_from_zhihu",
+        lambda config: calls.append(config)
+        or {"status": "LOGGED_OUT", "logout_method": "clear_origin_storage"},
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
+            "logout",
+            "zhihu-test",
+            "--registry",
+            str(registry),
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+    payload = _json(result)
+
+    assert calls == [("config", tmp_path / "runner.toml")]
+    assert payload["status"] == "LOGGED_OUT"
+    assert payload["target"] == "zhihu@zhihu-test"
+    lower = result.output.lower()
+    assert "cookie" not in lower
+    assert "localstorage" not in lower
 
 
 def test_zhihu_account_status_dispatches_read_only_auth(monkeypatch, tmp_path):
@@ -188,12 +385,18 @@ def test_zhihu_account_login_qr_dispatches_manual_checkpoint(monkeypatch, tmp_pa
     registry = _registry(tmp_path)
     calls = []
     monkeypatch.setattr(cli, "load_runner_config", lambda path: ("config", Path(path)))
-    monkeypatch.setattr(
-        cli,
-        "wait_for_login",
-        lambda config, *, timeout, method="qr": calls.append((config, timeout, method))
-        or {"status": "READY", "login_method": method},
-    )
+    def fake_wait_for_login(
+        config,
+        *,
+        timeout,
+        method="qr",
+        checkpoint_artifact=None,
+        checkpoint_callback=None,
+    ):
+        calls.append((config, timeout, method, checkpoint_artifact, checkpoint_callback))
+        return {"status": "READY", "login_method": method}
+
+    monkeypatch.setattr(cli, "wait_for_login", fake_wait_for_login)
 
     result = CliRunner().invoke(
         main,
@@ -214,10 +417,80 @@ def test_zhihu_account_login_qr_dispatches_manual_checkpoint(monkeypatch, tmp_pa
     )
     payload = _json(result)
 
-    assert calls == [(("config", tmp_path / "runner.toml"), 60, "qr")]
+    assert calls == [(("config", tmp_path / "runner.toml"), 60, "qr", None, None)]
     assert payload["status"] == "READY"
     assert payload["target"] == "zhihu@zhihu-test"
     assert payload["login_method"] == "qr"
+
+
+def test_zhihu_account_login_qr_can_emit_checkpoint_receipt_while_waiting(
+    monkeypatch, tmp_path
+):
+    registry = _registry(tmp_path)
+    artifact = tmp_path / "wait-login.png"
+    receipt_path = tmp_path / "wait-login-ready.json"
+    scan_link = "https://www.zhihu.com/account/scan/login/waiting?/api/login/qrcode"
+    calls = []
+    monkeypatch.setattr(cli, "load_runner_config", lambda path: ("config", Path(path)))
+
+    def fake_wait_for_login(
+        config,
+        *,
+        timeout,
+        method="qr",
+        checkpoint_artifact=None,
+        checkpoint_callback=None,
+    ):
+        calls.append((config, timeout, method, checkpoint_artifact, checkpoint_callback))
+        assert checkpoint_callback is not None
+        checkpoint_callback(
+            {
+                "status": "CHECKPOINT_IMAGE_READY",
+                "login_method": method,
+                "artifact_path": str(checkpoint_artifact),
+                "artifact_mime": "image/png",
+                "login_url": scan_link,
+            }
+        )
+        return {"status": "READY", "login_method": method}
+
+    monkeypatch.setattr(cli, "wait_for_login", fake_wait_for_login)
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
+            "account",
+            "login",
+            "qr",
+            "zhihu@zhihu-test",
+            "--registry",
+            str(registry),
+            "--artifact",
+            str(artifact),
+            "--receipt",
+            str(receipt_path),
+            "--timeout",
+            "60",
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+    payload = _json(result)
+
+    assert calls == [
+        (("config", tmp_path / "runner.toml"), 60, "qr", artifact, calls[0][4])
+    ]
+    assert payload["status"] == "READY"
+    assert payload["target"] == "zhihu@zhihu-test"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["status"] == "CHECKPOINT_IMAGE_READY"
+    assert receipt["target"] == "zhihu@zhihu-test"
+    assert receipt["login_url"] == scan_link
+    assert receipt["artifact_path"] == str(artifact)
+    assert receipt["receipt_path"] == str(receipt_path)
+    assert receipt_path.stat().st_mode & 0o077 == 0
 
 
 def test_zhihu_account_login_qr_artifact_generates_qr_receipt_and_returns_link(

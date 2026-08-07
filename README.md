@@ -42,10 +42,12 @@ pip install -e ".[dev]"
 chatpost --help
 chatpost --version
 chatpost --tree
-chatpost account --help
-chatpost qr --help
+chatpost platforms --help
+chatpost profiles --help
 chatpost zhihu --help
-chatpost zhihu account login --help
+chatpost zhihu login --help
+chatpost zhihu logout --help
+chatpost zhihu status --help
 chatpost zhihu draft --help
 python -m pytest -q
 python -m build

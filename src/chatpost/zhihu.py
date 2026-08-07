@@ -70,6 +70,20 @@ _PROTECTED_BROWSER_ARGS = (
 )
 _LOGIN_METHODS = {"qr", "code"}
 _ZHIHU_QRCODE_API = "https://www.zhihu.com/api/v3/account/api/login/qrcode"
+_ZHIHU_QRCODE_RESOURCE = re.compile(
+    r"/(?:api/v\d+/account/api/login/qrcode|api/login/qrcode|account/api/login/qrcode)"
+    r"/(?P<token>[A-Za-z0-9_-]+)(?:[/?#]|$)"
+)
+_ZHIHU_QRCODE_TOKEN_REDACTION = re.compile(
+    r"(/(?:api/v\d+/account/api/login/qrcode|api/login/qrcode|account/api/login/qrcode)/)"
+    r"[A-Za-z0-9_-]+"
+)
+_QRCODE_RESOURCE_EXPRESSION = """
+(() => performance.getEntriesByType('resource')
+  .map((entry) => entry.name)
+  .filter((name) => /\/qrcode\//i.test(name))
+  .slice(-20))
+""".strip()
 
 
 @dataclass(frozen=True)
@@ -1383,38 +1397,23 @@ def _generate_login_qr_artifact(
     clock: Callable[[], float] = time.monotonic,
     ready_timeout: float = 10.0,
 ) -> dict[str, Any]:
-    """Create a fresh Zhihu QR login link in the page context and render it.
+    """Render the login page's own QR token as a handoff PNG/link.
 
     Zhihu renders the QR into a tainted canvas, so screenshotting the whole page
-    can race before the canvas is visible and `toDataURL()` is blocked. The page
-    itself creates the QR through a short-lived API; use that same API from the
-    owned login target, then render the returned public scan link as a PNG.
+    can race before the canvas is visible and `toDataURL()` is blocked. The login
+    page also polls a token-specific QR status endpoint; extract that page-owned
+    token and render the matching public scan link. Do not create a separate QR
+    token, because the waiting Profile will not observe authorization for a token
+    it is not polling.
     """
 
     output = destination.expanduser().resolve()
-    expression = f"""
-(async () => {{
-  const response = await fetch({_ZHIHU_QRCODE_API!r}, {{
-    method: 'POST',
-    credentials: 'include',
-    headers: {{
-      'content-type': 'application/json',
-      'x-requested-with': 'fetch'
-    }}
-  }});
-  const text = await response.text();
-  let data = null;
-  try {{ data = JSON.parse(text); }} catch (_) {{}}
-  if (!response.ok) {{
-    return {{ok: false, status: response.status, error: data || text.slice(0, 200)}};
-  }}
-  return {{ok: true, status: response.status, ...(data || {{}})}};
-}})()
-""".strip()
-    ready_expression = "({url: location.href, ready: document.readyState})"
     session_id: str | None = None
+    observed_qrcode_urls: list[str] = []
     with _owned_browser_socket(endpoint) as debug_socket:
         try:
+            if hasattr(debug_socket, "settimeout"):
+                debug_socket.settimeout(0.5)
             identifier = 1
             attach = _cdp_command(
                 debug_socket,
@@ -1426,53 +1425,153 @@ def _generate_login_qr_artifact(
             if not isinstance(session_id, str) or not session_id:
                 raise TypeError("Login target attachment did not return a session id")
             deadline = clock() + ready_timeout
-            while True:
-                identifier += 1
-                state_eval = _cdp_command(
-                    debug_socket,
-                    identifier,
-                    "Runtime.evaluate",
-                    {"expression": ready_expression, "returnByValue": True},
-                    session_id=session_id,
-                )
-                state_result = state_eval.get("result", {})
-                state = state_result.get("value") if isinstance(state_result, dict) else None
-                if isinstance(state, dict):
-                    url = state.get("url")
-                    ready = state.get("ready")
-                    if (
-                        isinstance(url, str)
-                        and url.startswith("https://www.zhihu.com/")
-                        and ready in {"interactive", "complete"}
-                    ):
-                        break
-                if clock() >= deadline:
-                    raise RuntimeError("Zhihu login page was not ready for QR API")
-                sleeper(0.2)
+
             identifier += 1
-            evaluation = _cdp_command(
+            _cdp_command(
                 debug_socket,
                 identifier,
-                "Runtime.evaluate",
-                {"expression": expression, "returnByValue": True, "awaitPromise": True},
+                "Network.enable",
                 session_id=session_id,
             )
-            result = evaluation.get("result", {})
-            value = result.get("value") if isinstance(result, dict) else None
-            if not isinstance(value, dict):
-                raise TypeError("Zhihu QR API did not return structured data")
-            if value.get("ok") is False:
-                status = value.get("status", "unknown")
-                raise RuntimeError(f"Zhihu QR API rejected the checkpoint request: {status}")
-            link = value.get("link")
-            if not isinstance(link, str) or not link.startswith("https://www.zhihu.com/account/scan/login/"):
-                raise RuntimeError("Zhihu QR API did not return a scan login link")
-            payload = qr_renderer(link, output)
-            payload["login_url"] = link
-            expires_at = value.get("expires_at")
-            if isinstance(expires_at, int):
-                payload["qr_expires_at"] = expires_at
-            return payload
+            identifier += 1
+            _cdp_command(
+                debug_socket,
+                identifier,
+                "Page.enable",
+                session_id=session_id,
+            )
+            identifier += 1
+            reload_identifier = identifier
+            debug_socket.send(
+                json.dumps(
+                    {
+                        "id": reload_identifier,
+                        "method": "Page.reload",
+                        "sessionId": session_id,
+                    }
+                )
+            )
+            reload_acknowledged = False
+
+            def payload_from_page_owned_url(url: str) -> dict[str, Any] | None:
+                if "qrcode" in url.lower():
+                    observed_qrcode_urls.append(
+                        _ZHIHU_QRCODE_TOKEN_REDACTION.sub(r"\1[REDACTED]", url)[-200:]
+                    )
+                match = _ZHIHU_QRCODE_RESOURCE.search(url)
+                if not match:
+                    return None
+                token = match.group("token")
+                link = (
+                    "https://www.zhihu.com/account/scan/login/"
+                    f"{token}?/api/login/qrcode"
+                )
+                payload = qr_renderer(link, output)
+                payload["login_url"] = link
+                payload["handoff_kind"] = "page_owned_login_url"
+                return payload
+
+            def payload_from_performance_entries() -> dict[str, Any] | None:
+                nonlocal identifier
+                identifier += 1
+                try:
+                    evaluation = _cdp_command(
+                        debug_socket,
+                        identifier,
+                        "Runtime.evaluate",
+                        {
+                            "expression": _QRCODE_RESOURCE_EXPRESSION,
+                            "returnByValue": True,
+                        },
+                        session_id=session_id,
+                    )
+                    result = evaluation.get("result", {})
+                    urls = result.get("value") if isinstance(result, dict) else None
+                    if not isinstance(urls, list):
+                        return None
+                    for url in reversed(urls):
+                        if isinstance(url, str):
+                            payload = payload_from_page_owned_url(url)
+                            if payload is not None:
+                                return payload
+                    return None
+                except (
+                    KeyError,
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                    websocket.WebSocketException,
+                ):
+                    return None
+
+            while True:
+                try:
+                    response = json.loads(debug_socket.recv())
+                except websocket.WebSocketTimeoutException:
+                    response = {}
+                if response.get("id") == reload_identifier:
+                    if response.get("error"):
+                        raise RuntimeError("Browser CDP command failed: Page.reload")
+                    reload_acknowledged = True
+                if response.get("sessionId") == session_id and response.get("method") in {
+                    "Network.requestWillBeSent",
+                    "Network.responseReceived",
+                }:
+                    params = response.get("params", {})
+                    request_or_response = params.get("request") or params.get("response")
+                    url = (
+                        request_or_response.get("url")
+                        if isinstance(request_or_response, dict)
+                        else None
+                    )
+                    if isinstance(url, str):
+                        payload = payload_from_page_owned_url(url)
+                        if payload is not None:
+                            return payload
+                if reload_acknowledged:
+                    payload = payload_from_performance_entries()
+                    if payload is not None:
+                        return payload
+                if clock() >= deadline:
+                    suffix = " after reload ack" if reload_acknowledged else " before reload ack"
+                    if observed_qrcode_urls:
+                        suffix += "; observed qrcode paths: " + ", ".join(
+                            observed_qrcode_urls[-5:]
+                        )
+                    try:
+                        screenshot = _cdp_command(
+                            debug_socket,
+                            9998,
+                            "Page.captureScreenshot",
+                            {"format": "png", "fromSurface": True},
+                            session_id=session_id,
+                        )
+                        encoded = screenshot.get("data")
+                        if isinstance(encoded, str) and encoded:
+                            image = base64.b64decode(encoded, validate=True)
+                            output.parent.mkdir(parents=True, exist_ok=True)
+                            with tempfile.NamedTemporaryFile(
+                                "wb",
+                                prefix=f".{output.name}.",
+                                suffix=".tmp",
+                                dir=output.parent,
+                                delete=False,
+                            ) as stream:
+                                temporary = Path(stream.name)
+                                stream.write(image)
+                            try:
+                                os.chmod(temporary, 0o600)
+                                os.replace(temporary, output)
+                                os.chmod(output, 0o600)
+                                suffix += f"; saved login-page screenshot: {output}"
+                            finally:
+                                temporary.unlink(missing_ok=True)
+                    except Exception as error:
+                        suffix += f"; screenshot capture failed: {type(error).__name__}: {error}"
+                    raise RuntimeError(
+                        "Zhihu login page did not expose a page-owned QR token" + suffix
+                    )
+                sleeper(0.2)
         finally:
             if session_id is not None:
                 _cdp_command(
@@ -1672,6 +1771,37 @@ def execute_task(
     }
 
 
+def logout(
+    config: ZhihuRunnerConfig,
+    *,
+    browser_session_factory: Callable[[ZhihuRunnerConfig], Any] = browser_session,
+) -> dict[str, Any]:
+    """Clear Zhihu login state for a configured browser Profile without reading it."""
+
+    origins = (
+        "https://www.zhihu.com",
+        "https://zhuanlan.zhihu.com",
+    )
+    with browser_session_factory(config) as session:
+        browser, endpoint = session
+        with _owned_browser_socket(endpoint) as debug_socket:
+            for index, origin in enumerate(origins, start=1):
+                _cdp_command(
+                    debug_socket,
+                    index,
+                    "Storage.clearDataForOrigin",
+                    {
+                        "origin": origin,
+                        "storageTypes": "cookies,local_storage,indexeddb,cache_storage,service_workers,websql",
+                    },
+                )
+    return {
+        "status": "LOGGED_OUT",
+        "logout_method": "clear_origin_storage",
+        **browser,
+    }
+
+
 __all__ = [
     "RESULT_UNKNOWN",
     "ResultUnknownError",
@@ -1681,6 +1811,7 @@ __all__ = [
     "execute_task",
     "load_runner_config",
     "login_checkpoint_url",
+    "logout",
     "preflight",
     "wait_for_login",
 ]

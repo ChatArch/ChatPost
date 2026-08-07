@@ -38,11 +38,11 @@ ChatPost 不读取平台 Cookie，也不把浏览器 Profile 当作普通配置�
 | Chrome for Testing host binary | 已验证 | 成功链路直接运行本地二进制，没有使用 Docker。 |
 | 独立持久化 Profile | 已验证 | 知乎登录态保留在专用 `user-data-dir`，未导出 Cookie。 |
 | 知乎二维码扫码登录 | 已验证 | 在可见隔离浏览器中完成扫码，Profile 随后保持登录态。 |
-| 知乎短信验证码登录 | CLI checkpoint 已实现，待单独验收 | `chatpost login code` 可打开验证码登录 checkpoint；手机号/验证码只在后续人工浏览器流程中使用，现有端到端证据不宣称新号短信登录已走通。 |
+| 知乎短信验证码登录 | Hidden compatibility checkpoint 已实现，待单独验收 | `chatpost zhihu account login code` 仍可作为隐藏兼容入口打开验证码登录 checkpoint；手机号/验证码只在后续人工浏览器流程中使用，现有端到端证据不宣称新号短信登录已走通。 |
 | loopback bridge + token | 已验证 | 扩展与 CLI 通过本机 WebSocket 通讯，Token 不是知乎凭据。 |
 | ChatUp Playwright environment | 已发布依赖 | `chatup 0.2.4` 提供 `chatup playwright` 与 `chatup.playwright.resolve`；ChatPost 不重复实现下载。 |
 | ChatPost task-specific Zhihu Runner | 已实现 | `preflight/auth/draft`、持久 Profile、exact extension、loopback CDP/bridge 与 receipt 已有代码和测试。 |
-| 通用 account/login/post CLI | 已实现 | `chatpost account list/show` 读取非敏感 alias registry；`chatpost login status/qr/code` 做登录状态、二维码 checkpoint 与验证码 checkpoint；`chatpost post draft` 从 `platform@alias` 创建 review 草稿并写 receipt。 |
+| Profile-based 知乎 CLI | 已实现 | `chatpost platforms/profiles` 发现平台与非敏感 Profile target；`chatpost zhihu login/status/logout PROFILE` 处理二维码登录、只读状态和登出；`chatpost zhihu draft create PROFILE SOURCE` 创建 review 草稿并写 receipt。 |
 | 多账号调度与 publication ledger | 提案 | 本页定义资源和状态边界，后续按测试实现。 |
 
 ## 核心资源

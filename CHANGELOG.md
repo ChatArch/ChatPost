@@ -4,15 +4,16 @@
 
 ### Added
 
-- Add common `chatpost account list/show`, `chatpost qr encode`, `chatpost login status/qr/qr-image/qr-link/code`, and `chatpost post draft` commands on top of the existing Zhihu runner.
-- Add a non-sensitive account alias registry parser and tests for `platform@alias` resolution.
+- Add visible Profile-based entrypoints: `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, `chatpost zhihu login/status/logout PROFILE`, and `chatpost zhihu draft dry-run/create PROFILE SOURCE` on top of the existing Zhihu runner.
+- Keep older `chatpost account list/show`, `chatpost qr encode`, and `chatpost zhihu account ...` commands callable as hidden compatibility aliases.
+- Add a non-sensitive Profile/account alias registry parser and tests for `platform@alias` resolution.
 - Add explicit `attach_existing_cdp = true` runner mode for a Profile already held by a known loopback CDP browser; this mode closes only the per-run extension popup and leaves the existing browser running.
 
 ### Changed
 
 - Require `chatbrowser>=0.1.2,<0.2.0` and `qrcode[pil]>=7.4,<9.0` alongside ChatUp, ChatEnv, ChatStyle, and websocket-client dependencies.
 - Fix Wechatsync extension bridge wake-up by writing the MCP token to extension local storage key `mcpToken`, sending `MCP_SET_SERVER_URL` with `payload.url`, and starting the active MCP watch with `MCP_WATCH_START` before adapter communication.
-- Update README, CLI tree, MkDocs pages, and capability maps so `account/login/post draft` and the SMS-code login checkpoint are documented as implemented while final publish and long-term publication commands remain proposals.
+- Update README, CLI tree, MkDocs pages, and capability maps so the Profile-based `chatpost zhihu login/status/logout/draft` surface is documented as implemented, older account/QR helpers are hidden compatibility, and final publish plus long-term publication commands remain proposals.
 
 ## 0.1.0 - 2026-08-04
 

@@ -22,16 +22,23 @@ def _registry(tmp_path: Path) -> Path:
     return registry
 
 
-def test_zhihu_cli_exposes_platform_scoped_task_commands():
+def test_zhihu_cli_exposes_profile_based_task_commands_with_hidden_compatibility():
     zhihu = main.commands["zhihu"]
-    assert set(zhihu.commands) == {"account", "draft"}
+    assert {"profiles", "login", "logout", "status", "draft"}.issubset(zhihu.commands)
+    assert zhihu.commands["profiles"].hidden is False
+    assert zhihu.commands["login"].hidden is False
+    assert zhihu.commands["logout"].hidden is False
+    assert zhihu.commands["status"].hidden is False
+    assert set(zhihu.commands["draft"].commands) == {"dry-run", "create"}
+
+    assert "account" in zhihu.commands
+    assert zhihu.commands["account"].hidden is True
     assert set(zhihu.commands["account"].commands) == {"preflight", "status", "login"}
     assert set(zhihu.commands["account"].commands["login"].commands) == {
         "qr",
         "qr-artifact",
         "code",
     }
-    assert set(zhihu.commands["draft"].commands) == {"dry-run", "create"}
 
 
 def test_preflight_json(monkeypatch, tmp_path):
@@ -82,9 +89,8 @@ def test_status_json_dispatches_read_only_auth(monkeypatch, tmp_path):
         main,
         [
             "zhihu",
-            "account",
             "status",
-            "zhihu@zhihu-test",
+            "zhihu-test",
             "--registry",
             str(registry),
             "--output",
@@ -99,28 +105,36 @@ def test_status_json_dispatches_read_only_auth(monkeypatch, tmp_path):
     assert '"target": "zhihu@zhihu-test"' in result.output
 
 
-def test_login_cli_dispatches_read_only_checkpoint(monkeypatch, tmp_path):
+def test_login_cli_dispatches_single_qr_handoff(monkeypatch, tmp_path):
     registry = _registry(tmp_path)
+    qr_path = tmp_path / "login.png"
     sentinel = object()
     calls = []
     monkeypatch.setattr(command, "load_runner_config", lambda _path: sentinel)
-    monkeypatch.setattr(
-        command,
-        "wait_for_login",
-        lambda loaded, *, timeout, method="qr": calls.append((loaded, timeout, method))
-        or {"status": "READY", "login_method": method},
-    )
+
+    def fake_wait_for_login(
+        loaded,
+        *,
+        timeout,
+        method="qr",
+        checkpoint_artifact=None,
+        checkpoint_callback=None,
+    ):
+        calls.append((loaded, timeout, method, checkpoint_artifact, checkpoint_callback))
+        return {"status": "READY", "login_method": method}
+
+    monkeypatch.setattr(command, "wait_for_login", fake_wait_for_login)
 
     result = CliRunner().invoke(
         main,
         [
             "zhihu",
-            "account",
             "login",
-            "qr",
-            "zhihu@zhihu-test",
+            "zhihu-test",
             "--registry",
             str(registry),
+            "--qr",
+            str(qr_path),
             "--timeout",
             "60",
             "--output",
@@ -130,7 +144,7 @@ def test_login_cli_dispatches_read_only_checkpoint(monkeypatch, tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    assert calls == [(sentinel, 60, "qr")]
+    assert calls == [(sentinel, 60, "qr", qr_path, calls[0][4])]
     assert '"status": "READY"' in result.output
     assert '"login_method": "qr"' in result.output
 

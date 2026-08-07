@@ -1,6 +1,8 @@
 # CLI 树
 
-`ChatPost 0.1.x` 的命令面现在按“平台无关能力 + 平台专用能力”组织：顶层只保留账号 alias registry、通用 QR artifact 和具体平台名。登录、草稿和平台 runner 都挂到对应平台下；因此不再有全局 `chatpost login` 或 `chatpost post`。
+`ChatPost 0.1.x` 的用户可见命令面按“发现入口 + 平台专用能力”组织。顶层只暴露平台发现、Profile 发现和具体平台名；知乎登录、登出、状态和草稿都挂在 `chatpost zhihu ...` 下，因此不再有全局 `chatpost login` 或 `chatpost post`。
+
+这里的 `profile` 指一个非敏感的 Chrome/Profile target 配置：它把 alias、platform、runner_config、profile 名和 label 绑定起来，方便 `login/status/logout/draft` 找到对应浏览器 Profile；它不是 Cookie、LocalStorage、知乎账号详情或凭据。
 
 ## 当前真实命令
 
@@ -11,22 +13,16 @@ chatpost  # platform content publishing and draft orchestration
 ├── --help  # Show help for the current command.
 ├── --version  # Show package version.
 ├── --tree  # Print the registered CLI tree with command purpose and IO shape.
-├── account  # account alias registry; metadata only
-│   ├── list [--registry PATH] [--output text|json] [-I/--no-interactive]  # List account aliases; never reads cookies/tokens/session.
-│   └── show TARGET [--registry PATH] [--output text|json] [-I/--no-interactive]  # Show one account alias by ALIAS or PLATFORM@ALIAS.
-├── qr  # platform-neutral QR artifact tools
-│   └── encode DATA --artifact PATH [--output text|json] [-I/--no-interactive]  # Render DATA into PNG without echoing DATA by default.
+├── platforms [--output text|json] [-I/--no-interactive]  # List supported publishing platforms.
+├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Chrome/profile targets.
 └── zhihu  # Zhihu platform capabilities
-    ├── account  # Zhihu account status, preflight, and login checkpoints
-    │   ├── status TARGET [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check.
-    │   ├── preflight TARGET [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check runner/profile/browser/extension readiness.
-    │   └── login  # Zhihu manual login checkpoints; no phone/code/cookie arguments.
-    │       ├── qr TARGET [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open QR login checkpoint and wait for READY.
-    │       ├── qr-artifact TARGET [--registry PATH] --artifact PATH --receipt PATH [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Create live QR PNG + receipt, return immediately.
-    │       └── code TARGET [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open SMS-code checkpoint without accepting phone/code values.
+    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu Chrome/profile targets.
+    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open live QR login, emit link/QR/receipt, and wait for READY.
+    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Clear Zhihu login state for this profile; does not read session values.
+    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check.
     └── draft  # Zhihu review-draft operations
-        ├── dry-run TARGET SOURCE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Parse SOURCE without starting browser or writing Zhihu.
-        └── create TARGET SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft.
+        ├── dry-run PROFILE SOURCE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Parse SOURCE without starting browser or writing Zhihu.
+        └── create PROFILE SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft.
 ```
 
 查看真实 help：
@@ -34,17 +30,19 @@ chatpost  # platform content publishing and draft orchestration
 ```bash
 chatpost --tree
 chatpost --help
-chatpost account --help
-chatpost qr --help
+chatpost platforms --help
+chatpost profiles --help
 chatpost zhihu --help
-chatpost zhihu account --help
-chatpost zhihu account login --help
+chatpost zhihu profiles --help
+chatpost zhihu login --help
+chatpost zhihu logout --help
+chatpost zhihu status --help
 chatpost zhihu draft --help
 ```
 
 ## 常规任务顺序
 
-准备一个只含非敏感 metadata 的账号 registry：
+准备一个只含非敏感 metadata 的 Profile registry：
 
 ```toml
 [accounts."zhihu-test"]
@@ -54,60 +52,42 @@ profile = "zhihu-test"
 label = "Zhihu test account"
 ```
 
-然后按平台作用域入口执行：
+然后执行可见平台入口：
 
 ```bash
-chatpost account list \
+chatpost platforms \
+  --output json \
+  -I
+
+chatpost zhihu profiles \
   --registry accounts.toml \
   --output json \
   -I
 
-chatpost account show zhihu@zhihu-test \
+chatpost zhihu login zhihu-test \
   --registry accounts.toml \
-  --output json \
-  -I
-
-chatpost qr encode 'https://www.zhihu.com/signin?login_method=qr' \
-  --artifact login-url.png \
-  --output json \
-  -I
-
-chatpost zhihu account status zhihu@zhihu-test \
-  --registry accounts.toml \
-  --output json \
-  -I
-
-chatpost zhihu account preflight zhihu@zhihu-test \
-  --registry accounts.toml \
-  --output json \
-  -I
-
-chatpost zhihu account login qr zhihu@zhihu-test \
-  --registry accounts.toml \
-  --timeout 900 \
-  --output json \
-  -I
-
-chatpost zhihu account login qr-artifact zhihu@zhihu-test \
-  --registry accounts.toml \
-  --artifact live-login-qr.png \
+  --qr live-login-qr.png \
   --receipt live-login-qr-ready.json \
-  --timeout 60 \
-  --output json \
-  -I
-
-chatpost zhihu account login code zhihu@zhihu-test \
-  --registry accounts.toml \
   --timeout 900 \
   --output json \
   -I
 
-chatpost zhihu draft dry-run zhihu@zhihu-test article.md \
+chatpost zhihu status zhihu-test \
   --registry accounts.toml \
   --output json \
   -I
 
-chatpost zhihu draft create zhihu@zhihu-test article.md \
+chatpost zhihu logout zhihu-test \
+  --registry accounts.toml \
+  --output json \
+  -I
+
+chatpost zhihu draft dry-run zhihu-test article.md \
+  --registry accounts.toml \
+  --output json \
+  -I
+
+chatpost zhihu draft create zhihu-test article.md \
   --registry accounts.toml \
   --receipt receipt.json \
   --output json \
@@ -116,17 +96,28 @@ chatpost zhihu draft create zhihu@zhihu-test article.md \
 
 这些入口只是 ChatPost 编排层：
 
-1. `account list/show` 只读账号 alias registry，不保存或回显 Cookie、LocalStorage、token、password、credential 等敏感值。
-2. `qr encode` 把调用方提供的数据渲染为 PNG artifact，默认只报告 artifact metadata，不回显原始数据。
-3. `zhihu account status` 解析 `platform@alias`，对知乎账号调用一次只读 auth check。
-4. `zhihu account preflight` 检查 exact Playwright install、Profile 权限、扩展、Node、Wechatsync CLI、secret 文件和 loopback 端口；不会安装、启动或写知乎。
-5. `zhihu account login qr` 打开二维码登录 checkpoint 并等待账号变为 `READY`；当前仍由浏览器/Profile 承载登录态，ChatPost 不导出 Cookie。
-6. `zhihu account login qr-artifact` 打开 live 登录 checkpoint，在本轮 browser context 中创建新的知乎 scan-login 短链，把提取到的 `login_url` 渲染为 QR PNG，写 `0600` receipt，然后立刻返回；图片如何发送给用户由对话宿主/gateway 决定。
-7. `zhihu account login code` 打开验证码登录 checkpoint 并等待 `READY`；手机号和验证码只在浏览器人工流程中使用，不作为 CLI 参数、不写 registry、config、receipt 或日志。
-8. `zhihu draft dry-run` 只解析文章，不启动浏览器，不连接扩展，不写知乎。
-9. `zhihu draft create` 只调用一次 Wechatsync create 路径。成功时写入权限 `0600` 的 receipt；结果不明确时写 `RESULT_UNKNOWN`，禁止自动重试。它创建 review 草稿，不是最终发布。
+1. `platforms` 列出当前一等平台和推荐入口。
+2. `profiles` / `zhihu profiles` 只读 Profile registry，不保存或回显 Cookie、LocalStorage、token、password、credential 等敏感值。
+3. `zhihu login` 是一个二维码登录 handoff：打开同一个浏览器 Profile 的知乎登录页，等待页面二维码可扫，使用**同一个登录页正在轮询的 page-owned `login_url`** 生成 QR 图片/写 `0600` receipt，然后保持浏览器打开并等待账号变为 `READY`。当前仍由浏览器/Profile 承载登录态，ChatPost 不导出 Cookie。
+4. `zhihu status` 解析 `PROFILE`，对知乎 Profile 调用一次只读 auth check，不读 Cookie、LocalStorage 或 IndexedDB。
+5. `zhihu logout` 清理该 Profile 下知乎 origin 的登录态；它只发浏览器存储清理命令，不读取或导出 session 值。
+6. `zhihu draft dry-run` 只解析文章，不启动浏览器，不连接扩展，不写知乎。
+7. `zhihu draft create` 只调用一次 Wechatsync create 路径。成功时写入权限 `0600` 的 receipt；结果不明确时写 `RESULT_UNKNOWN`，禁止自动重试。它创建 review 草稿，不是最终发布。
+8. 手机号和验证码只属于人工浏览器流程；ChatPost 不提供 `--phone`、`--code`、`--otp` 或 `--sms-code` 参数，也不会把这些值写入 registry、config、receipt 或日志。
 
 `ChatPost 0.1.x` **没有最终发布命令**，也没有文章更新命令。
+
+## Hidden compatibility
+
+旧的脚本入口仍可调用，但不出现在 `--help` 或 `--tree` 中：
+
+```text
+chatpost account list/show
+chatpost qr encode
+chatpost zhihu account status/preflight/login qr/login qr-artifact/login code
+```
+
+这些 hidden compatibility 命令用于兼容既有自动化，不是新的日常文档路径；平台发送图片仍由宿主/gateway 决定，ChatPost CLI 不输出 `MEDIA:ssh://...` 或 `[media attachment]`。
 
 ## ChatUp / ChatBrowser 边界
 
@@ -138,7 +129,7 @@ chatup playwright install 1.61.1 --browser chromium --output json -I
 chatup playwright doctor 1.61.1 --browser chromium --output json -I
 ```
 
-ChatPost 依赖 `chatup>=0.2.4,<0.3.0`、`chatbrowser>=0.1.2,<0.2.0` 和 `qrcode[pil]>=7.4,<9.0`。当前知乎写草稿路径仍直接通过 ChatUp resolve exact browser，再由 ChatPost 管理 Profile、扩展、loopback CDP/bridge、QR/link handoff artifact 与 Wechatsync 进程；账号 registry 只保存非敏感 alias metadata。ChatBrowser 负责浏览器 runtime/profile/session metadata 的安全边界，后续更丰富的 session 发现应从 ChatBrowser 接入，而不是在 ChatPost 里保存浏览器秘密。
+ChatPost 依赖 `chatup>=0.2.4,<0.3.0`、`chatbrowser>=0.1.2,<0.2.0` 和 `qrcode[pil]>=7.4,<9.0`。当前知乎写草稿路径仍直接通过 ChatUp resolve exact browser，再由 ChatPost 管理 Profile、扩展、loopback CDP/bridge、QR/link handoff artifact 与 Wechatsync 进程；Profile registry 只保存非敏感 alias metadata。ChatBrowser 负责浏览器 runtime/profile/session metadata 的安全边界，后续更丰富的 session 发现应从 ChatBrowser 接入，而不是在 ChatPost 里保存浏览器秘密。
 
 ```python
 from chatup.playwright import resolve
@@ -150,7 +141,7 @@ installation = resolve("1.61.1", browser="chromium")
 
 - ChatUp：Playwright package、它声明的 browser revision、安装元数据和 executable path；
 - ChatBrowser：浏览器 runtime、Profile metadata、CDP session metadata；
-- ChatPost：账号 alias、QR 图片 artifact、发布任务编排、Profile/扩展/CDP/bridge/Wechatsync 单次任务与 receipt；
+- ChatPost：Profile alias、QR 图片 artifact、发布任务编排、Profile/扩展/CDP/bridge/Wechatsync 单次任务与 receipt；
 - Wechatsync：知乎 adapter 与草稿写入；
 - 人工：首次登录和最终发布确认。
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,7 @@ from chatpost.zhihu import (
     create_login_qr_artifact,
     execute_task,
     load_runner_config,
+    logout as logout_from_zhihu,
     preflight,
     wait_for_login,
 )
@@ -29,37 +31,25 @@ _CLI_TREE_LINES = (
     "├── --help  # Show help for the current command.",
     "├── --version  # Show package version.",
     "├── --tree  # Print the registered CLI tree with command purpose and IO shape.",
-    "├── account  # account alias registry; metadata only",
-    "│   ├── list [--registry PATH] [--output text|json] [-I/--no-interactive]  # List account aliases; never reads cookies/tokens/session.",
-    "│   └── show TARGET [--registry PATH] [--output text|json] [-I/--no-interactive]  # Show one account alias by ALIAS or PLATFORM@ALIAS.",
-    "├── qr  # platform-neutral QR artifact tools",
-    "│   └── encode DATA --artifact PATH [--output text|json] [-I/--no-interactive]  # Render DATA into PNG without echoing DATA by default.",
+    "├── platforms [--output text|json] [-I/--no-interactive]  # List supported publishing platforms.",
+    "├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Chrome/profile targets.",
     "└── zhihu  # Zhihu platform capabilities",
-    "    ├── account  # Zhihu account status, preflight, and login checkpoints",
-    "    │   ├── status TARGET [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check.",
-    "    │   ├── preflight TARGET [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check runner/profile/browser/extension readiness.",
-    "    │   └── login  # Zhihu manual login checkpoints; no phone/code/cookie arguments.",
-    "    │       ├── qr TARGET [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open QR login checkpoint and wait for READY.",
-    "    │       ├── qr-artifact TARGET [--registry PATH] --artifact PATH --receipt PATH [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Create live QR PNG + receipt, return immediately.",
-    "    │       └── code TARGET [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open SMS-code checkpoint without accepting phone/code values.",
+    "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu Chrome/profile targets.",
+    "    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open live QR login, emit link/QR/receipt, and wait for READY.",
+    "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Clear Zhihu login state for this profile; does not read session values.",
+    "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check.",
     "    └── draft  # Zhihu review-draft operations",
-    "        ├── dry-run TARGET SOURCE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Parse SOURCE without starting browser or writing Zhihu.",
-    "        └── create TARGET SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft.",
+    "        ├── dry-run PROFILE SOURCE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Parse SOURCE without starting browser or writing Zhihu.",
+    "        └── create PROFILE SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft.",
 )
 _CLI_TREE_COMMAND_PATHS = (
-    ("account",),
-    ("account", "list"),
-    ("account", "show"),
-    ("qr",),
-    ("qr", "encode"),
+    ("platforms",),
+    ("profiles",),
     ("zhihu",),
-    ("zhihu", "account"),
-    ("zhihu", "account", "status"),
-    ("zhihu", "account", "preflight"),
-    ("zhihu", "account", "login"),
-    ("zhihu", "account", "login", "qr"),
-    ("zhihu", "account", "login", "qr-artifact"),
-    ("zhihu", "account", "login", "code"),
+    ("zhihu", "profiles"),
+    ("zhihu", "login"),
+    ("zhihu", "logout"),
+    ("zhihu", "status"),
     ("zhihu", "draft"),
     ("zhihu", "draft", "dry-run"),
     ("zhihu", "draft", "create"),
@@ -71,8 +61,20 @@ def _emit(payload: dict[str, Any], output: str) -> None:
         click.echo(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
         return
     click.echo(f"status: {payload.get('status', 'UNKNOWN')}")
+    if payload.get("platforms"):
+        for platform in payload["platforms"]:
+            click.echo(f"platform: {platform.get('name')}")
+            for key in ("profiles_command", "login_command", "status_command", "logout_command"):
+                if platform.get(key):
+                    click.echo(f"{key}: {platform[key]}")
+    if payload.get("profiles"):
+        for profile in payload["profiles"]:
+            target = f"{profile.get('platform')}@{profile.get('alias')}"
+            label = f" ({profile['label']})" if profile.get("label") else ""
+            click.echo(f"profile: {target}{label}")
     for key in (
         "target",
+        "platform",
         "login_method",
         "login_url",
         "artifact_path",
@@ -81,11 +83,40 @@ def _emit(payload: dict[str, Any], output: str) -> None:
         "artifact_mime",
         "data_length",
         "qr_expires_at",
+        "logout_method",
         "draft_id",
         "review_url",
     ):
         if payload.get(key):
             click.echo(f"{key}: {payload[key]}")
+
+
+def _platforms_payload() -> dict[str, Any]:
+    return {
+        "status": "READY",
+        "platforms": [
+            {
+                "name": "zhihu",
+                "profiles_command": "chatpost zhihu profiles",
+                "login_command": "chatpost zhihu login PROFILE",
+                "status_command": "chatpost zhihu status PROFILE",
+                "logout_command": "chatpost zhihu logout PROFILE",
+            }
+        ],
+    }
+
+
+def _profiles_payload(registry: Path | None, *, platform: str | None = None) -> dict[str, Any]:
+    accounts = _accounts_or_click_error(registry)
+    profiles = [
+        account.to_payload()
+        for account in accounts.values()
+        if platform is None or account.platform == platform
+    ]
+    payload: dict[str, Any] = {"status": "READY", "profiles": profiles}
+    if platform is not None:
+        payload["platform"] = platform
+    return payload
 
 
 def _write_receipt(path: Path, payload: dict[str, Any]) -> None:
@@ -167,7 +198,34 @@ def main(ctx: click.Context, show_tree: bool) -> None:
         ctx.exit()
 
 
-@main.group("account")
+@main.command("platforms")
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def platforms_command(output: str, no_interactive: bool) -> None:
+    """List supported publishing platforms."""
+
+    del no_interactive
+    _emit(_platforms_payload(), output)
+
+
+@main.command("profiles")
+@click.option("--platform", type=click.Choice(["zhihu"]), default=None)
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def profiles_command(
+    platform: str | None,
+    registry: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """List configured Chrome/profile targets without reading session values."""
+
+    del no_interactive
+    _emit(_profiles_payload(registry, platform=platform), output)
+
+
+@main.group("account", hidden=True)
 def account_group() -> None:
     """List and inspect non-sensitive ChatPost account aliases."""
 
@@ -208,7 +266,7 @@ def account_show_command(
     _emit({"status": "READY", "account": account.to_payload()}, output)
 
 
-@main.group("qr")
+@main.group("qr", hidden=True)
 def qr_group() -> None:
     """Generate non-platform-specific QR code image artifacts."""
 
@@ -231,10 +289,121 @@ def qr_encode_command(data: str, artifact: Path, output: str, no_interactive: bo
 
 @main.group("zhihu")
 def zhihu_group() -> None:
-    """Run Zhihu platform account and draft operations."""
+    """Run Zhihu login, profile status, and draft operations."""
 
 
-@zhihu_group.group("account")
+@zhihu_group.command("profiles")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def zhihu_profiles_command(registry: Path | None, output: str, no_interactive: bool) -> None:
+    """List configured Zhihu Chrome/profile targets."""
+
+    del no_interactive
+    _emit(_profiles_payload(registry, platform="zhihu"), output)
+
+
+@zhihu_group.command("status")
+@click.argument("profile")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def zhihu_status_command(
+    profile: str,
+    registry: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Perform a read-only Zhihu auth check for PROFILE."""
+
+    del no_interactive
+    account = _zhihu_account_or_click_error(registry, profile)
+    config = _load_zhihu_runner_config(account)
+    try:
+        payload = execute_task(config, None, mode="auth")
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    _emit({"target": account.target(), **payload}, output)
+
+
+def _default_login_qr_path(account) -> Path:
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    return Path.cwd() / f"chatpost-{account.platform}-{account.alias}-login-{stamp}.png"
+
+
+@zhihu_group.command("login")
+@click.argument("profile")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--qr", "qr_path", type=click.Path(path_type=Path), default=None)
+@click.option("--receipt", type=click.Path(path_type=Path), default=None)
+@click.option("--timeout", type=click.IntRange(min=1), default=900, show_default=True)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def zhihu_login_command(
+    profile: str,
+    registry: Path | None,
+    qr_path: Path | None,
+    receipt: Path | None,
+    timeout: int,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Open live QR login, emit link/QR/receipt, and wait for READY."""
+
+    del no_interactive
+    account = _zhihu_account_or_click_error(registry, profile)
+    config = _load_zhihu_runner_config(account)
+    qr_path = qr_path or _default_login_qr_path(account)
+    receipt = receipt or qr_path.with_suffix(".json")
+    checkpoint_payload: dict[str, Any] = {}
+
+    def checkpoint_callback(payload: dict[str, Any]) -> None:
+        checkpoint_payload.clear()
+        checkpoint_payload.update({"target": account.target(), **payload})
+        checkpoint_payload["receipt_path"] = str(receipt.expanduser().resolve())
+        _write_receipt(receipt, checkpoint_payload)
+
+    try:
+        payload = wait_for_login(
+            config,
+            timeout=timeout,
+            method="qr",
+            checkpoint_artifact=qr_path,
+            checkpoint_callback=checkpoint_callback,
+        )
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    result = {"target": account.target(), **payload}
+    for key in ("login_url", "artifact_path", "artifact_mime", "data_length", "receipt_path"):
+        if checkpoint_payload.get(key) and not result.get(key):
+            result[key] = checkpoint_payload[key]
+    _emit(result, output)
+
+
+@zhihu_group.command("logout")
+@click.argument("profile")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def zhihu_logout_command(
+    profile: str,
+    registry: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Clear Zhihu login state for PROFILE without reading session values."""
+
+    del no_interactive
+    account = _zhihu_account_or_click_error(registry, profile)
+    config = _load_zhihu_runner_config(account)
+    try:
+        payload = logout_from_zhihu(config)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    _emit({"target": account.target(), **payload}, output)
+
+
+@zhihu_group.group("account", hidden=True)
 def zhihu_account_group() -> None:
     """Check Zhihu account state and open login checkpoints."""
 
@@ -293,12 +462,16 @@ def zhihu_account_login_group() -> None:
 @zhihu_account_login_group.command("qr")
 @click.argument("target")
 @click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--artifact", type=click.Path(path_type=Path), default=None)
+@click.option("--receipt", type=click.Path(path_type=Path), default=None)
 @click.option("--timeout", type=click.IntRange(min=1), default=900, show_default=True)
 @click.option("--output", type=_OUTPUT, default="text", show_default=True)
 @click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
 def zhihu_account_login_qr_command(
     target: str,
     registry: Path | None,
+    artifact: Path | None,
+    receipt: Path | None,
     timeout: int,
     output: str,
     no_interactive: bool,
@@ -308,8 +481,22 @@ def zhihu_account_login_qr_command(
     del no_interactive
     account = _zhihu_account_or_click_error(registry, target)
     config = _load_zhihu_runner_config(account)
+    if receipt is not None and artifact is None:
+        raise click.ClickException("--receipt requires --artifact")
+    checkpoint_callback = None
+    if receipt is not None:
+        def checkpoint_callback(payload: dict[str, Any]) -> None:
+            payload = {"target": account.target(), **payload}
+            payload["receipt_path"] = str(receipt.expanduser().resolve())
+            _write_receipt(receipt, payload)
     try:
-        payload = wait_for_login(config, timeout=timeout, method="qr")
+        payload = wait_for_login(
+            config,
+            timeout=timeout,
+            method="qr",
+            checkpoint_artifact=artifact,
+            checkpoint_callback=checkpoint_callback,
+        )
     except (OSError, RuntimeError, TypeError, ValueError) as error:
         raise click.ClickException(str(error)) from error
     _emit({"target": account.target(), **payload}, output)
