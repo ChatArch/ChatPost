@@ -1189,6 +1189,54 @@ def test_generate_login_qr_artifact_ignores_other_session_qrcode_events(
     assert payload["handoff_kind"] == "page_owned_login_url"
 
 
+def test_generate_login_qr_artifact_fails_without_page_owned_login_url(
+    monkeypatch, tmp_path
+):
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+        extension_target_id="extension-owned-target",
+    )
+    artifact = tmp_path / "checkpoint.png"
+    sent = []
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            if message["method"] == "Target.attachToTarget":
+                result = {"sessionId": "login-session"}
+            else:
+                result = {}
+            return json.dumps({"id": message["id"], "result": result})
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    now = [0.0]
+
+    def clock():
+        now[0] += 20.0
+        return now[0]
+
+    with pytest.raises(RuntimeError, match="page-owned QR token"):
+        zhihu._generate_login_qr_artifact(
+            endpoint,
+            "login-target",
+            artifact,
+            sleeper=lambda _seconds: None,
+            clock=clock,
+            ready_timeout=1.0,
+        )
+
+    assert not artifact.exists()
+    assert "Page.captureScreenshot" not in [message["method"] for message in sent]
+
+
 def test_wait_for_login_can_emit_checkpoint_image_before_polling(tmp_path):
     config = load_runner_config(_config(tmp_path))
     artifact = tmp_path / "qr.png"

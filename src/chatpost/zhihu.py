@@ -1538,36 +1538,6 @@ def _generate_login_qr_artifact(
                         suffix += "; observed qrcode paths: " + ", ".join(
                             observed_qrcode_urls[-5:]
                         )
-                    try:
-                        screenshot = _cdp_command(
-                            debug_socket,
-                            9998,
-                            "Page.captureScreenshot",
-                            {"format": "png", "fromSurface": True},
-                            session_id=session_id,
-                        )
-                        encoded = screenshot.get("data")
-                        if isinstance(encoded, str) and encoded:
-                            image = base64.b64decode(encoded, validate=True)
-                            output.parent.mkdir(parents=True, exist_ok=True)
-                            with tempfile.NamedTemporaryFile(
-                                "wb",
-                                prefix=f".{output.name}.",
-                                suffix=".tmp",
-                                dir=output.parent,
-                                delete=False,
-                            ) as stream:
-                                temporary = Path(stream.name)
-                                stream.write(image)
-                            try:
-                                os.chmod(temporary, 0o600)
-                                os.replace(temporary, output)
-                                os.chmod(output, 0o600)
-                                suffix += f"; saved login-page screenshot: {output}"
-                            finally:
-                                temporary.unlink(missing_ok=True)
-                    except Exception as error:
-                        suffix += f"; screenshot capture failed: {type(error).__name__}: {error}"
                     raise RuntimeError(
                         "Zhihu login page did not expose a page-owned QR token" + suffix
                     )
