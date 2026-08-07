@@ -35,12 +35,10 @@ _CLI_TREE_LINES = (
     "├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Chrome/profile targets.",
     "└── zhihu  # Zhihu platform capabilities",
     "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu Chrome/profile targets.",
-    "    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open live QR login, emit link/QR/receipt, and wait for READY.",
-    "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Clear Zhihu login state for this profile; does not read session values.",
+    "    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Check auth first; emit QR only if login is needed.",
+    "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check auth first; clear Zhihu state only if logged in.",
     "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check.",
-    "    └── draft  # Zhihu review-draft operations",
-    "        ├── dry-run PROFILE SOURCE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Parse SOURCE without starting browser or writing Zhihu.",
-    "        └── create PROFILE SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft.",
+    "    └── draft PROFILE SOURCE [--registry PATH] [--receipt PATH] [--dry-run] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu review draft.",
 )
 _CLI_TREE_COMMAND_PATHS = (
     ("platforms",),
@@ -51,8 +49,6 @@ _CLI_TREE_COMMAND_PATHS = (
     ("zhihu", "logout"),
     ("zhihu", "status"),
     ("zhihu", "draft"),
-    ("zhihu", "draft", "dry-run"),
-    ("zhihu", "draft", "create"),
 )
 
 
@@ -561,56 +557,38 @@ def zhihu_account_login_code_command(
     _emit({"target": account.target(), **payload}, output)
 
 
-@zhihu_group.group("draft")
-def zhihu_draft_group() -> None:
-    """Create or validate Zhihu review drafts."""
-
-
-@zhihu_draft_group.command("dry-run")
-@click.argument("target")
+@zhihu_group.command("draft")
+@click.argument("profile")
 @click.argument("source", type=click.Path(path_type=Path))
 @click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--receipt", type=click.Path(path_type=Path), default=None)
+@click.option("--dry-run", is_flag=True, help="Parse SOURCE without browser or Zhihu writes.")
 @click.option("--output", type=_OUTPUT, default="text", show_default=True)
 @click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
-def zhihu_draft_dry_run_command(
-    target: str,
+def zhihu_draft_command(
+    profile: str,
     source: Path,
     registry: Path | None,
+    receipt: Path | None,
+    dry_run: bool,
     output: str,
     no_interactive: bool,
 ) -> None:
-    """Parse SOURCE for TARGET without starting a browser or writing Zhihu."""
+    """Dry-run or create one Zhihu review draft from SOURCE."""
 
     del no_interactive
-    account = _zhihu_account_or_click_error(registry, target)
+    account = _zhihu_account_or_click_error(registry, profile)
     config = _load_zhihu_runner_config(account)
-    try:
-        payload = execute_task(config, source, mode="dry-run")
-    except (OSError, RuntimeError, TypeError, ValueError) as error:
-        raise click.ClickException(str(error)) from error
-    _emit({"target": account.target(), **payload}, output)
+    if dry_run:
+        try:
+            payload = execute_task(config, source, mode="dry-run")
+        except (OSError, RuntimeError, TypeError, ValueError) as error:
+            raise click.ClickException(str(error)) from error
+        _emit({"target": account.target(), **payload}, output)
+        return
 
-
-@zhihu_draft_group.command("create")
-@click.argument("target")
-@click.argument("source", type=click.Path(path_type=Path))
-@click.option("--registry", type=click.Path(path_type=Path), default=None)
-@click.option("--receipt", type=click.Path(path_type=Path), required=True)
-@click.option("--output", type=_OUTPUT, default="text", show_default=True)
-@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
-def zhihu_draft_create_command(
-    target: str,
-    source: Path,
-    registry: Path | None,
-    receipt: Path,
-    output: str,
-    no_interactive: bool,
-) -> None:
-    """Create exactly one Zhihu review draft for TARGET from SOURCE."""
-
-    del no_interactive
-    account = _zhihu_account_or_click_error(registry, target)
-    config = _load_zhihu_runner_config(account)
+    if receipt is None:
+        raise click.ClickException("--receipt is required unless --dry-run is set")
     try:
         payload = execute_task(config, source, mode="create")
     except ResultUnknownError as error:

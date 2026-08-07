@@ -2058,3 +2058,76 @@ def test_login_checkpoint_repeats_only_read_only_auth_until_ready(tmp_path):
         (None, "auth", _endpoint()),
         (None, "auth", _endpoint()),
     ]
+
+
+def test_logout_noops_without_storage_clear_when_auth_precheck_is_not_ready(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    calls = []
+
+    @contextmanager
+    def session(_config):
+        yield {"browser_version": "149.0.7827.55"}, _endpoint()
+
+    def adapter(_config, source, mode, endpoint):
+        calls.append((source, mode, endpoint))
+        return subprocess.CompletedProcess([], 1, "", "not logged in")
+
+    def forbidden_socket(_endpoint_value):
+        raise AssertionError("logout must not clear storage when auth precheck is not READY")
+
+    monkeypatch.setattr(zhihu, "_owned_browser_socket", forbidden_socket)
+
+    result = zhihu.logout(
+        config,
+        adapter_runner=adapter,
+        browser_session_factory=session,
+    )
+
+    assert calls == [(None, "auth", _endpoint())]
+    assert result == {
+        "status": "ALREADY_LOGGED_OUT",
+        "logout_method": "auth_precheck",
+        "browser_version": "149.0.7827.55",
+    }
+
+
+def test_logout_clears_storage_only_after_ready_auth_precheck(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    calls = []
+    sent = []
+
+    @contextmanager
+    def session(_config):
+        yield {"browser_version": "149.0.7827.55"}, _endpoint()
+
+    def adapter(_config, source, mode, endpoint):
+        calls.append((source, mode, endpoint))
+        return subprocess.CompletedProcess([], 0, "logged in", "")
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            return json.dumps({"id": message["id"], "result": {}})
+
+    @contextmanager
+    def socket(_endpoint_value):
+        yield Socket()
+
+    monkeypatch.setattr(zhihu, "_owned_browser_socket", socket)
+
+    result = zhihu.logout(
+        config,
+        adapter_runner=adapter,
+        browser_session_factory=session,
+    )
+
+    assert calls == [(None, "auth", _endpoint())]
+    assert [message["method"] for message in sent] == [
+        "Storage.clearDataForOrigin",
+        "Storage.clearDataForOrigin",
+    ]
+    assert result["status"] == "LOGGED_OUT"
+    assert result["logout_method"] == "clear_origin_storage"

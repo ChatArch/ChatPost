@@ -22,7 +22,7 @@ ChatPost 是 ChatArch 的多平台内容发布控制面。这个文档站把已�
 
 - **总体架构**：控制面、执行面和核心资源的责任边界。
 - **配置、环境与状态**：Chrome 安装、ChatEnv secrets、Runner state 和 publication ledger。
-- **知乎首次设置与草稿验收**：用固定博客稿定义可验证的首次登录和单次 draft create。
+- **知乎首次设置与草稿验收**：用固定博客稿定义可验证的首次登录和单次带 receipt 的 draft create mode。
 - **CLI 树**：最直观的命令展示入口，包含真实命令树、状态和更新清单。
 - **Browser Runner 与账号隔离**：解释 host binary、Docker、多账号 user-data-dir 和 bridge 边界。
 - **能力地图**：当前一等能力、边界和不负责的范围。
@@ -46,7 +46,7 @@ ChatPost 是 ChatArch 的多平台内容发布控制面。这个文档站把已�
 
 - **知乎首次设置与草稿验收**
 
-    从固定 MkDocs 博客稿出发，查看首次登录、plan、单次 draft create 和回读契约。
+    从固定 MkDocs 博客稿出发，查看首次登录、plan、单次带 receipt 的 draft create mode 和回读契约。
 
     [查看知乎任务流](zhihu-first-run.md)
 

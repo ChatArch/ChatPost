@@ -4,7 +4,7 @@
 
 ### Added
 
-- Add visible Profile-based entrypoints: `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, `chatpost zhihu login/status/logout PROFILE`, and `chatpost zhihu draft dry-run/create PROFILE SOURCE` on top of the existing Zhihu runner.
+- Add visible Profile-based entrypoints: `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, `chatpost zhihu login/status/logout PROFILE`, and `chatpost zhihu draft PROFILE SOURCE [--dry-run]` on top of the existing Zhihu runner.
 - Keep older `chatpost account list/show`, `chatpost qr encode`, and `chatpost zhihu account ...` commands callable as hidden compatibility aliases.
 - Add a non-sensitive Profile/account alias registry parser and tests for `platform@alias` resolution.
 - Add explicit `attach_existing_cdp = true` runner mode for a Profile already held by a known loopback CDP browser; this mode closes only the per-run extension popup and leaves the existing browser running.
@@ -19,7 +19,7 @@
 
 ### Added
 
-- Add task-oriented `chatpost zhihu preflight`, `login`, `auth`, `draft dry-run`, and `draft create` commands.
+- Add task-oriented `chatpost zhihu preflight`, `login`, `auth`, `draft` command with `--dry-run` and receipt-backed create mode.
 - Resolve exact Playwright browser installations through `chatup.playwright.resolve` while keeping Profile and publication state in ChatPost.
 - Launch the proven direct-browser route with a persistent Profile, exact unpacked extension, loopback CDP/bridge, and internal raw-CDP extension wake.
 - Write mode-`0600` success or `RESULT_UNKNOWN` receipts and prohibit automatic retry after ambiguous writes.

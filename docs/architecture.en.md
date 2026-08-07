@@ -42,7 +42,7 @@ ChatPost never reads platform cookies and does not treat a browser profile as or
 | Loopback bridge and token | Verified | The extension and CLI communicated over local WebSocket; the token was not a Zhihu credential. |
 | ChatUp Playwright environment | Released dependency | `chatup 0.2.4` provides `chatup playwright` and `chatup.playwright.resolve`; ChatPost does not duplicate downloads. |
 | ChatPost task-specific Zhihu Runner | Implemented | `preflight/auth/draft`, persistent Profile, exact extension, loopback CDP/bridge, and receipts have code and tests. |
-| Profile-based Zhihu CLI | Implemented | `chatpost platforms/profiles` discover platforms and non-sensitive Profile targets; `chatpost zhihu login/status/logout PROFILE` handles QR login, read-only status, and logout; `chatpost zhihu draft create PROFILE SOURCE` creates a review draft and writes a receipt. |
+| Profile-based Zhihu CLI | Implemented | `chatpost platforms/profiles` discover platforms and non-sensitive Profile targets; `chatpost zhihu login/status/logout PROFILE` handles QR login, read-only status, and logout; `chatpost zhihu draft PROFILE SOURCE` either preflights with `--dry-run` or creates a review draft in receipt-required create mode. |
 | Multi-account scheduling and publication ledger | Proposed | This page defines the resource and state boundaries for later implementation. |
 
 ## Core Resources
@@ -159,7 +159,7 @@ AUTH_CHECKING
 ACCOUNT_READY
   -> plan
 PLANNED
-  -> one explicit draft create; update/publish stay unsupported
+  -> one explicit receipt-backed draft create-mode run; update/publish stay unsupported
 RUNNING
   -> DRAFT_CREATED -> AWAITING_REVIEW
   -> RESULT_UNKNOWN
@@ -195,7 +195,7 @@ It includes headings, lists, a table, fenced code, a link, a local PNG, and stab
 
 1. select an isolated, authorized Zhihu runner;
 2. require successful auth and plan;
-3. issue exactly one explicit `draft create`;
+3. issue exactly one explicit `draft` create-mode run without `--dry-run`;
 4. read back draft ID, title, marker, code, and image;
 5. write the ledger receipt;
 6. stop at human review without final publish.
@@ -211,7 +211,7 @@ The first release includes:
 - one dedicated user-data-dir per runner;
 - ChatEnv bridge secret references;
 - non-sensitive account registries, human login checkpoints, and read-only auth;
-- plan, one explicit draft create, and fail-closed boundaries for unsupported update/publish paths;
+- plan, one explicit receipt-backed draft create-mode run, and fail-closed boundaries for unsupported update/publish paths;
 - review-draft receipts;
 - Zhihu as the first adapter.
 

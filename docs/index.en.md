@@ -46,7 +46,7 @@ This site keeps durable documentation entry points instead of a generic roadmap:
 
 - **Zhihu First Setup and Draft Acceptance**
 
-    Follow visible login, planning, one draft create, and readback using the fixed MkDocs article.
+    Follow visible login, planning, one receipt-backed draft create-mode run, and readback using the fixed MkDocs article.
 
     [Open Zhihu Task Flow](zhihu-first-run.md)
 

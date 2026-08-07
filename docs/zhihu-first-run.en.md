@@ -171,8 +171,9 @@ Run `auth` once more after login. ChatPost never reads cookies from the Profile.
 
 ```bash
 ARTICLE=/absolute/path/to/article.md
-"$CHATPOST" zhihu draft dry-run "$ARTICLE" \
-  --config "$RUNNER_HOME/runner.toml" \
+"$CHATPOST" zhihu draft zhihu-personal "$ARTICLE" \
+  --registry "$RUNNER_HOME/accounts.toml" \
+  --dry-run \
   --output json \
   -I
 ```
@@ -183,8 +184,8 @@ Confirm the title, body, asset references, and fixed marker from the JSON `previ
 
 ```bash
 RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
-"$CHATPOST" zhihu draft create "$ARTICLE" \
-  --config "$RUNNER_HOME/runner.toml" \
+"$CHATPOST" zhihu draft zhihu-personal "$ARTICLE" \
+  --registry "$RUNNER_HOME/accounts.toml" \
   --receipt "$RECEIPT" \
   --output json \
   -I

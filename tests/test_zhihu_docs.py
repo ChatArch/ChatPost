@@ -14,10 +14,12 @@ def test_cli_tree_matches_registered_task_commands():
             "chatpost zhihu login",
             "chatpost zhihu logout",
             "chatpost zhihu status",
-            "chatpost zhihu draft dry-run",
-            "chatpost zhihu draft create",
+            "chatpost zhihu draft",
+            "--dry-run",
         ):
             assert command in text
+        assert "chatpost zhihu draft dry-run" not in text
+        assert "chatpost zhihu draft create" not in text
         assert "Hidden compatibility" in text
         assert "chatpost zhihu account status/preflight/login qr/login qr-artifact/login code" in text
         assert "chatpost login --help" not in text
@@ -61,7 +63,8 @@ def test_quick_start_keeps_create_update_and_publish_boundaries_explicit():
     for relative in ("docs/zhihu-first-run.md", "docs/zhihu-first-run.en.md"):
         text = (ROOT / relative).read_text(encoding="utf-8")
         assert "RESULT_UNKNOWN" in text
-        assert "draft create" in text
+        assert "--dry-run" in text
+        assert "--receipt" in text
         assert "1.61.1" in text
         assert "1228" in text
         assert "149.0.7827.55" in text

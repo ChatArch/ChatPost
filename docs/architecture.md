@@ -42,7 +42,7 @@ ChatPost 不读取平台 Cookie，也不把浏览器 Profile 当作普通配置�
 | loopback bridge + token | 已验证 | 扩展与 CLI 通过本机 WebSocket 通讯，Token 不是知乎凭据。 |
 | ChatUp Playwright environment | 已发布依赖 | `chatup 0.2.4` 提供 `chatup playwright` 与 `chatup.playwright.resolve`；ChatPost 不重复实现下载。 |
 | ChatPost task-specific Zhihu Runner | 已实现 | `preflight/auth/draft`、持久 Profile、exact extension、loopback CDP/bridge 与 receipt 已有代码和测试。 |
-| Profile-based 知乎 CLI | 已实现 | `chatpost platforms/profiles` 发现平台与非敏感 Profile target；`chatpost zhihu login/status/logout PROFILE` 处理二维码登录、只读状态和登出；`chatpost zhihu draft create PROFILE SOURCE` 创建 review 草稿并写 receipt。 |
+| Profile-based 知乎 CLI | 已实现 | `chatpost platforms/profiles` 发现平台与非敏感 Profile target；`chatpost zhihu login/status/logout PROFILE` 处理二维码登录、只读状态和登出；`chatpost zhihu draft PROFILE SOURCE` 通过 `--dry-run` 预检，或在要求 `--receipt` 的 create mode 下创建 review 草稿。 |
 | 多账号调度与 publication ledger | 提案 | 本页定义资源和状态边界，后续按测试实现。 |
 
 ## 核心资源
@@ -159,7 +159,7 @@ AUTH_CHECKING
 ACCOUNT_READY
   -> plan
 PLANNED
-  -> one explicit draft create; update/publish stay unsupported
+  -> one explicit receipt-backed draft create-mode run; update/publish stay unsupported
 RUNNING
   -> DRAFT_CREATED -> AWAITING_REVIEW
   -> RESULT_UNKNOWN
@@ -195,7 +195,7 @@ examples/zhihu/mkdocs-quickstart.md
 
 1. 使用隔离的已授权知乎 Runner；
 2. auth 与 plan 必须先成功；
-3. 只允许一次明确的 `draft create`；
+3. 只允许一次明确的不带 `--dry-run` 的 `draft` create mode；
 4. 回读返回的草稿 ID、标题、marker、代码和图片；
 5. 写入 ledger；
 6. 停在人工 Review，不点击最终发布。
@@ -211,7 +211,7 @@ examples/zhihu/mkdocs-quickstart.md
 - 一个 Runner 一个独立 user-data-dir；
 - ChatEnv bridge secret reference；
 - 非敏感 Account registry、人工登录 checkpoint 和只读 auth；
-- plan、一次明确的 draft create，以及 update/publish 未支持时的 fail-closed 边界；
+- plan、一次明确带 receipt 的 draft create mode，以及 update/publish 未支持时的 fail-closed 边界；
 - review 草稿 receipt；
 - 知乎 adapter 首先落地。
 

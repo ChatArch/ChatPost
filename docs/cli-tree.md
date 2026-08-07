@@ -17,12 +17,10 @@ chatpost  # platform content publishing and draft orchestration
 ├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Chrome/profile targets.
 └── zhihu  # Zhihu platform capabilities
     ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu Chrome/profile targets.
-    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open live QR login, emit link/QR/receipt, and wait for READY.
-    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Clear Zhihu login state for this profile; does not read session values.
+    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Check auth first; emit QR only if login is needed.
+    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check auth first; clear Zhihu state only if logged in.
     ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check.
-    └── draft  # Zhihu review-draft operations
-        ├── dry-run PROFILE SOURCE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Parse SOURCE without starting browser or writing Zhihu.
-        └── create PROFILE SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft.
+    └── draft PROFILE SOURCE [--registry PATH] [--receipt PATH] [--dry-run] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu review draft.
 ```
 
 查看真实 help：
@@ -82,12 +80,13 @@ chatpost zhihu logout zhihu-test \
   --output json \
   -I
 
-chatpost zhihu draft dry-run zhihu-test article.md \
+chatpost zhihu draft zhihu-test article.md \
   --registry accounts.toml \
+  --dry-run \
   --output json \
   -I
 
-chatpost zhihu draft create zhihu-test article.md \
+chatpost zhihu draft zhihu-test article.md \
   --registry accounts.toml \
   --receipt receipt.json \
   --output json \
@@ -100,9 +99,9 @@ chatpost zhihu draft create zhihu-test article.md \
 2. `profiles` / `zhihu profiles` 只读 Profile registry，不保存或回显 Cookie、LocalStorage、token、password、credential 等敏感值。
 3. `zhihu login` 是一个二维码登录 handoff：打开同一个浏览器 Profile 的知乎登录页，等待页面二维码可扫，使用**同一个登录页正在轮询的 page-owned `login_url`** 生成 QR 图片/写 `0600` receipt，然后保持浏览器打开并等待账号变为 `READY`。当前仍由浏览器/Profile 承载登录态，ChatPost 不导出 Cookie。
 4. `zhihu status` 解析 `PROFILE`，对知乎 Profile 调用一次只读 auth check，不读 Cookie、LocalStorage 或 IndexedDB。
-5. `zhihu logout` 清理该 Profile 下知乎 origin 的登录态；它只发浏览器存储清理命令，不读取或导出 session 值。
-6. `zhihu draft dry-run` 只解析文章，不启动浏览器，不连接扩展，不写知乎。
-7. `zhihu draft create` 只调用一次 Wechatsync create 路径。成功时写入权限 `0600` 的 receipt；结果不明确时写 `RESULT_UNKNOWN`，禁止自动重试。它创建 review 草稿，不是最终发布。
+5. `zhihu logout` 先只读 auth；未登录时 no-op，已登录时才清理该 Profile 下知乎 origin 的登录态。它只发浏览器存储清理命令，不读取或导出 session 值。
+6. `zhihu draft --dry-run` 只解析文章，不启动浏览器，不连接扩展，不写知乎。
+7. `zhihu draft` 不带 `--dry-run` 时只调用一次 Wechatsync create 路径且要求 `--receipt`。成功时写入权限 `0600` 的 receipt；结果不明确时写 `RESULT_UNKNOWN`，禁止自动重试。它创建 review 草稿，不是最终发布。
 8. 手机号和验证码只属于人工浏览器流程；ChatPost 不提供 `--phone`、`--code`、`--otp` 或 `--sms-code` 参数，也不会把这些值写入 registry、config、receipt 或日志。
 
 `ChatPost 0.1.x` **没有最终发布命令**，也没有文章更新命令。

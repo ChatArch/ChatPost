@@ -17,12 +17,10 @@ chatpost  # platform content publishing and draft orchestration
 ├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Chrome/profile targets.
 └── zhihu  # Zhihu platform capabilities
     ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu Chrome/profile targets.
-    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open live QR login, emit link/QR/receipt, and wait for READY.
-    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Clear Zhihu login state for this profile; does not read session values.
+    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Check auth first; emit QR only if login is needed.
+    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check auth first; clear Zhihu state only if logged in.
     ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check.
-    └── draft  # Zhihu review-draft operations
-        ├── dry-run PROFILE SOURCE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Parse SOURCE without starting browser or writing Zhihu.
-        └── create PROFILE SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft.
+    └── draft PROFILE SOURCE [--registry PATH] [--receipt PATH] [--dry-run] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu review draft.
 ```
 
 Inspect the real help:
@@ -82,12 +80,13 @@ chatpost zhihu logout zhihu-test \
   --output json \
   -I
 
-chatpost zhihu draft dry-run zhihu-test article.md \
+chatpost zhihu draft zhihu-test article.md \
   --registry accounts.toml \
+  --dry-run \
   --output json \
   -I
 
-chatpost zhihu draft create zhihu-test article.md \
+chatpost zhihu draft zhihu-test article.md \
   --registry accounts.toml \
   --receipt receipt.json \
   --output json \
@@ -100,9 +99,9 @@ These entrypoints are ChatPost orchestration only:
 2. `profiles` / `zhihu profiles` read only the Profile registry. They do not store or print cookies, local storage, tokens, passwords, credentials, or other secrets.
 3. `zhihu login` is a QR login handoff: it opens the Zhihu login page in the same browser Profile, waits until the page QR is scannable, renders the **same login page's page-owned `login_url`** into a QR image/writes a mode-`0600` receipt, then keeps the browser open until the Profile becomes `READY`. The browser/Profile still owns login state and ChatPost never exports cookies.
 4. `zhihu status` resolves `PROFILE` and runs one read-only Zhihu auth check without reading cookies, local storage, or IndexedDB.
-5. `zhihu logout` clears Zhihu origin login state for that Profile. It sends browser storage-clear commands but does not read or export session values.
-6. `zhihu draft dry-run` parses the article without starting a browser, connecting the extension, or writing to Zhihu.
-7. `zhihu draft create` invokes the Wechatsync create path exactly once. Success writes a mode-`0600` receipt. An ambiguous result writes `RESULT_UNKNOWN` and must never be retried automatically. It creates a review draft, not final publish.
+5. `zhihu logout` first runs read-only auth. It no-ops when already logged out and only clears Zhihu origin login state when authenticated. It sends browser storage-clear commands but does not read or export session values.
+6. `zhihu draft --dry-run` parses the article without starting a browser, connecting the extension, or writing to Zhihu.
+7. `zhihu draft` without `--dry-run` invokes the Wechatsync create path exactly once and requires `--receipt`. Success writes a mode-`0600` receipt. An ambiguous result writes `RESULT_UNKNOWN` and must never be retried automatically. It creates a review draft, not final publish.
 8. Phone numbers and verification codes are human browser-flow inputs only. ChatPost does not expose `--phone`, `--code`, `--otp`, or `--sms-code`, and never writes those values to the registry, config, receipt, or logs.
 
 `ChatPost 0.1.x` has **no final-publish command** and no article-update command.

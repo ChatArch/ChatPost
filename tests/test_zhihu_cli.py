@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import click
 from click.testing import CliRunner
 
 import chatpost.cli as command
@@ -29,7 +30,8 @@ def test_zhihu_cli_exposes_profile_based_task_commands_with_hidden_compatibility
     assert zhihu.commands["login"].hidden is False
     assert zhihu.commands["logout"].hidden is False
     assert zhihu.commands["status"].hidden is False
-    assert set(zhihu.commands["draft"].commands) == {"dry-run", "create"}
+    assert zhihu.commands["draft"].hidden is False
+    assert not isinstance(zhihu.commands["draft"], click.Group)
 
     assert "account" in zhihu.commands
     assert zhihu.commands["account"].hidden is True
@@ -171,7 +173,6 @@ def test_create_writes_safe_receipt(monkeypatch, tmp_path):
         [
             "zhihu",
             "draft",
-            "create",
             "zhihu@zhihu-test",
             str(source),
             "--registry",
@@ -222,7 +223,6 @@ def test_unknown_receipt_write_failure_preserves_do_not_retry_result(
         [
             "zhihu",
             "draft",
-            "create",
             "zhihu@zhihu-test",
             str(source),
             "--registry",
@@ -269,7 +269,6 @@ def test_created_result_is_emitted_before_receipt_write_failure(monkeypatch, tmp
         [
             "zhihu",
             "draft",
-            "create",
             "zhihu@zhihu-test",
             str(source),
             "--registry",

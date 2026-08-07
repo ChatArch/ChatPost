@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import click
 from click.testing import CliRunner
 
 import chatpost.cli as cli
@@ -40,7 +41,8 @@ def test_task_cli_exposes_profile_based_zhihu_surface_and_hides_advanced_helpers
     assert zhihu.commands["login"].hidden is False
     assert zhihu.commands["logout"].hidden is False
     assert zhihu.commands["status"].hidden is False
-    assert set(zhihu.commands["draft"].commands) == {"dry-run", "create"}
+    assert zhihu.commands["draft"].hidden is False
+    assert not isinstance(zhihu.commands["draft"], click.Group)
 
     # Keep low-level/legacy account helpers callable for scripts, but not as the daily-use CLI.
     assert "account" in zhihu.commands
@@ -62,11 +64,12 @@ def test_top_level_tree_prints_profile_based_registered_cli_tree():
     assert "├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Chrome/profile targets." in result.output
     assert "└── zhihu  # Zhihu platform capabilities" in result.output
     assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu Chrome/profile targets." in result.output
-    assert "    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open live QR login, emit link/QR/receipt, and wait for READY." in result.output
-    assert "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Clear Zhihu login state for this profile; does not read session values." in result.output
+    assert "    ├── login PROFILE [--registry PATH] [--qr PATH] [--receipt PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Check auth first; emit QR only if login is needed." in result.output
+    assert "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check auth first; clear Zhihu state only if logged in." in result.output
     assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Read-only Zhihu auth check." in result.output
-    assert "    └── draft  # Zhihu review-draft operations" in result.output
-    assert "        └── create PROFILE SOURCE [--registry PATH] --receipt PATH [--output text|json] [-I/--no-interactive]  # Create exactly one Zhihu review draft." in result.output
+    assert "    └── draft PROFILE SOURCE [--registry PATH] [--receipt PATH] [--dry-run] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu review draft." in result.output
+    assert "draft dry-run" not in result.output
+    assert "draft create" not in result.output
     assert "account login qr" not in result.output
     assert "qr-artifact" not in result.output
     assert "MEDIA:ssh" not in result.output
@@ -661,9 +664,9 @@ def test_zhihu_draft_dry_run_dispatches_without_browser_write(monkeypatch, tmp_p
         [
             "zhihu",
             "draft",
-            "dry-run",
             "zhihu@zhihu-test",
             str(source),
+            "--dry-run",
             "--registry",
             str(registry),
             "--output",
@@ -702,7 +705,6 @@ def test_zhihu_draft_create_dispatches_create_and_writes_receipt(monkeypatch, tm
         [
             "zhihu",
             "draft",
-            "create",
             "zhihu@zhihu-test",
             str(source),
             "--registry",

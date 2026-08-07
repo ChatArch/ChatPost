@@ -1752,6 +1752,10 @@ def execute_task(
 def logout(
     config: ZhihuRunnerConfig,
     *,
+    adapter_runner: Callable[
+        [ZhihuRunnerConfig, Path | None, str, _CdpEndpoint | None],
+        subprocess.CompletedProcess[str],
+    ] = _run_adapter,
     browser_session_factory: Callable[[ZhihuRunnerConfig], Any] = browser_session,
 ) -> dict[str, Any]:
     """Clear Zhihu login state for a configured browser Profile without reading it."""
@@ -1762,6 +1766,13 @@ def logout(
     )
     with browser_session_factory(config) as session:
         browser, endpoint = session
+        result = adapter_runner(config, None, "auth", endpoint)
+        if result.returncode != 0:
+            return {
+                "status": "ALREADY_LOGGED_OUT",
+                "logout_method": "auth_precheck",
+                **browser,
+            }
         with _owned_browser_socket(endpoint) as debug_socket:
             for index, origin in enumerate(origins, start=1):
                 _cdp_command(
