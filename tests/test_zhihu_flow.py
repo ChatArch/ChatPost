@@ -1237,6 +1237,47 @@ def test_generate_login_qr_artifact_fails_without_page_owned_login_url(
     assert "Page.captureScreenshot" not in [message["method"] for message in sent]
 
 
+def test_wait_for_login_returns_ready_without_checkpoint_when_already_authenticated(tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    artifact = tmp_path / "qr.png"
+    opened = []
+    captured = []
+    adapter_calls = []
+
+    @contextmanager
+    def browser_session(_config):
+        yield ({"browser_version": "149.0.7827.55"}, _endpoint())
+
+    def opener(_config, _endpoint_value, *, method):
+        opened.append(method)
+        return "login-target"
+
+    def capturer(_endpoint_value, target_id, destination, **_kwargs):
+        captured.append((target_id, destination))
+        destination.write_bytes(b"PNG")
+        return {"artifact_path": str(destination), "artifact_mime": "image/png"}
+
+    def adapter(_config, _source, mode, _endpoint_value):
+        adapter_calls.append(mode)
+        return subprocess.CompletedProcess([], 0, "authenticated", "")
+
+    result = wait_for_login(
+        config,
+        timeout=30,
+        checkpoint_artifact=artifact,
+        adapter_runner=adapter,
+        browser_session_factory=browser_session,
+        login_page_opener=opener,
+        screenshot_capturer=capturer,
+    )
+
+    assert result["status"] == "READY"
+    assert adapter_calls == ["auth"]
+    assert opened == []
+    assert captured == []
+    assert not artifact.exists()
+
+
 def test_wait_for_login_can_emit_checkpoint_image_before_polling(tmp_path):
     config = load_runner_config(_config(tmp_path))
     artifact = tmp_path / "qr.png"
@@ -1258,6 +1299,8 @@ def test_wait_for_login_can_emit_checkpoint_image_before_polling(tmp_path):
 
     def adapter(_config, _source, mode, _endpoint_value):
         adapter_calls.append(mode)
+        if len(adapter_calls) == 1:
+            return subprocess.CompletedProcess([], 1, "", "not authenticated")
         return subprocess.CompletedProcess([], 0, "authenticated", "")
 
     result = wait_for_login(
@@ -1280,7 +1323,7 @@ def test_wait_for_login_can_emit_checkpoint_image_before_polling(tmp_path):
             "browser_version": "149.0.7827.55",
         }
     ]
-    assert adapter_calls == ["auth"]
+    assert adapter_calls == ["auth", "auth"]
     assert result["status"] == "READY"
     assert result["checkpoint_artifact_path"] == str(artifact)
 
@@ -2010,8 +2053,8 @@ def test_login_checkpoint_repeats_only_read_only_auth_until_ready(tmp_path):
         "browser_version": "149.0.7827.55",
     }
     assert calls == [
-        (None, "open-login-qr", _endpoint()),
         (None, "auth", _endpoint()),
+        (None, "open-login-qr", _endpoint()),
         (None, "auth", _endpoint()),
         (None, "auth", _endpoint()),
     ]

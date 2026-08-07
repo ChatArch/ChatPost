@@ -1594,6 +1594,15 @@ def wait_for_login(
     deadline = clock() + timeout
     with browser_session_factory(config) as session:
         browser, endpoint = session
+        last_auth_error: Exception | None = None
+        try:
+            initial_result = adapter_runner(config, None, "auth", endpoint)
+        except (OSError, RuntimeError, TypeError, ValueError) as error:
+            last_auth_error = error
+            initial_result = None
+        if initial_result is not None and initial_result.returncode == 0:
+            return {"status": "READY", "login_method": method, **browser}
+
         target_id = login_page_opener(config, endpoint, method=method)
         checkpoint_payload: dict[str, Any] = {}
         if checkpoint_artifact is not None:
@@ -1610,7 +1619,6 @@ def wait_for_login(
             }
             if checkpoint_callback is not None:
                 checkpoint_callback(dict(checkpoint_payload))
-        last_auth_error: Exception | None = None
         while clock() < deadline:
             try:
                 result = adapter_runner(config, None, "auth", endpoint)
