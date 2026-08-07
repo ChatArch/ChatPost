@@ -2131,3 +2131,276 @@ def test_logout_clears_storage_only_after_ready_auth_precheck(monkeypatch, tmp_p
     ]
     assert result["status"] == "LOGGED_OUT"
     assert result["logout_method"] == "clear_origin_storage"
+
+
+
+def _browser_login_config_file(tmp_path: Path) -> Path:
+    profile = tmp_path / "profile-login-only"
+    playwright_home = tmp_path / "playwright-login-only"
+    profile.mkdir()
+    profile.chmod(0o700)
+    path = tmp_path / "browser-runner.toml"
+    path.write_text(
+        "[zhihu]\n"
+        "playwright_version = \"1.61.1\"\n"
+        f"playwright_home = {json.dumps(str(playwright_home))}\n"
+        f"profile_dir = {json.dumps(str(profile))}\n"
+        "cdp_host = \"127.0.0.1\"\n"
+        "cdp_port = 9333\n"
+        "headless = true\n"
+        "browser_args = [\"--disable-dev-shm-usage\"]\n"
+        "attach_existing_cdp = false\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_load_browser_config_accepts_login_only_runner_without_adapter_fields(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+
+    assert config.profile_dir == tmp_path / "profile-login-only"
+    assert config.cdp_host == "127.0.0.1"
+    assert config.cdp_port == 9333
+    serialized = json.dumps(config.__dict__, default=str).lower()
+    assert "wechatsync" not in serialized
+    assert "extension" not in serialized
+    assert "env_file" not in serialized
+    assert "token" not in serialized
+
+
+def test_browser_login_command_does_not_load_extension_or_bridge(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+    command = zhihu._browser_login_command(config, _installation(tmp_path), "owned-token")
+    joined = " ".join(command).lower()
+
+    assert f"--user-data-dir={config.profile_dir}" in command
+    assert f"--remote-debugging-port={config.cdp_port}" in command
+    assert "--load-extension" not in joined
+    assert "--disable-extensions-except" not in joined
+    assert "wechatsync" not in joined
+    assert "bridge" not in joined
+
+
+def test_visible_page_state_waits_for_navigation_after_target_creation(monkeypatch):
+    endpoint = zhihu._CdpEndpoint(
+        base_url="http://127.0.0.1:9227",
+        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
+    )
+    sent = []
+    readiness = [
+        {"readyState": "complete", "href": "about:blank"},
+        {"readyState": "complete", "href": "https://www.zhihu.com/people/me"},
+    ]
+
+    class Socket:
+        def send(self, payload):
+            sent.append(json.loads(payload))
+
+        def recv(self):
+            message = sent[-1]
+            if message["method"] == "Target.attachToTarget":
+                result = {"sessionId": "status-session"}
+            elif message["method"] == "Runtime.evaluate":
+                expression = message["params"]["expression"]
+                if "document.readyState" in expression and "location.href" in expression:
+                    value = readiness.pop(0)
+                elif expression == "document.readyState":
+                    value = "complete"
+                else:
+                    value = {
+                        "href": "https://www.zhihu.com/people/me"
+                        if not readiness
+                        else "about:blank"
+                    }
+                result = {"result": {"value": value}}
+            else:
+                result = {}
+            return json.dumps({"id": message["id"], "result": result})
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(zhihu.websocket, "create_connection", lambda *_args, **_kwargs: Socket())
+
+    state = zhihu._evaluate_visible_page_state(
+        endpoint,
+        "status-target",
+        "(() => ({href: location.href}))()",
+        clock=lambda: 0.0,
+        sleeper=lambda _seconds: None,
+    )
+
+    assert state == {"href": "https://www.zhihu.com/people/me"}
+    assert readiness == []
+
+
+def test_status_from_visible_state_uses_browser_page_me_api_public_identity():
+    payload = zhihu._status_from_visible_state(
+        {
+            "href": "https://www.zhihu.com/people/me",
+            "title": "知乎 - 知乎",
+            "hasLoginPrompt": False,
+            "apiMe": {
+                "ok": True,
+                "name": "RexWang",
+                "urlToken": "rexwang",
+                "url": "https://www.zhihu.com/people/rexwang",
+            },
+        }
+    )
+
+    assert payload == {
+        "status": "LOGGED_IN",
+        "check_method": "browser_page",
+        "account_name": "RexWang",
+        "account_url": "https://www.zhihu.com/people/rexwang",
+    }
+    assert "id" not in payload
+
+
+def test_browser_status_uses_page_visible_reader_only(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+    calls = []
+
+    @contextmanager
+    def session_factory(_config):
+        calls.append(("session", _config))
+        yield ({"browser_version": "149.0.7827.55", "browser_attachment": "OWNED_BROWSER"}, _endpoint(None))
+
+    def status_reader(endpoint):
+        calls.append(("reader", endpoint))
+        return {
+            "status": "LOGGED_IN",
+            "account_name": "RexWang",
+            "account_url": "https://www.zhihu.com/people/rexwang",
+            "check_method": "browser_page",
+        }
+
+    result = zhihu.browser_status(
+        config,
+        browser_session_factory=session_factory,
+        status_reader=status_reader,
+    )
+
+    assert result == {
+        "status": "LOGGED_IN",
+        "account_name": "RexWang",
+        "account_url": "https://www.zhihu.com/people/rexwang",
+        "check_method": "browser_page",
+        "browser_version": "149.0.7827.55",
+        "browser_attachment": "OWNED_BROWSER",
+    }
+    assert calls[0] == ("session", config)
+    assert calls[1][0] == "reader"
+
+
+def test_browser_login_emits_page_owned_login_url_before_waiting(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+    events = []
+    now = [0.0]
+    checks = iter(
+        [
+            {"status": "LOGGED_OUT", "check_method": "browser_page"},
+            {"status": "LOGGED_IN", "account_name": "RexWang", "check_method": "browser_page"},
+        ]
+    )
+    calls = []
+
+    @contextmanager
+    def session_factory(_config):
+        yield ({"browser_version": "149.0.7827.55"}, _endpoint(None))
+
+    def status_reader(endpoint):
+        calls.append(("status", endpoint))
+        return next(checks)
+
+    def handoff_opener(endpoint):
+        calls.append(("open", endpoint))
+        return {
+            "target_id": "login-target",
+            "login_url": "https://www.zhihu.com/account/scan/login/page-owned",
+            "handoff_kind": "page_owned_login_url",
+        }
+
+    def sleeper(seconds):
+        now[0] += seconds
+
+    result = zhihu.browser_login(
+        config,
+        timeout=30,
+        browser_session_factory=session_factory,
+        status_reader=status_reader,
+        login_handoff_opener=handoff_opener,
+        event_callback=events.append,
+        sleeper=sleeper,
+        clock=lambda: now[0],
+    )
+
+    assert events == [
+        {
+            "event": "login_url",
+            "status": "LOGIN_REQUIRED",
+            "login_url": "https://www.zhihu.com/account/scan/login/page-owned",
+            "handoff_kind": "page_owned_login_url",
+            "check_method": "browser_page",
+            "browser_version": "149.0.7827.55",
+        }
+    ]
+    assert result["status"] == "LOGGED_IN"
+    assert result["account_name"] == "RexWang"
+    assert calls[0][0] == "status"
+    assert calls[1][0] == "open"
+    assert calls[2][0] == "status"
+
+
+def test_browser_logout_noops_when_browser_page_status_is_logged_out(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+    clears = []
+
+    @contextmanager
+    def session_factory(_config):
+        yield ({"browser_version": "149.0.7827.55"}, _endpoint(None))
+
+    result = zhihu.browser_logout(
+        config,
+        browser_session_factory=session_factory,
+        status_reader=lambda _endpoint: {"status": "LOGGED_OUT", "check_method": "browser_page"},
+        storage_clearer=lambda *_args: clears.append(_args),
+    )
+
+    assert result == {
+        "status": "ALREADY_LOGGED_OUT",
+        "check_method": "browser_page",
+        "logout_method": "browser_status_precheck",
+        "browser_version": "149.0.7827.55",
+    }
+    assert clears == []
+
+
+def test_browser_logout_clears_zhihu_origins_only_after_logged_in_precheck(tmp_path):
+    config = zhihu.load_browser_config(_browser_login_config_file(tmp_path))
+    clears = []
+
+    @contextmanager
+    def session_factory(_config):
+        yield ({"browser_version": "149.0.7827.55"}, _endpoint(None))
+
+    result = zhihu.browser_logout(
+        config,
+        browser_session_factory=session_factory,
+        status_reader=lambda _endpoint: {"status": "LOGGED_IN", "check_method": "browser_page"},
+        storage_clearer=lambda endpoint, origins: clears.append((endpoint, origins)),
+    )
+
+    assert result == {
+        "status": "LOGGED_OUT",
+        "check_method": "browser_page",
+        "logout_method": "clear_origin_storage",
+        "browser_version": "149.0.7827.55",
+    }
+    assert clears == [
+        (
+            _endpoint(None),
+            ("https://www.zhihu.com", "https://zhuanlan.zhihu.com"),
+        )
+    ]

@@ -1,156 +1,83 @@
-# Quickstart：从登录到发送草稿
+# Quickstart：纯浏览器登录
 
-本页是 ChatPost 的日常最短路径：确认 Profile、登录知乎、dry-run 文章、把文章发送到知乎 **review 草稿**。它不会点击最终发布，也不会读取或导出 Cookie、LocalStorage、IndexedDB 或 session 原值。
+本页只覆盖 ChatPost 的登录基础层：发现 Profile、检查知乎网页登录态、打开登录 handoff、以及登出/清理。它不创建草稿、不发布内容、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。
 
-如果还没有准备 Runner、Profile registry、Wechatsync adapter 和本机 loopback bridge，先看 [配置、环境与状态](configuration.md)。如果要审查完整验收链路和底层制品版本，继续看 [知乎首次设置与草稿验收](zhihu-first-run.md)。
-
-## 这条路径会做什么
-
-<div class="grid cards" markdown>
-
-- **登录**
-
-    `login` 内部先做只读 auth 检查。已登录时直接返回 `READY`，不会打开二维码页；未登录时才从当前登录页的 page-owned `login_url` 生成 QR。
-
-- **预检文章**
-
-    `draft --dry-run` 只解析 source 并返回 preview，不启动浏览器、不连接扩展、不写知乎。
-
-- **发送 review 草稿**
-
-    不带 `--dry-run` 的 `draft` 调用一次 Wechatsync create 路径，写 `0600` receipt，并返回知乎 `/edit` review URL。
-
-- **明确边界**
-
-    ChatPost 当前只创建 review 草稿，不做最终发布，不做 same-ID update；`RESULT_UNKNOWN` 后不能自动重试。
-
-</div>
-
-## 0. 设定本次运行变量
+## 0. 设定变量
 
 ```bash
 CHATPOST=chatpost
 REGISTRY=/absolute/path/to/accounts.toml
 PROFILE=zhihu-personal
-SOURCE=/absolute/path/to/article.md
-RUN_DIR="$HOME/.chatarch/chatpost/runs/quickstart-$(date +%Y%m%d-%H%M%S)"
-install -d -m 700 "$RUN_DIR"
 ```
 
-`accounts.toml` 只保存非敏感 Profile metadata，例如 alias、platform、runner_config、profile 和 label。不要把 Cookie、LocalStorage、二维码 payload、验证码、手机号、密码、bridge token 或 WebSocket UUID 写入 registry、文章、receipt、日志或文档。
+`accounts.toml` 只保存非敏感 Profile metadata，例如 alias、platform、runner_config、profile 和 label。不要把 Cookie、LocalStorage、二维码 payload、验证码、手机号、密码、token 或 WebSocket UUID 写入 registry、config、日志或文档。
 
 ## 1. 确认可见 CLI 和 Profile
 
 ```bash
 "$CHATPOST" --tree
 
-"$CHATPOST" platforms \
-  --output json \
-  -I
+"$CHATPOST" platforms   --output json   -I
 
-"$CHATPOST" profiles \
-  --platform zhihu \
-  --registry "$REGISTRY" \
-  --output json \
-  -I
+"$CHATPOST" profiles   --platform zhihu   --registry "$REGISTRY"   --output json   -I
+
+"$CHATPOST" zhihu profiles   --registry "$REGISTRY"   --output json   -I
 ```
 
-确认输出中能看到 `PROFILE` 对应的知乎 target。这里仍然只是 registry 只读发现，不会读取浏览器登录态。
+这些发现命令只读 registry，不启动浏览器，不读取登录态。等价真实命令名是 `chatpost platforms`、`chatpost profiles` 和 `chatpost zhihu profiles`。
 
-## 2. 登录或复用已登录 Profile
+登录基础层的真实命令名是 `chatpost zhihu status`、`chatpost zhihu login` 和 `chatpost zhihu logout`。
 
-先做一次只读状态检查：
+## 2. 检查当前网页登录态
 
 ```bash
-"$CHATPOST" zhihu status "$PROFILE" \
-  --registry "$REGISTRY" \
-  --output json \
-  -I
+"$CHATPOST" zhihu status "$PROFILE"   --registry "$REGISTRY"   --output json   -I
 ```
 
-然后运行登录入口：
+`status` 只做 browser-level 页面检查：打开/连接受控 Chromium Profile，通过知乎页面的 URL、DOM、可见账号入口判断状态。输出状态为：
+
+- `LOGGED_IN`：页面可见信息能确认已登录，可带 `account_name` / `account_url`；
+- `LOGGED_OUT`：页面可见信息显示未登录；
+- `UNKNOWN`：页面无法可靠判断，且不会 fallback 到发布适配器。
+
+## 3. 登录或复用已登录 Profile
 
 ```bash
-"$CHATPOST" zhihu login "$PROFILE" \
-  --registry "$REGISTRY" \
-  --qr "$RUN_DIR/zhihu-login.png" \
-  --receipt "$RUN_DIR/zhihu-login-receipt.json" \
-  --timeout 900 \
-  --output json \
-  -I
+"$CHATPOST" zhihu login "$PROFILE"   --registry "$REGISTRY"   --timeout 900   --output json   -I
 ```
 
 行为约定：
 
-- 如果 `PROFILE` 已登录，`login` 直接返回 `READY`，不会生成 QR，也不会要求扫码。
-- 如果未登录，`login` 打开同一个 Profile 的知乎登录页；只有拿到该页面正在轮询的 page-owned `login_url` 后，才用它生成 QR 图片和 receipt。
-- 页面截图不是登录 handoff。截图只能作为内部调试证据，不作为 ChatPost 的最终交付物。
-- 机器验证、滑块、手机号和验证码都属于人工浏览器流程；ChatPost 不提供 `--phone`、`--code`、`--otp` 或 `--sms-code` 参数。
+- 已登录：先做 browser-page status，确认已登录后直接返回 `LOGGED_IN`，不会发 QR、不会发登录链接；
+- 未登录：打开同一个 Profile 的知乎登录页，尽快输出 page-owned `login_url` 或 `browser_opened` handoff，然后保持浏览器等待人工完成登录；
+- 不读取或导出 Cookie、LocalStorage、IndexedDB、session、token；
+- 不调用发布适配器，不需要 adapter env，不需要发布 token；
+- 页面截图不是登录 handoff，不能冒充最终登录交付；
+- 机器验证、滑块、手机号和验证码都属于人工浏览器流程，CLI 不提供 `--phone`、`--code`、`--otp` 或 `--sms-code`。
 
-登录完成后再回读一次状态：
+JSON 输出是 JSON Lines：先输出可交互 handoff 事件，最后输出登录完成或超时事件。
 
-```bash
-"$CHATPOST" zhihu status "$PROFILE" \
-  --registry "$REGISTRY" \
-  --output json \
-  -I
-```
-
-继续前应看到 `READY`。
-
-## 3. Dry-run 文章
+## 4. 回读状态验收
 
 ```bash
-"$CHATPOST" zhihu draft "$PROFILE" "$SOURCE" \
-  --registry "$REGISTRY" \
-  --dry-run \
-  --output json \
-  -I
+"$CHATPOST" zhihu status "$PROFILE"   --registry "$REGISTRY"   --output json   -I
 ```
 
-检查 JSON 里的 `preview`、标题、正文和图片引用。`--dry-run` 是 `draft` 的参数，不是独立子命令；它不会启动浏览器、不会连接扩展、不会写知乎。
+登录实践完成后，应看到 `LOGGED_IN`，并尽可能看到页面可见的 `account_name` 或 `account_url`。
 
-## 4. 发送到知乎 review 草稿
+## 5. 登出/清理
 
 ```bash
-DRAFT_RECEIPT="$RUN_DIR/zhihu-draft-receipt.json"
-
-"$CHATPOST" zhihu draft "$PROFILE" "$SOURCE" \
-  --registry "$REGISTRY" \
-  --receipt "$DRAFT_RECEIPT" \
-  --output json \
-  -I
+"$CHATPOST" zhihu logout "$PROFILE"   --registry "$REGISTRY"   --output json   -I
 ```
 
-成功时应看到：
-
-- `status` 为 `DRAFT_CREATED`；
-- 有知乎 draft ID；
-- 有 `/edit` review URL；
-- `$DRAFT_RECEIPT` 已写入，权限为 `0600`。
-
-这一步只创建 review 草稿，不点击最终发布。打开 review URL 后仍需要人工检查标题、正文、图片和排版。
-
-## 5. 收尾或退出登录
-
-如果要保留该 Profile 供后续草稿复用，可以不登出。需要清理登录态时运行：
-
-```bash
-"$CHATPOST" zhihu logout "$PROFILE" \
-  --registry "$REGISTRY" \
-  --output json \
-  -I
-```
-
-`logout` 也会先做只读 auth：未登录时直接 no-op；已登录时才清理知乎 origin 登录态。它不读取或导出 session 值。
+`logout` 先做 browser-level status：未登录时返回 `ALREADY_LOGGED_OUT`；已登录时才清理知乎 origins 登录态。清理是浏览器命令，不读取任何 session 原值。
 
 ## 常见停点
 
 | 停点 | 处理 |
 | --- | --- |
-| `login` 已返回 `READY` 但没有 QR | 这是预期行为，说明 Profile 已登录。 |
+| `login` 直接返回 `LOGGED_IN` | 预期行为，说明 Profile 已登录。 |
+| `login` 输出 `browser_opened` 但没有 page-owned `login_url` | 浏览器已打开等待人工登录；不要用截图或私有 artifact 冒充登录链接。 |
 | 登录页需要滑块或验证码 | 停在人工浏览器流程，不把验证码写进 CLI 参数或日志。 |
-| 没有 page-owned `login_url` | 登录 handoff 失败；不要用页面截图冒充 QR 结果。 |
-| `draft --dry-run` preview 不对 | 修 source 后重新 dry-run；不会写知乎。 |
-| `draft` 返回 `RESULT_UNKNOWN` | 不自动重试；读取 receipt 和日志，人工确认知乎后台状态。 |
-| 想最终发布 | 当前 ChatPost 没有最终发布命令；review 后由人工在知乎完成。 |
+| `status` 返回 `UNKNOWN` | 只报告未知；不要 fallback 到发布适配器或读取 Cookie/token。 |

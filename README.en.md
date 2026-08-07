@@ -17,23 +17,16 @@
 
 # ChatPost
 
-ChatArch multi-platform content publishing infrastructure package.
+ChatArch browser-level platform login foundation.
 
-
-Documentation entry: <https://arch.gh.wzhecnu.cn/ChatPost/en/>
-
-Choose documentation by scenario:
+Docs: <https://arch.gh.wzhecnu.cn/ChatPost/>
 
 | Scenario | Document |
 | --- | --- |
-| Understand ChatPost resources and data flow | [Overall Architecture](docs/architecture.en.md) |
-| Review the ChatUp Chrome dependency, ChatEnv, and state ownership | [Configuration, Environment, and State](docs/configuration.en.md) |
-| Go from login to creating a Zhihu review draft | [Quickstart: From Login to Draft Creation](docs/quickstart.en.md) |
-| Review the full fixed-article draft acceptance runbook | [Zhihu First Setup and Draft Acceptance](docs/zhihu-first-run.en.md) |
-| Inspect the current real commands | [CLI Tree](docs/cli-tree.en.md) |
-| Review the proposed CLI, ChatUp runtime dependency, and multi-account isolation | [Browser Runners and Account Isolation](docs/browser-runners.en.md) |
-| Check first-class capabilities and current boundaries | [Capability Map](docs/capability-map.en.md) |
-| Call package behavior directly from Python | [Python Interface Tree](docs/interface-tree.md) |
+| Run the login foundation now | [Quickstart: Pure Browser Login](docs/quickstart.en.md) |
+| Inspect the real CLI tree | [CLI Tree](docs/cli-tree.en.md) |
+| Check current capabilities and boundaries | [Capability Map](docs/capability-map.md) |
+| Review Chrome/Profile state boundaries | [Configuration, Environment, and State](docs/configuration.en.md) |
 
 ## Quick Start
 
@@ -45,31 +38,16 @@ chatpost --tree
 chatpost platforms --help
 chatpost profiles --help
 chatpost zhihu --help
+chatpost zhihu profiles --help
 chatpost zhihu login --help
-chatpost zhihu logout --help
 chatpost zhihu status --help
-chatpost zhihu draft --help
+chatpost zhihu logout --help
 python -m pytest -q
 python -m build
 ```
 
-## CLI Contract
+## Current Boundary
 
-This package depends on `chatstyle>=0.1.1,<0.2.0`, `chatenv>=0.2.0,<0.3.0`, `chatup>=0.2.4,<0.3.0`, `chatbrowser>=0.1.2,<0.2.0`, `qrcode[pil]>=7.4,<9.0`, and `websocket-client>=1.8,<2.0`. ChatUp owns Playwright package/browser installation. ChatBrowser owns the browser runtime, Profile metadata, and CDP metadata safety boundary. ChatPost resolves exact descriptors, account aliases, QR image artifacts, and publishing tasks, then owns the Profile, extension, loopback CDP/bridge, and one-shot review-draft task.
+`chatpost zhihu login/status/logout PROFILE` is a pure browser login foundation: it manages only the controlled Chromium Profile and page-visible login state. It does not call a publishing adapter, load a publishing extension, require a publishing token, or read/export cookies/local storage/IndexedDB/sessions/tokens.
 
-- `CommandSchema` / `CommandField` for inputs.
-- `add_interactive_option()` for the shared `-i/-I` switch.
-- `resolve_command_inputs()` for missing args, defaults, TTY behavior, and validation.
-- Generate `config.py` and a `chatenv.configs` entry point by default so the package is ChatEnv-discoverable; use `--without-chatenv-provider` only when ChatEnv integration is intentionally not needed.
-
-## Layout
-
-- `src/`: package source code
-- `tests/code-tests/`: code tests and migrated historical tests
-- `tests/cli-tests/`: real CLI tests, doc-first
-- `tests/mock-cli-tests/`: mock/fake CLI tests, doc-first
-- `docs/`: long-lived project docs built by mkdocs
-
-## Development Notes
-
-See `DEVELOP.md` and `AGENTS.md` before expanding the scaffold.
+This package depends on `chatstyle>=0.1.1,<0.2.0`, `chatenv>=0.2.0,<0.3.0`, `chatup>=0.2.4,<0.3.0`, `chatbrowser>=0.1.2,<0.2.0`, `qrcode[pil]>=7.4,<9.0`, and `websocket-client>=1.8,<2.0`. ChatUp owns Playwright package/browser installation. ChatBrowser owns the browser runtime, Profile metadata, and CDP metadata safety boundary.

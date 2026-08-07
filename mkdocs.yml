@@ -39,8 +39,6 @@ plugins:
             设计: Design
             总体架构: Overall Architecture
             配置、环境与状态: Configuration, Environment, and State
-            任务流程: Task Flows
-            知乎首次设置与草稿验收: Zhihu First Setup and Draft Acceptance
             命令与接口: Commands and APIs
             CLI 树: CLI Tree
             Browser Runner 与账号隔离: Browser Runners and Account Isolation
@@ -73,8 +71,6 @@ nav:
       - 总体架构: architecture.md
       - 配置、环境与状态: configuration.md
       - Browser Runner 与账号隔离: browser-runners.md
-  - 任务流程:
-      - 知乎首次设置与草稿验收: zhihu-first-run.md
   - 命令与接口:
       - CLI 树: cli-tree.md
       - 能力地图: capability-map.md

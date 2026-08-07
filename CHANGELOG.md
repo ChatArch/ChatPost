@@ -4,17 +4,15 @@
 
 ### Added
 
-- Add visible Profile-based entrypoints: `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, `chatpost zhihu login/status/logout PROFILE`, and `chatpost zhihu draft PROFILE SOURCE [--dry-run]` on top of the existing Zhihu runner.
-- Keep older `chatpost account list/show`, `chatpost qr encode`, and `chatpost zhihu account ...` commands callable as hidden compatibility aliases.
-- Add a non-sensitive Profile/account alias registry parser and tests for `platform@alias` resolution.
-- Add explicit `attach_existing_cdp = true` runner mode for a Profile already held by a known loopback CDP browser; this mode closes only the per-run extension popup and leaves the existing browser running.
+- Add a login-only visible CLI surface: `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, and `chatpost zhihu login/status/logout PROFILE`.
+- Add browser-only Zhihu runner loading via `load_browser_config`; login/status/logout require only Chromium/Profile/CDP fields and do not require adapter env, extension files, bridge ports, or publishing tokens.
+- Add browser-page status, login handoff, and logout helpers that infer login state from page-visible URL/DOM/account entrypoints without reading or exporting Cookie, LocalStorage, IndexedDB, session, or token values.
 
 ### Changed
 
-- Require `chatbrowser>=0.1.2,<0.2.0` and `qrcode[pil]>=7.4,<9.0` alongside ChatUp, ChatEnv, ChatStyle, and websocket-client dependencies.
-- Fix Wechatsync extension bridge wake-up by writing the MCP token to extension local storage key `mcpToken`, sending `MCP_SET_SERVER_URL` with `payload.url`, and starting the active MCP watch with `MCP_WATCH_START` before adapter communication.
-- Add a dedicated MkDocs Quickstart for the daily Zhihu path from Profile discovery through login, `draft --dry-run`, and receipt-backed review-draft creation.
-- Update README, CLI tree, MkDocs pages, and capability maps so the Profile-based `chatpost zhihu login/status/logout/draft` surface is documented as implemented, older account/QR helpers are hidden compatibility, and final publish plus long-term publication commands remain proposals.
+- Remove unreleased user-facing `account`, `qr`, `zhihu account ...`, and `zhihu draft ...` commands from the registered CLI tree for this login-foundation PR.
+- Update README, CLI tree, Quickstart, MkDocs home, and capability map to describe the login-only boundary.
+- Preserve publishing-adapter code/tests as an internal historical path, but keep it out of `login/status/logout` and out of the current user-visible CLI.
 
 ## 0.1.0 - 2026-08-04
 

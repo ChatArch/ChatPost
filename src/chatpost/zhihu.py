@@ -78,12 +78,63 @@ _ZHIHU_QRCODE_TOKEN_REDACTION = re.compile(
     r"(/(?:api/v\d+/account/api/login/qrcode|api/login/qrcode|account/api/login/qrcode)/)"
     r"[A-Za-z0-9_-]+"
 )
-_QRCODE_RESOURCE_EXPRESSION = """
+_QRCODE_RESOURCE_EXPRESSION = r"""
 (() => performance.getEntriesByType('resource')
   .map((entry) => entry.name)
   .filter((name) => /\/qrcode\//i.test(name))
   .slice(-20))
 """.strip()
+_ZHIHU_STATUS_URL = "https://www.zhihu.com/people/me"
+_ZHIHU_STATUS_EXPRESSION = r"""
+(async () => {
+  const clean = (value) => (value || '').replace(/\s+/g, ' ').trim();
+  const href = location.href;
+  const title = document.title || '';
+  const text = document.body ? document.body.innerText.slice(0, 3000) : '';
+  const anchors = Array.from(document.querySelectorAll('a[href*="/people/"]'))
+    .map((anchor) => ({href: anchor.href || '', text: clean(anchor.textContent)}))
+    .filter((item) => item.href)
+    .slice(0, 30);
+  const nameCandidates = [
+    document.querySelector('.ProfileHeader-name')?.textContent,
+    document.querySelector('h1')?.textContent,
+    document.querySelector('[data-zop-user-token]')?.textContent,
+    anchors.find((item) => item.text)?.text,
+  ].map(clean).filter(Boolean).slice(0, 10);
+  const apiMe = {ok: false, name: '', urlToken: '', url: '', status: null};
+  try {
+    const response = await fetch('/api/v4/me', {credentials: 'include'});
+    apiMe.status = response.status;
+    if (response.ok) {
+      const data = await response.json();
+      apiMe.ok = true;
+      apiMe.name = clean(data.name);
+      apiMe.urlToken = clean(data.url_token || data.urlToken);
+      apiMe.url = typeof data.url === 'string' ? data.url : '';
+    }
+  } catch (_error) {}
+  return {
+    href,
+    title,
+    anchors,
+    nameCandidates,
+    apiMe,
+    hasLoginPrompt: /(登录|注册|扫码登录|验证码|sign in|log in)/i.test(text),
+  };
+})()
+""".strip()
+
+
+@dataclass(frozen=True)
+class ZhihuBrowserConfig:
+    playwright_version: str
+    playwright_home: Path
+    profile_dir: Path
+    cdp_host: str
+    cdp_port: int
+    headless: bool
+    browser_args: tuple[str, ...]
+    attach_existing_cdp: bool
 
 
 @dataclass(frozen=True)
@@ -141,15 +192,64 @@ def _port(table: dict[str, Any], key: str) -> int:
     return value
 
 
-def load_runner_config(path: str | Path) -> ZhihuRunnerConfig:
-    """Load a secret-free runner TOML file and enforce the loopback boundary."""
-
+def _load_zhihu_table(path: str | Path) -> dict[str, Any]:
     config_path = Path(path).expanduser().resolve()
     with config_path.open("rb") as stream:
         data = tomllib.load(stream)
     table = data.get("zhihu")
     if not isinstance(table, dict):
         raise TypeError("runner config must contain a [zhihu] table")
+    return table
+
+
+def _browser_fields(table: dict[str, Any]) -> dict[str, Any]:
+    cdp_host = _required(table, "cdp_host", str)
+    if cdp_host not in _LOOPBACK_HOSTS:
+        raise ValueError("CDP host must be the 127.0.0.1 loopback address")
+
+    browser_args_value = table.get("browser_args", [])
+    if not isinstance(browser_args_value, list) or not all(
+        isinstance(item, str) and item for item in browser_args_value
+    ):
+        raise ValueError("zhihu.browser_args must be a string array")
+    for argument in browser_args_value:
+        if argument.startswith(_PROTECTED_BROWSER_ARGS):
+            raise ValueError(f"ChatPost owns protected browser argument: {argument}")
+
+    headless = table.get("headless", True)
+    if not isinstance(headless, bool):
+        raise TypeError("zhihu.headless must be a boolean")
+    attach_existing_cdp = table.get("attach_existing_cdp", False)
+    if not isinstance(attach_existing_cdp, bool):
+        raise TypeError("zhihu.attach_existing_cdp must be a boolean")
+
+    return {
+        "playwright_version": _required(table, "playwright_version", str),
+        "playwright_home": _path(table, "playwright_home"),
+        "profile_dir": _path(table, "profile_dir"),
+        "cdp_host": cdp_host,
+        "cdp_port": _port(table, "cdp_port"),
+        "headless": headless,
+        "browser_args": tuple(browser_args_value),
+        "attach_existing_cdp": attach_existing_cdp,
+    }
+
+
+def load_browser_config(path: str | Path) -> ZhihuBrowserConfig:
+    """Load the pure browser-login runner config.
+
+    This intentionally ignores adapter/extension/env fields. Login/status/logout
+    must not require Wechatsync, bridge ports, env files, tokens, or extension
+    manifests.
+    """
+
+    return ZhihuBrowserConfig(**_browser_fields(_load_zhihu_table(path)))
+
+
+def load_runner_config(path: str | Path) -> ZhihuRunnerConfig:
+    """Load the publishing runner TOML file and enforce the loopback boundary."""
+
+    table = _load_zhihu_table(path)
 
     cdp_host = _required(table, "cdp_host", str)
     bridge_host = _required(table, "bridge_host", str)
@@ -168,38 +268,24 @@ def load_runner_config(path: str | Path) -> ZhihuRunnerConfig:
         raise ValueError("zhihu.extension_id must be an exact Chrome extension ID")
 
 
-    browser_args_value = table.get("browser_args", [])
-    if not isinstance(browser_args_value, list) or not all(
-        isinstance(item, str) and item for item in browser_args_value
-    ):
-        raise ValueError("zhihu.browser_args must be a string array")
-    for argument in browser_args_value:
-        if argument.startswith(_PROTECTED_BROWSER_ARGS):
-            raise ValueError(f"ChatPost owns protected browser argument: {argument}")
-
-    headless = table.get("headless", True)
-    if not isinstance(headless, bool):
-        raise TypeError("zhihu.headless must be a boolean")
-    attach_existing_cdp = table.get("attach_existing_cdp", False)
-    if not isinstance(attach_existing_cdp, bool):
-        raise TypeError("zhihu.attach_existing_cdp must be a boolean")
+    browser = _browser_fields(table)
 
     return ZhihuRunnerConfig(
-        playwright_version=_required(table, "playwright_version", str),
-        playwright_home=_path(table, "playwright_home"),
-        profile_dir=_path(table, "profile_dir"),
+        playwright_version=browser["playwright_version"],
+        playwright_home=browser["playwright_home"],
+        profile_dir=browser["profile_dir"],
         extension_dir=_path(table, "extension_dir"),
         node_bin=_path(table, "node_bin"),
         wechatsync_cli=_path(table, "wechatsync_cli"),
         env_file=_path(table, "env_file"),
         cdp_host=cdp_host,
-        cdp_port=cdp_port,
+        cdp_port=browser["cdp_port"],
         bridge_host=bridge_host,
         bridge_port=bridge_port,
         extension_id=extension_id,
-        headless=headless,
-        browser_args=tuple(browser_args_value),
-        attach_existing_cdp=attach_existing_cdp,
+        headless=browser["headless"],
+        browser_args=browser["browser_args"],
+        attach_existing_cdp=browser["attach_existing_cdp"],
     )
 
 
@@ -360,6 +446,48 @@ def preflight(
     }
 
 
+def browser_preflight(
+    config: ZhihuBrowserConfig,
+    *,
+    resolver: Callable[..., PlaywrightBrowserInstallation] = resolve,
+    port_checker: Callable[[str, int], bool] = _port_is_open,
+) -> dict[str, Any]:
+    """Validate only the browser inputs needed for login/status/logout."""
+
+    if not config.profile_dir.is_dir():
+        raise ValueError(f"Profile directory does not exist: {config.profile_dir}")
+    profile_mode = stat.S_IMODE(config.profile_dir.stat().st_mode)
+    if profile_mode & 0o077:
+        raise ValueError("Profile directory must not be accessible by group or other users")
+    cdp_open = port_checker(config.cdp_host, config.cdp_port)
+    if config.attach_existing_cdp:
+        if not cdp_open:
+            raise ValueError(
+                f"Existing CDP endpoint is not listening: {config.cdp_host}:{config.cdp_port}"
+            )
+    elif cdp_open:
+        raise ValueError(f"CDP port is already listening: {config.cdp_host}:{config.cdp_port}")
+
+    installation = resolver(
+        config.playwright_version,
+        browser="chromium",
+        home=config.playwright_home,
+    )
+    if not _is_executable(installation.binary_path):
+        raise ValueError(f"Playwright browser is not executable: {installation.binary_path}")
+
+    return {
+        "status": "READY",
+        "playwright_version": installation.playwright_version,
+        "browser": installation.browser,
+        "browser_revision": installation.browser_revision,
+        "browser_version": installation.browser_version,
+        "headless": config.headless,
+        "cdp": f"{config.cdp_host}:{config.cdp_port}",
+        "browser_attachment": "EXISTING_CDP" if config.attach_existing_cdp else "OWNED_BROWSER",
+    }
+
+
 def _http_json(url: str, *, method: str = "GET") -> Any:
     request = urllib.request.Request(url, method=method)
     with urllib.request.urlopen(request, timeout=2) as response:
@@ -393,24 +521,30 @@ def _existing_cdp_endpoint(config: ZhihuRunnerConfig) -> _CdpEndpoint:
 
 
 def _sanitize_browser_diagnostics(
-    config: ZhihuRunnerConfig,
+    config: ZhihuRunnerConfig | ZhihuBrowserConfig,
     diagnostics: Iterable[str],
     extra_redactions: Iterable[str] = (),
 ) -> str:
     text = "\n".join(list(diagnostics)[-40:])
-    for value, replacement in (
+    replacements = [
         (str(config.profile_dir), "[PROFILE]"),
-        (str(config.extension_dir), "[EXTENSION]"),
         (str(config.playwright_home), "[PLAYWRIGHT_HOME]"),
         (str(Path.home()), "[HOME]"),
-    ):
+    ]
+    extension_dir = getattr(config, "extension_dir", None)
+    if extension_dir is not None:
+        replacements.append((str(extension_dir), "[EXTENSION]"))
+    for value, replacement in replacements:
         text = text.replace(value, replacement)
-    try:
-        private_env = _read_env(config.env_file)
-    except (OSError, UnicodeError):
-        return "[REDACTED]" if text.strip() else ""
-    if not private_env.get("WECHATSYNC_TOKEN"):
-        return "[REDACTED]" if text.strip() else ""
+    env_file = getattr(config, "env_file", None)
+    private_env: dict[str, str] = {}
+    if env_file is not None:
+        try:
+            private_env = _read_env(env_file)
+        except (OSError, UnicodeError):
+            return "[REDACTED]" if text.strip() else ""
+        if not private_env.get("WECHATSYNC_TOKEN"):
+            return "[REDACTED]" if text.strip() else ""
     private_values = [value for value in private_env.values() if value]
     private_values.extend(
         value
@@ -776,6 +910,123 @@ def _browser_command(
     command.extend(config.browser_args)
     command.append(_ownership_url(ownership_token))
     return command
+
+
+def _browser_login_command(
+    config: ZhihuBrowserConfig,
+    installation: PlaywrightBrowserInstallation,
+    ownership_token: str,
+) -> list[str]:
+    """Start Chromium for login/status/logout without extension or bridge flags."""
+
+    command = [
+        str(installation.binary_path),
+        f"--user-data-dir={config.profile_dir}",
+        f"--remote-debugging-address={config.cdp_host}",
+        f"--remote-debugging-port={config.cdp_port}",
+        f"--remote-allow-origins=http://{config.cdp_host}:{config.cdp_port}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-sync",
+        "--disable-features=ChromeWhatsNewUI",
+        "--hide-crash-restore-bubble",
+        "--lang=zh-CN",
+        "--window-size=1400,1000",
+    ]
+    if config.headless:
+        command.append("--headless=new")
+    command.extend(config.browser_args)
+    command.append(_ownership_url(ownership_token))
+    return command
+
+
+@contextmanager
+def browser_login_session(
+    config: ZhihuBrowserConfig,
+) -> Iterator[tuple[dict[str, Any], _CdpEndpoint]]:
+    """Start/attach to Chromium for pure login-status operations only."""
+
+    browser_preflight(config)
+    installation = resolve(
+        config.playwright_version,
+        browser="chromium",
+        home=config.playwright_home,
+    )
+    browser = {
+        "browser_version": installation.browser_version,
+        "browser_revision": installation.browser_revision,
+        "playwright_version": installation.playwright_version,
+        "browser_attachment": "EXISTING_CDP" if config.attach_existing_cdp else "OWNED_BROWSER",
+    }
+    if config.attach_existing_cdp:
+        endpoint = _existing_cdp_endpoint(config)
+        try:
+            version_info = _http_json(f"{endpoint.base_url}/json/version")
+        except (OSError, TypeError, ValueError, urllib.error.URLError):
+            version_info = {}
+        if isinstance(version_info, dict) and isinstance(version_info.get("Browser"), str):
+            browser["browser_cdp_product"] = version_info["Browser"]
+            browser["browser_version"] = version_info["Browser"].split("/", 1)[-1]
+            browser["browser_revision"] = "existing-cdp"
+        try:
+            yield browser, endpoint
+        finally:
+            browser["cleanup_status"] = "LEFT_RUNNING_EXISTING_CDP"
+        return
+
+    ownership_token = secrets.token_urlsafe(24)
+    process = subprocess.Popen(
+        _browser_login_command(config, installation, ownership_token),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    diagnostics: deque[str] = deque(maxlen=80)
+    diagnostic_thread = None
+    diagnostic_stream = getattr(process, "stderr", None)
+    if diagnostic_stream is not None:
+        diagnostic_thread = Thread(
+            target=_drain_browser_diagnostics,
+            args=(diagnostic_stream, diagnostics),
+            daemon=True,
+        )
+        diagnostic_thread.start()
+    endpoint: _CdpEndpoint | None = None
+    try:
+        endpoint = _wait_for_cdp(
+            config,
+            process,
+            ownership_token,
+            diagnostics,
+            diagnostic_thread,
+        )
+        yield browser, endpoint
+    finally:
+        if process.poll() is not None:
+            browser["cleanup_status"] = "CLOSED"
+        elif endpoint is None:
+            browser["cleanup_status"] = "MANUAL_RECOVERY_REQUIRED"
+            browser["cleanup_error"] = (
+                "Owned CDP endpoint was not established; "
+                "the process was left running for manual recovery"
+            )
+        else:
+            try:
+                _close_browser(endpoint, process)
+                browser["cleanup_status"] = "CLOSED"
+            except (
+                KeyError,
+                OSError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+                websocket.WebSocketException,
+            ) as error:
+                browser["cleanup_status"] = "MANUAL_RECOVERY_REQUIRED"
+                browser["cleanup_error"] = str(error)
+        if diagnostic_thread is not None:
+            diagnostic_thread.join(timeout=1)
 
 
 def _drain_browser_diagnostics(stream: Any, diagnostics: deque[str]) -> None:
@@ -1568,6 +1819,408 @@ def _open_login_page(
     return target_id
 
 
+def _create_browser_page(endpoint: _CdpEndpoint, url: str) -> str:
+    with _owned_browser_socket(endpoint) as debug_socket:
+        result = _cdp_command(debug_socket, 1, "Target.createTarget", {"url": url})
+    target_id = result.get("targetId")
+    if not isinstance(target_id, str) or not target_id:
+        raise TypeError("Browser target creation did not return a target id")
+    return target_id
+
+
+def _close_browser_page(endpoint: _CdpEndpoint, target_id: str) -> None:
+    with _owned_browser_socket(endpoint) as debug_socket:
+        _cdp_command(debug_socket, 1, "Target.closeTarget", {"targetId": target_id})
+
+
+def _evaluate_visible_page_state(
+    endpoint: _CdpEndpoint,
+    target_id: str,
+    expression: str,
+    *,
+    ready_timeout: float = 12.0,
+    clock: Callable[[], float] = time.monotonic,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> Any:
+    session_id: str | None = None
+    with _owned_browser_socket(endpoint) as debug_socket:
+        attach = _cdp_command(
+            debug_socket,
+            1,
+            "Target.attachToTarget",
+            {"targetId": target_id, "flatten": True},
+        )
+        raw_session_id = attach.get("sessionId")
+        if not isinstance(raw_session_id, str) or not raw_session_id:
+            raise TypeError("Browser target attach did not return a session id")
+        session_id = raw_session_id
+        try:
+            _cdp_command(debug_socket, 2, "Page.enable", session_id=session_id)
+            _cdp_command(debug_socket, 3, "Runtime.enable", session_id=session_id)
+            deadline = clock() + ready_timeout
+            identifier = 4
+            while True:
+                readiness = _cdp_command(
+                    debug_socket,
+                    identifier,
+                    "Runtime.evaluate",
+                    {
+                        "expression": "(() => ({readyState: document.readyState, href: location.href}))()",
+                        "returnByValue": True,
+                    },
+                    session_id=session_id,
+                )
+                identifier += 1
+                result = readiness.get("result", {})
+                value = result.get("value") if isinstance(result, dict) else None
+                ready_state = None
+                href = None
+                if isinstance(value, dict):
+                    raw_ready_state = value.get("readyState")
+                    raw_href = value.get("href")
+                    ready_state = raw_ready_state if isinstance(raw_ready_state, str) else None
+                    href = raw_href if isinstance(raw_href, str) else None
+                elif isinstance(value, str):
+                    ready_state = value
+                navigated = isinstance(href, str) and href not in {"", "about:blank"}
+                if (ready_state in {"interactive", "complete"} and navigated) or clock() >= deadline:
+                    break
+                sleeper(0.2)
+            evaluation = _cdp_command(
+                debug_socket,
+                identifier,
+                "Runtime.evaluate",
+                {"expression": expression, "awaitPromise": True, "returnByValue": True},
+                session_id=session_id,
+            )
+            if evaluation.get("exceptionDetails"):
+                raise RuntimeError("Browser page evaluation failed")
+            value = evaluation.get("result", {}).get("value")
+            return value
+        finally:
+            if session_id is not None:
+                _cdp_command(
+                    debug_socket,
+                    999,
+                    "Target.detachFromTarget",
+                    {"sessionId": session_id},
+                )
+
+
+def _canonical_zhihu_profile_url(url: str) -> str | None:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        return None
+    if parsed.hostname != "www.zhihu.com":
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) >= 2 and parts[0] == "people" and parts[1] not in {"me", "signin"}:
+        return f"https://www.zhihu.com/people/{parts[1]}"
+    return None
+
+
+def _status_from_visible_state(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {"status": "UNKNOWN", "check_method": "browser_page"}
+    href = value.get("href") if isinstance(value.get("href"), str) else ""
+    title = value.get("title") if isinstance(value.get("title"), str) else ""
+    has_login_prompt = bool(value.get("hasLoginPrompt"))
+    account_url = _canonical_zhihu_profile_url(href)
+    anchors = value.get("anchors")
+    if account_url is None and isinstance(anchors, list):
+        for anchor in anchors:
+            if not isinstance(anchor, dict):
+                continue
+            raw_href = anchor.get("href")
+            if isinstance(raw_href, str):
+                account_url = _canonical_zhihu_profile_url(raw_href)
+                if account_url is not None:
+                    break
+    candidates = value.get("nameCandidates")
+    account_name = None
+    if isinstance(candidates, list):
+        for candidate in candidates:
+            if isinstance(candidate, str) and candidate.strip():
+                account_name = candidate.strip()
+                break
+    if account_name is None and account_url is not None and title:
+        account_name = title.split(" - ", 1)[0].strip() or None
+    api_me = value.get("apiMe")
+    if isinstance(api_me, dict) and api_me.get("ok"):
+        if account_name is None:
+            raw_name = api_me.get("name")
+            if isinstance(raw_name, str) and raw_name.strip():
+                account_name = raw_name.strip()
+        if account_url is None:
+            raw_token = api_me.get("urlToken")
+            if isinstance(raw_token, str) and raw_token.strip():
+                account_url = f"https://www.zhihu.com/people/{urllib.parse.quote(raw_token.strip(), safe='')}"
+            else:
+                raw_url = api_me.get("url")
+                if isinstance(raw_url, str):
+                    account_url = _canonical_zhihu_profile_url(raw_url)
+    if account_url is not None:
+        payload: dict[str, Any] = {"status": "LOGGED_IN", "check_method": "browser_page"}
+        if account_name:
+            payload["account_name"] = account_name
+        payload["account_url"] = account_url
+        return payload
+    if has_login_prompt or "signin" in href.lower() or "login" in href.lower():
+        return {"status": "LOGGED_OUT", "check_method": "browser_page"}
+    return {"status": "UNKNOWN", "check_method": "browser_page"}
+
+
+def _read_zhihu_browser_page_status(endpoint: _CdpEndpoint) -> dict[str, Any]:
+    target_id = _create_browser_page(endpoint, _ZHIHU_STATUS_URL)
+    try:
+        state = _evaluate_visible_page_state(endpoint, target_id, _ZHIHU_STATUS_EXPRESSION)
+        return _status_from_visible_state(state)
+    finally:
+        try:
+            _close_browser_page(endpoint, target_id)
+        except (OSError, RuntimeError, TypeError, ValueError, websocket.WebSocketException):
+            pass
+
+
+def _extract_page_owned_login_url(
+    endpoint: _CdpEndpoint,
+    target_id: str,
+    *,
+    ready_timeout: float = 8.0,
+    sleeper: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> str | None:
+    session_id: str | None = None
+    with _owned_browser_socket(endpoint) as debug_socket:
+        try:
+            if hasattr(debug_socket, "settimeout"):
+                debug_socket.settimeout(0.5)
+            identifier = 1
+            attach = _cdp_command(
+                debug_socket,
+                identifier,
+                "Target.attachToTarget",
+                {"targetId": target_id, "flatten": True},
+            )
+            session_id = attach.get("sessionId")
+            if not isinstance(session_id, str) or not session_id:
+                raise TypeError("Login target attachment did not return a session id")
+
+            def login_url_from_resource(url: str) -> str | None:
+                match = _ZHIHU_QRCODE_RESOURCE.search(url)
+                if not match:
+                    return None
+                token = match.group("token")
+                return f"https://www.zhihu.com/account/scan/login/{token}?/api/login/qrcode"
+
+            identifier += 1
+            _cdp_command(debug_socket, identifier, "Network.enable", session_id=session_id)
+            identifier += 1
+            _cdp_command(debug_socket, identifier, "Page.enable", session_id=session_id)
+            identifier += 1
+            reload_identifier = identifier
+            debug_socket.send(
+                json.dumps(
+                    {
+                        "id": reload_identifier,
+                        "method": "Page.reload",
+                        "sessionId": session_id,
+                    }
+                )
+            )
+            reload_acknowledged = False
+            deadline = clock() + ready_timeout
+            while True:
+                try:
+                    response = json.loads(debug_socket.recv())
+                except websocket.WebSocketTimeoutException:
+                    response = {}
+                if response.get("id") == reload_identifier:
+                    if response.get("error"):
+                        return None
+                    reload_acknowledged = True
+                if response.get("sessionId") == session_id and response.get("method") in {
+                    "Network.requestWillBeSent",
+                    "Network.responseReceived",
+                }:
+                    params = response.get("params", {})
+                    request_or_response = params.get("request") or params.get("response")
+                    url = (
+                        request_or_response.get("url")
+                        if isinstance(request_or_response, dict)
+                        else None
+                    )
+                    if isinstance(url, str):
+                        login_url = login_url_from_resource(url)
+                        if login_url is not None:
+                            return login_url
+                if reload_acknowledged:
+                    identifier += 1
+                    try:
+                        evaluation = _cdp_command(
+                            debug_socket,
+                            identifier,
+                            "Runtime.evaluate",
+                            {
+                                "expression": _QRCODE_RESOURCE_EXPRESSION,
+                                "returnByValue": True,
+                            },
+                            session_id=session_id,
+                        )
+                    except (
+                        KeyError,
+                        RuntimeError,
+                        TypeError,
+                        ValueError,
+                        websocket.WebSocketException,
+                    ):
+                        evaluation = {}
+                    result = evaluation.get("result", {}) if isinstance(evaluation, dict) else {}
+                    urls = result.get("value") if isinstance(result, dict) else None
+                    if isinstance(urls, list):
+                        for url in reversed(urls):
+                            if isinstance(url, str):
+                                login_url = login_url_from_resource(url)
+                                if login_url is not None:
+                                    return login_url
+                if clock() >= deadline:
+                    return None
+                sleeper(0.2)
+        finally:
+            if session_id is not None:
+                _cdp_command(
+                    debug_socket,
+                    9999,
+                    "Target.detachFromTarget",
+                    {"sessionId": session_id},
+                )
+
+
+def _open_browser_login_handoff(endpoint: _CdpEndpoint) -> dict[str, Any]:
+    target_id = _create_browser_page(endpoint, login_checkpoint_url("qr"))
+    login_url = _extract_page_owned_login_url(endpoint, target_id)
+    if login_url:
+        return {
+            "target_id": target_id,
+            "login_url": login_url,
+            "handoff_kind": "page_owned_login_url",
+        }
+    return {
+        "target_id": target_id,
+        "login_url": login_checkpoint_url("qr"),
+        "handoff_kind": "browser_opened",
+    }
+
+
+def browser_status(
+    config: ZhihuBrowserConfig,
+    *,
+    browser_session_factory: Callable[[ZhihuBrowserConfig], Any] = browser_login_session,
+    status_reader: Callable[[_CdpEndpoint], dict[str, Any]] = _read_zhihu_browser_page_status,
+) -> dict[str, Any]:
+    """Check Zhihu login state using only browser-visible page state."""
+
+    with browser_session_factory(config) as session:
+        browser, endpoint = session
+        return {**status_reader(endpoint), **browser}
+
+
+def browser_login(
+    config: ZhihuBrowserConfig,
+    *,
+    timeout: int = 900,
+    browser_session_factory: Callable[[ZhihuBrowserConfig], Any] = browser_login_session,
+    status_reader: Callable[[_CdpEndpoint], dict[str, Any]] = _read_zhihu_browser_page_status,
+    login_handoff_opener: Callable[[_CdpEndpoint], dict[str, Any]] = _open_browser_login_handoff,
+    event_callback: Callable[[dict[str, Any]], None] | None = None,
+    sleeper: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> dict[str, Any]:
+    """Open a pure browser login session and emit page-owned handoff if needed."""
+
+    if timeout < 1:
+        raise ValueError("Login timeout must be at least one second")
+    deadline = clock() + timeout
+    with browser_session_factory(config) as session:
+        browser, endpoint = session
+        initial = status_reader(endpoint)
+        if initial.get("status") == "LOGGED_IN":
+            return {"event": "already_logged_in", **initial, **browser}
+        handoff = login_handoff_opener(endpoint)
+        event = {
+            "event": "login_url",
+            "status": "LOGIN_REQUIRED",
+            "login_url": handoff.get("login_url"),
+            "handoff_kind": handoff.get("handoff_kind", "browser_opened"),
+            "check_method": "browser_page",
+            **browser,
+        }
+        if event_callback is not None:
+            event_callback(event)
+        while clock() < deadline:
+            current = status_reader(endpoint)
+            if current.get("status") == "LOGGED_IN":
+                return {"event": "logged_in", **current, **browser}
+            sleeper(3)
+        return {
+            "event": "login_timeout",
+            "status": "LOGIN_TIMEOUT",
+            "login_url": handoff.get("login_url"),
+            "handoff_kind": handoff.get("handoff_kind", "browser_opened"),
+            "check_method": "browser_page",
+            **browser,
+        }
+
+
+def _clear_zhihu_browser_state(
+    endpoint: _CdpEndpoint,
+    origins: tuple[str, ...],
+) -> None:
+    with _owned_browser_socket(endpoint) as debug_socket:
+        for index, origin in enumerate(origins, start=1):
+            _cdp_command(
+                debug_socket,
+                index,
+                "Storage.clearDataForOrigin",
+                {
+                    "origin": origin,
+                    "storageTypes": "cookies,local_storage,indexeddb,cache_storage,service_workers,websql",
+                },
+            )
+
+
+def browser_logout(
+    config: ZhihuBrowserConfig,
+    *,
+    browser_session_factory: Callable[[ZhihuBrowserConfig], Any] = browser_login_session,
+    status_reader: Callable[[_CdpEndpoint], dict[str, Any]] = _read_zhihu_browser_page_status,
+    storage_clearer: Callable[[_CdpEndpoint, tuple[str, ...]], None] = _clear_zhihu_browser_state,
+) -> dict[str, Any]:
+    """Log out via browser-level state only; never run adapter auth."""
+
+    origins = (
+        "https://www.zhihu.com",
+        "https://zhuanlan.zhihu.com",
+    )
+    with browser_session_factory(config) as session:
+        browser, endpoint = session
+        status = status_reader(endpoint)
+        if status.get("status") != "LOGGED_IN":
+            return {
+                "status": "ALREADY_LOGGED_OUT",
+                "check_method": status.get("check_method", "browser_page"),
+                "logout_method": "browser_status_precheck",
+                **browser,
+            }
+        storage_clearer(endpoint, origins)
+        return {
+            "status": "LOGGED_OUT",
+            "check_method": status.get("check_method", "browser_page"),
+            "logout_method": "clear_origin_storage",
+            **browser,
+        }
+
+
 def wait_for_login(
     config: ZhihuRunnerConfig,
     *,
@@ -1794,10 +2447,17 @@ def logout(
 __all__ = [
     "RESULT_UNKNOWN",
     "ResultUnknownError",
+    "ZhihuBrowserConfig",
     "ZhihuRunnerConfig",
+    "browser_login",
+    "browser_login_session",
+    "browser_logout",
+    "browser_preflight",
     "browser_session",
+    "browser_status",
     "create_login_qr_artifact",
     "execute_task",
+    "load_browser_config",
     "load_runner_config",
     "login_checkpoint_url",
     "logout",
