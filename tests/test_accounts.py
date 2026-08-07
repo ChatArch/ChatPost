@@ -3,7 +3,58 @@ from pathlib import Path
 
 import pytest
 
-from chatpost.accounts import AccountRegistryError, load_accounts
+from chatpost.accounts import (
+    AccountRegistryError,
+    default_chatpost_home,
+    default_registry_path,
+    load_accounts,
+)
+
+
+def _registry_toml(runner: Path) -> str:
+    return (
+        '[accounts."zhihu-test"]\n'
+        'platform = "zhihu"\n'
+        f'runner_config = {json.dumps(str(runner))}\n'
+    )
+
+
+def test_default_paths_live_under_chatarch_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("CHATPOST_HOME", raising=False)
+    monkeypatch.delenv("CHATPOST_ACCOUNT_REGISTRY", raising=False)
+
+    assert default_chatpost_home() == tmp_path / ".chatarch" / "chatpost"
+    assert default_registry_path() == tmp_path / ".chatarch" / "chatpost" / "accounts.toml"
+
+
+def test_default_registry_honors_chatpost_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    state_root = tmp_path / "chatarch-state" / "chatpost"
+    monkeypatch.setenv("CHATPOST_HOME", str(state_root))
+    monkeypatch.delenv("CHATPOST_ACCOUNT_REGISTRY", raising=False)
+
+    assert default_chatpost_home() == state_root.resolve()
+    assert default_registry_path() == state_root.resolve() / "accounts.toml"
+
+
+def test_account_registry_override_wins(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    state_root = tmp_path / "chatpost-home"
+    registry = tmp_path / "registries" / "accounts.toml"
+    monkeypatch.setenv("CHATPOST_HOME", str(state_root))
+    monkeypatch.setenv("CHATPOST_ACCOUNT_REGISTRY", str(registry))
+
+    assert default_registry_path() == registry.resolve()
+
+
+def test_load_accounts_uses_default_registry_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    runner = tmp_path / "runner.toml"
+    registry = tmp_path / "accounts.toml"
+    registry.write_text(_registry_toml(runner), encoding="utf-8")
+    monkeypatch.setenv("CHATPOST_ACCOUNT_REGISTRY", str(registry))
+
+    account = load_accounts()["zhihu-test"]
+
+    assert account.runner_config == runner.resolve()
 
 
 def test_load_accounts_accepts_non_sensitive_login_methods_and_relative_runner(tmp_path: Path):

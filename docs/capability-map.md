@@ -10,6 +10,7 @@
 | 平台与 Profile 发现 | 已实现 | `chatpost platforms`、`chatpost profiles --platform zhihu` 和 `chatpost zhihu profiles` 只读 registry metadata；不启动浏览器，不读取登录态，不输出 Cookie、LocalStorage、token、password 或 credential。 |
 | 知乎纯浏览器登录/状态/登出 | 已实现 | `chatpost zhihu login/status/logout PROFILE` 只操作受控 Chromium Profile。`status` 用页面 DOM/URL/可见账号入口判断 `LOGGED_IN`、`LOGGED_OUT` 或 `UNKNOWN`；`login` 已登录直接返回，未登录时输出 page-owned `login_url` 或 `browser_opened` handoff；`logout` 先 status，未登录 no-op，已登录才清理知乎 origins。全程不调用发布适配器、不加载发布扩展、不要求发布 token、不读取或导出 Cookie/LocalStorage/IndexedDB/session/token。 |
 | Browser-only runner config | 已实现 | 登录基础层只需要 `playwright_version`、`playwright_home`、`profile_dir`、`cdp_host`、`cdp_port`、`headless`、`browser_args`、`attach_existing_cdp`。 |
+| ChatArch state root | 已实现 | 默认本地状态根目录是 `~/.chatarch/chatpost/`；默认 registry 是 `~/.chatarch/chatpost/accounts.toml`，可用 `CHATPOST_HOME` / `CHATPOST_ACCOUNT_REGISTRY` / `--registry PATH` 显式覆盖。任务实验可显式传 `--registry`，但默认账号/runner/Profile/receipt 不落在仓库根目录或临时 project 目录。 |
 | Secret redaction / state boundary | 已实现 | 输出只包含页面可见账号名/主页 URL 等非 secret 状态；诊断继续遮蔽 WebSocket、loopback、ownership marker 和私密赋值。 |
 
 ## 已验证事实
@@ -35,6 +36,7 @@
 - `chatpost zhihu account ...`；
 - `chatpost zhihu draft ...`；
 - 发布适配器 verify/doctor；
+- Wechatsync adapter draft/create integration；
 - same-ID 文章更新；
 - 自动最终发布。
 

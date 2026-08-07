@@ -6,11 +6,14 @@
 
 ```bash
 CHATPOST=chatpost
-REGISTRY=/absolute/path/to/accounts.toml
+CHATPOST_HOME="${CHATPOST_HOME:-$HOME/.chatarch/chatpost}"
+REGISTRY="${CHATPOST_ACCOUNT_REGISTRY:-$CHATPOST_HOME/accounts.toml}"
 PROFILE=zhihu-personal
 ```
 
-`accounts.toml` 只保存非敏感 Profile metadata，例如 alias、platform、runner_config、profile 和 label。不要把 Cookie、LocalStorage、二维码 payload、验证码、手机号、密码、token 或 WebSocket UUID 写入 registry、config、日志或文档。
+ChatPost 默认把本地状态放在 ChatArch 内部目录 `~/.chatarch/chatpost/`：默认 registry 是 `~/.chatarch/chatpost/accounts.toml`，runner/Profile/receipt 等后续状态也应放在这个 state root 下。`--registry` 只用于显式覆盖或任务级实验；不要把默认 `accounts.toml` 放到仓库根目录、当前工作目录或临时 project 目录。
+
+`accounts.toml` 只保存非敏感 Profile metadata，例如 alias、platform、runner_config、profile 和 label。不要把 Cookie、LocalStorage、二维码 payload、验证码、手机号、密码、token 或 WebSocket UUID 写入 registry、config、日志或文档。相对 `runner_config` 路径按 registry 所在目录解析，因此默认情况下也会落在 `~/.chatarch/chatpost/` 内部。
 
 ## 1. 确认可见 CLI 和 Profile
 
@@ -90,7 +93,7 @@ JSON 输出是 JSON Lines：先输出可交互 handoff 事件，最后输出登�
 
 Practice registry：`/home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml`。
 
-说明：`zhihu-test` 与 `zhihu-qr-login` 的真实 stdout 按原样记录；`zhihu-practice-quickstart` 的 live `login_url` 是一次性浏览器 handoff，公开文档中不发布该 URL。
+说明：以下 transcript 基于真实 CLI 运行；一次性 live `login_url`、账号展示名和账号主页 URL 在公开文档中脱敏或省略，其他字段保留真实命令结果。
 
 ### root_help
 
@@ -230,8 +233,8 @@ $ chatpost zhihu status zhihu-test --registry /home/zhihong/Playground/projects/
 exit: 0
 stdout:
 {
-  "account_name": "rexwzh",
-  "account_url": "https://www.zhihu.com/people/40qok4",
+  "account_name": "[REDACTED]",
+  "account_url": "[URL_REDACTED]",
   "browser_attachment": "EXISTING_CDP",
   "browser_cdp_product": "Chrome/145.0.7632.6",
   "browser_revision": "existing-cdp",
@@ -251,7 +254,7 @@ stdout:
 $ chatpost zhihu login zhihu-test --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/accounts.toml --timeout 5 --output json -I
 exit: 0
 stdout:
-{"account_name": "rexwzh", "account_url": "https://www.zhihu.com/people/40qok4", "browser_attachment": "EXISTING_CDP", "browser_cdp_product": "Chrome/145.0.7632.6", "browser_revision": "existing-cdp", "browser_version": "145.0.7632.6", "check_method": "browser_page", "event": "already_logged_in", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-test", "status": "LOGGED_IN", "target": "zhihu@zhihu-test"}
+{"account_name": "[REDACTED]", "account_url": "[URL_REDACTED]", "browser_attachment": "EXISTING_CDP", "browser_cdp_product": "Chrome/145.0.7632.6", "browser_revision": "existing-cdp", "browser_version": "145.0.7632.6", "check_method": "browser_page", "event": "already_logged_in", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-test", "status": "LOGGED_IN", "target": "zhihu@zhihu-test"}
 ```
 
 ### zhihu_qr_login_status
@@ -261,8 +264,8 @@ $ chatpost zhihu status zhihu-qr-login --registry /home/zhihong/Playground/proje
 exit: 0
 stdout:
 {
-  "account_name": "致宏Rex",
-  "account_url": "https://www.zhihu.com/people/rexwzh",
+  "account_name": "[REDACTED]",
+  "account_url": "[URL_REDACTED]",
   "browser_attachment": "OWNED_BROWSER",
   "browser_revision": "1228",
   "browser_version": "149.0.7827.55",
@@ -281,7 +284,7 @@ stdout:
 $ chatpost zhihu login zhihu-qr-login --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/accounts.toml --timeout 5 --output json -I
 exit: 0
 stdout:
-{"account_name": "致宏Rex", "account_url": "https://www.zhihu.com/people/rexwzh", "browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "already_logged_in", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-qr-login", "status": "LOGGED_IN", "target": "zhihu@zhihu-qr-login"}
+{"account_name": "[REDACTED]", "account_url": "[URL_REDACTED]", "browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "already_logged_in", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-qr-login", "status": "LOGGED_IN", "target": "zhihu@zhihu-qr-login"}
 ```
 
 ### practice_status
@@ -317,7 +320,7 @@ stdout:
 
 ### practice_login_authorized_end_to_end
 
-This run keeps the same CLI command alive while the user authorizes the page-owned Zhihu login URL. The live tokenized `login_url` is omitted from the public documentation; the CLI output below is otherwise the real command result.
+This run keeps the same CLI command alive while the user authorizes the page-owned Zhihu login URL. The live tokenized `login_url` and page-visible account identity fields are omitted from the public documentation; the remaining CLI output below is the real command result.
 
 When this login URL is delivered through Feishu/Lark, do not treat a URL button click as observable completion. A URL button only navigates. Pair it with explicit callback buttons such as `I opened the link / authorization done` and `Cancel`, then verify completion by running `chatpost zhihu status PROFILE` or by waiting for this long-running `login` command to emit `LOGGED_IN`.
 
@@ -326,7 +329,7 @@ $ chatpost zhihu login zhihu-practice-quickstart --registry /home/zhihong/Playgr
 exit: 0
 stdout:
 {"browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "login_url", "handoff_kind": "page_owned_login_url", "login_url": "[LIVE_LOGIN_URL_OMITTED_FROM_PUBLIC_DOC]", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGIN_REQUIRED", "target": "zhihu@zhihu-practice-quickstart"}
-{"account_name": "致宏Rex", "account_url": "https://www.zhihu.com/people/rexwzh", "browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "logged_in", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGGED_IN", "target": "zhihu@zhihu-practice-quickstart"}
+{"account_name": "[REDACTED]", "account_url": "[URL_REDACTED]", "browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "logged_in", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGGED_IN", "target": "zhihu@zhihu-practice-quickstart"}
 ```
 
 ### practice_status_after_authorization
@@ -336,8 +339,8 @@ $ chatpost zhihu status zhihu-practice-quickstart --registry /home/zhihong/Playg
 exit: 0
 stdout:
 {
-  "account_name": "致宏Rex",
-  "account_url": "https://www.zhihu.com/people/rexwzh",
+  "account_name": "[REDACTED]",
+  "account_url": "[URL_REDACTED]",
   "browser_attachment": "OWNED_BROWSER",
   "browser_revision": "1228",
   "browser_version": "149.0.7827.55",

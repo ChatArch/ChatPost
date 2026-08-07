@@ -47,6 +47,8 @@ Cookies, local storage, passwords, and verification codes belong to none of thes
 
 The Chrome installation is a ChatUp machine resource. A profile is ChatPost runner state. Article mappings are workspace state. Keeping all three separate avoids binding a portable content repository to one machine or login state.
 
+The implemented login foundation defaults to the ChatArch-owned `~/.chatarch/chatpost/` state root: `CHATPOST_HOME` overrides the state root, while `CHATPOST_ACCOUNT_REGISTRY` or CLI `--registry PATH` overrides the registry file. The default registry is `~/.chatarch/chatpost/accounts.toml`. Normal users do not need to place `accounts.toml` in the repository root, current working directory, or a temporary project directory.
+
 ## ChatUp Playwright Dependency
 
 ChatPost consumes bounded released ChatUp and ChatBrowser dependencies:
@@ -198,17 +200,18 @@ The current Wechatsync request/response message schema has no protocol-version n
 
 ## Account Registry
 
-`accounts.toml` stores logical bindings and the latest read-only check:
+The implemented `accounts.toml` stores non-sensitive Profile metadata plus a runner config reference. The default location is `~/.chatarch/chatpost/accounts.toml`:
 
 ```toml
-[accounts."zhihu@personal"]
+[accounts."zhihu-personal"]
 platform = "zhihu"
-runner = "zhihu-personal"
-auth_state = "READY"
-last_auth_check = "<timestamp>"
+runner_config = "runners/zhihu-personal/runner.toml"
+profile = "zhihu-personal"
+label = "Personal Zhihu browser Profile"
+login_methods = ["qr"]
 ```
 
-It stores no username, phone, password, cookies, or verification codes. A public display name returned by the platform is diagnostic data, not the target key.
+Relative `runner_config` paths resolve from the registry directory, so the default layout keeps them under `~/.chatarch/chatpost/runners/...`. The registry stores no username, phone, password, cookies, local storage, IndexedDB, sessions, tokens, or verification codes. A public display name returned by the platform is diagnostic data, not the target key.
 
 ## Publication Ledger
 

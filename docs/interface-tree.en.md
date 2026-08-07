@@ -6,43 +6,47 @@ The CLI only parses arguments. Substantive behavior lives in `chatpost.accounts`
 chatpost.accounts
 ├── Account
 ├── AccountRegistryError
-├── default_registry_path()
+├── default_chatpost_home()       # defaults to ~/.chatarch/chatpost, override with CHATPOST_HOME
+├── default_registry_path()       # defaults to ~/.chatarch/chatpost/accounts.toml, override with CHATPOST_ACCOUNT_REGISTRY
 ├── load_accounts(path=None)
 └── resolve_account(target, accounts)
 
 chatpost.zhihu
-├── ZhihuRunnerConfig
-├── load_runner_config(path)
-├── preflight(config)
-├── browser_session(config)
-├── wait_for_login(config, timeout=...)
-├── execute_task(config, source, mode=...)
-├── ResultUnknownError
-└── RESULT_UNKNOWN
+├── ZhihuBrowserConfig            # pure browser-login config
+├── load_browser_config(path)     # ignores adapter/env/extension fields
+├── browser_preflight(config)
+├── browser_status(config)
+├── browser_login(config, timeout=..., event_callback=...)
+├── browser_logout(config)
+├── browser_login_session(config)
+├── ZhihuRunnerConfig             # follow-up publishing adapter / Wechatsync runner boundary
+└── load_runner_config(path)      # publishing-runner only; not the default login/status/logout path
 ```
 
 ## ChatUp / ChatBrowser Dependency
 
 ```python
-from chatup.playwright import PlaywrightBrowserInstallation, resolve
+from chatup.playwright import resolve
 import chatbrowser
 ```
 
-ChatPost resolves an existing exact Playwright browser installation. It never installs or upgrades one implicitly. ChatBrowser owns the browser runtime, Profile metadata, and CDP session metadata safety boundary; ChatPost does not store cookies, local storage, or QR payloads.
+ChatPost resolves an existing exact Playwright browser installation. It never installs or upgrades one implicitly. ChatBrowser owns the browser runtime, Profile metadata, and CDP session metadata safety boundary; ChatPost does not store cookies, local storage, IndexedDB, sessions, tokens, or QR payloads.
 
-## Example
+## Example: Read Profiles From The Default ChatArch State Root
 
 ```python
-from chatpost.accounts import load_accounts, resolve_account
-from chatpost.zhihu import execute_task, load_runner_config, preflight
+from chatpost.accounts import default_registry_path, load_accounts, resolve_account
+from chatpost.zhihu import browser_status, load_browser_config
 
-accounts = load_accounts("accounts.toml")
-account = resolve_account("zhihu@zhihu-test", accounts)
-config = load_runner_config(account.runner_config)
-status = preflight(config)
-result = execute_task(config, "article.md", mode="dry-run")
+registry_path = default_registry_path()  # ~/.chatarch/chatpost/accounts.toml
+accounts = load_accounts(registry_path)
+account = resolve_account("zhihu@zhihu-personal", accounts)
+config = load_browser_config(account.runner_config)
+status = browser_status(config)
 ```
 
-`execute_task(..., mode="create")` is an external write. Callers must retain its receipt and stop automatic retries after `ResultUnknownError` until the Zhihu draft box is reconciled.
+The default state root is `~/.chatarch/chatpost/`. Task-local experiments may pass `load_accounts(path)` or CLI `--registry PATH`, but normal users do not need to keep `accounts.toml` in the repository root or current working directory.
 
-`browser_session()` directly starts the browser binary returned by the ChatUp resolver with a persistent Profile, unpacked extension, and loopback CDP. It exposes no Playwright Page/Locator API.
+## Wechatsync Integration Boundary
+
+`ZhihuRunnerConfig` / `load_runner_config()` are reserved for follow-up publishing adapter integration. They may contain extension, bridge, env, and adapter CLI fields; however `browser_status()`, `browser_login()`, and `browser_logout()` must keep using `ZhihuBrowserConfig` and must not regain a dependency on Wechatsync, publishing tokens, cookies, local storage, or IndexedDB.

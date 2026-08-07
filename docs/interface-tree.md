@@ -6,43 +6,47 @@
 chatpost.accounts
 ├── Account
 ├── AccountRegistryError
-├── default_registry_path()
+├── default_chatpost_home()       # 默认 ~/.chatarch/chatpost，可由 CHATPOST_HOME 覆盖
+├── default_registry_path()       # 默认 ~/.chatarch/chatpost/accounts.toml，可由 CHATPOST_ACCOUNT_REGISTRY 覆盖
 ├── load_accounts(path=None)
 └── resolve_account(target, accounts)
 
 chatpost.zhihu
-├── ZhihuRunnerConfig
-├── load_runner_config(path)
-├── preflight(config)
-├── browser_session(config)
-├── wait_for_login(config, timeout=...)
-├── execute_task(config, source, mode=...)
-├── ResultUnknownError
-└── RESULT_UNKNOWN
+├── ZhihuBrowserConfig            # 纯浏览器登录配置
+├── load_browser_config(path)     # 不读取 adapter/env/extension 字段
+├── browser_preflight(config)
+├── browser_status(config)
+├── browser_login(config, timeout=..., event_callback=...)
+├── browser_logout(config)
+├── browser_login_session(config)
+├── ZhihuRunnerConfig             # 后续发布 adapter/Wechatsync runner 配置边界
+└── load_runner_config(path)      # 发布 runner 专用；不得被 login/status/logout 默认调用
 ```
 
 ## ChatUp / ChatBrowser dependency
 
 ```python
-from chatup.playwright import PlaywrightBrowserInstallation, resolve
+from chatup.playwright import resolve
 import chatbrowser
 ```
 
-ChatPost 只解析已存在的 exact Playwright browser installation，不隐式安装或升级。ChatBrowser 负责浏览器 runtime、Profile metadata 和 CDP session metadata 的安全边界；ChatPost 不保存 Cookie、LocalStorage 或 QR payload。
+ChatPost 只解析已存在的 exact Playwright browser installation，不隐式安装或升级。ChatBrowser 负责浏览器 runtime、Profile metadata 和 CDP session metadata 的安全边界；ChatPost 不保存 Cookie、LocalStorage、IndexedDB、session、token 或 QR payload。
 
-## 示例
+## 示例：默认 ChatArch state root 读取 Profile registry
 
 ```python
-from chatpost.accounts import load_accounts, resolve_account
-from chatpost.zhihu import execute_task, load_runner_config, preflight
+from chatpost.accounts import default_registry_path, load_accounts, resolve_account
+from chatpost.zhihu import browser_status, load_browser_config
 
-accounts = load_accounts("accounts.toml")
-account = resolve_account("zhihu@zhihu-test", accounts)
-config = load_runner_config(account.runner_config)
-status = preflight(config)
-result = execute_task(config, "article.md", mode="dry-run")
+registry_path = default_registry_path()  # ~/.chatarch/chatpost/accounts.toml
+accounts = load_accounts(registry_path)
+account = resolve_account("zhihu@zhihu-personal", accounts)
+config = load_browser_config(account.runner_config)
+status = browser_status(config)
 ```
 
-`execute_task(..., mode="create")` 是外部写操作：调用方必须保留 receipt，并在 `ResultUnknownError` 后停止自动重试、先去知乎草稿箱消歧。
+默认状态根目录是 `~/.chatarch/chatpost/`。任务实验可以显式传 `load_accounts(path)` 或 CLI `--registry PATH`，但普通用户默认不需要在仓库根目录或当前目录放 `accounts.toml`。
 
-`browser_session()` 直接启动 ChatUp resolver 返回的浏览器二进制，使用持久 Profile、unpacked extension 和 loopback CDP；它不提供 Playwright Page/Locator API。
+## Wechatsync 接入边界
+
+`ZhihuRunnerConfig` / `load_runner_config()` 保留给后续发布 adapter 接入。它可以包含 extension、bridge、env 和 adapter CLI 字段；但 `browser_status()`、`browser_login()` 和 `browser_logout()` 必须继续使用 `ZhihuBrowserConfig`，不能为了发布接入重新依赖 Wechatsync、发布 token、Cookie、LocalStorage 或 IndexedDB。

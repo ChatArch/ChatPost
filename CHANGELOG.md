@@ -12,6 +12,9 @@
 
 - Remove unreleased user-facing `account`, `qr`, `zhihu account ...`, and `zhihu draft ...` commands from the registered CLI tree for this login-foundation PR.
 - Update README, CLI tree, Quickstart, MkDocs home, and capability map to describe the login-only boundary.
+- Document `~/.chatarch/chatpost/` as the default ChatArch-owned state root and `~/.chatarch/chatpost/accounts.toml` as the default non-sensitive registry, with `CHATPOST_HOME`, `CHATPOST_ACCOUNT_REGISTRY`, and `--registry PATH` as explicit overrides.
+- Align configuration and Python interface docs to the current browser-login API while keeping Wechatsync adapter integration as follow-up work.
+- Redact live login URLs, account names, and account/profile URLs from the public Quickstart transcript while preserving `LOGGED_IN` evidence.
 - Preserve publishing-adapter code/tests as an internal historical path, but keep it out of `login/status/logout` and out of the current user-visible CLI.
 
 ## 0.1.0 - 2026-08-04
