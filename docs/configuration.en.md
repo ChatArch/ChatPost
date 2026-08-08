@@ -209,6 +209,13 @@ runner_config = "runners/zhihu-personal/runner.toml"
 profile = "zhihu-personal"
 label = "Personal Zhihu browser Profile"
 login_methods = ["qr"]
+
+[accounts."xhs-personal"]
+platform = "xiaohongshu"
+runner_config = "runners/xhs-personal/runner.toml"
+profile = "xhs-personal"
+label = "Personal Xiaohongshu browser Profile"
+login_methods = ["qr"]
 ```
 
 Relative `runner_config` paths resolve from the registry directory, so the default layout keeps them under `~/.chatarch/chatpost/runners/...`. The registry stores no username, phone, password, cookies, local storage, IndexedDB, sessions, tokens, or verification codes. A public display name returned by the platform is diagnostic data, not the target key.

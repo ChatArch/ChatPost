@@ -26,6 +26,7 @@ _SENSITIVE_KEY_MARKERS = (
 )
 _ALLOWED_ACCOUNT_KEYS = {"platform", "runner_config", "profile", "label", "login_methods"}
 _SUPPORTED_LOGIN_METHODS = {"qr", "code"}
+_SUPPORTED_PLATFORMS = {"zhihu", "xiaohongshu"}
 
 
 def default_chatpost_home() -> Path:
@@ -118,7 +119,7 @@ def load_accounts(path: str | Path | None = None) -> dict[str, Account]:
             raise AccountRegistryError(f"account {alias!r} must be a table")
         _reject_sensitive_keys(table, alias=alias)
         platform = _required_string(table, "platform", alias=alias)
-        if platform != "zhihu":
+        if platform not in _SUPPORTED_PLATFORMS:
             raise AccountRegistryError(f"unsupported account platform: {platform}")
         raw_runner_config = Path(_required_string(table, "runner_config", alias=alias)).expanduser()
         if not raw_runner_config.is_absolute():

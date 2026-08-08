@@ -23,7 +23,7 @@ ChatArch browser-level platform login foundation and draft entrypoint.
 
 | 场景 | 文档 |
 | --- | --- |
-| 立即跑登录与草稿路径 | [Quickstart：浏览器登录与知乎草稿](docs/quickstart.md) |
+| 立即跑登录与草稿路径 | [Quickstart：浏览器登录、知乎草稿与小红书登录](docs/quickstart.md) |
 | 查看当前真实命令 | [CLI 树](docs/cli-tree.md) |
 | 校对当前能力和边界 | [能力地图](docs/capability-map.md) |
 | Review Chrome/Profile 状态边界 | [配置、环境与状态](docs/configuration.md) |
@@ -43,12 +43,18 @@ chatpost zhihu login --help
 chatpost zhihu status --help
 chatpost zhihu logout --help
 chatpost zhihu draft --help
+chatpost xiaohongshu --help
+chatpost xiaohongshu profiles --help
+chatpost xiaohongshu login --help
+chatpost xiaohongshu status --help
+chatpost xiaohongshu logout --help
+chatpost xiaohongshu draft --help
 python -m pytest -q
 python -m build
 ```
 
 ## 当前边界
 
-`chatpost zhihu login/status/logout PROFILE` 是纯浏览器登录基础层：它只管理受控 Chromium Profile 和页面可见登录态，不调用发布适配器、不加载发布扩展、不要求发布 token、不读取或导出 Cookie/LocalStorage/IndexedDB/session/token。`chatpost zhihu draft PROFILE SOURCE` 是独立 Wechatsync adapter 入口：dry-run 使用 Wechatsync CLI parser 做预览；create 通过 Wechatsync extension MCP 直连创建一个草稿，不最终发布。
+`chatpost zhihu login/status/logout PROFILE` 与 `chatpost xiaohongshu login/status/logout PROFILE` 是纯浏览器登录基础层：它只管理受控 Chromium Profile 和页面可见登录态，不调用发布适配器、不加载发布扩展、不要求发布 token、不读取或导出 Cookie/LocalStorage/IndexedDB/session/token。`chatpost zhihu draft PROFILE SOURCE` 是独立 Wechatsync adapter 入口：dry-run 使用 Wechatsync CLI parser 做预览；create 通过 Wechatsync extension MCP 直连创建一个草稿，不最终发布。`chatpost xiaohongshu draft PROFILE SOURCE` 当前只做本地 dry-run/source 校验；create 在小红书 adapter 接入前明确返回 `CREATE_NOT_SUPPORTED`。
 
 这个包依赖 `chatstyle>=0.1.1,<0.2.0`、`chatenv>=0.2.0,<0.3.0`、`chatup>=0.2.4,<0.3.0`、`chatbrowser>=0.1.2,<0.2.0`、`qrcode[pil]>=7.4,<9.0`、`websocket-client>=1.8,<2.0` 和 `websockets>=12.0,<16.0`。Playwright package/browser 安装由 ChatUp 负责；浏览器 runtime/Profile/CDP metadata 边界由 ChatBrowser 承担。

@@ -1,6 +1,6 @@
-# Quickstart: Browser Login and Zhihu Drafts
+# Quickstart: Browser Login, Zhihu Drafts, and Xiaohongshu Login
 
-This page covers ChatPost's daily path: use the pure browser login foundation to discover Profiles, check Zhihu web login state, open a login handoff, and log out / clear browser state; then use the separate `chatpost zhihu draft` entrypoint to dry-run or create one Zhihu draft. `login/status/logout` do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens.
+This page covers ChatPost's daily path: use the pure browser login foundation to discover Profiles, check Zhihu/Xiaohongshu web login state, open a login handoff, and log out / clear browser state; then use the separate `chatpost zhihu draft` entrypoint to dry-run or create one Zhihu draft. `login/status/logout` do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens. Xiaohongshu `draft` currently performs local dry-run/source validation only; create explicitly returns unsupported until an adapter is connected.
 
 ## 0. Set Variables
 
@@ -24,12 +24,16 @@ ChatPost stores local state under the ChatArch-owned state root `~/.chatarch/cha
 
 "$CHATPOST" profiles   --platform zhihu   --registry "$REGISTRY"   --output json   -I
 
+"$CHATPOST" profiles   --platform xiaohongshu   --registry "$REGISTRY"   --output json   -I
+
 "$CHATPOST" zhihu profiles   --registry "$REGISTRY"   --output json   -I
+
+"$CHATPOST" xiaohongshu profiles   --registry "$REGISTRY"   --output json   -I
 ```
 
-Discovery commands read only the registry. They do not start a browser or inspect login state. The equivalent real command names are `chatpost platforms`, `chatpost profiles`, and `chatpost zhihu profiles`.
+Discovery commands read only the registry. They do not start a browser or inspect login state. The equivalent real command names are `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, and `chatpost xiaohongshu profiles`.
 
-The real login-foundation command names are `chatpost zhihu status`, `chatpost zhihu login`, and `chatpost zhihu logout`.
+The real login-foundation command names are `chatpost zhihu status`, `chatpost zhihu login`, `chatpost zhihu logout`, `chatpost xiaohongshu status`, `chatpost xiaohongshu login`, and `chatpost xiaohongshu logout`.
 
 ## 2. Check Current Web Login State
 
@@ -76,6 +80,23 @@ After a real login practice, this should return `LOGGED_IN`, ideally with page-v
 
 `logout` first runs browser-level status. It returns `ALREADY_LOGGED_OUT` when already logged out, and clears Zhihu origins only after a logged-in precheck. Clearing state is a browser command; it does not read session values.
 
+## 5b. Xiaohongshu Login Link Handoff
+
+Xiaohongshu keeps the same platform shape as Zhihu. `login` opens the Xiaohongshu login page and tries to extract a page-owned `login_url` from the page QR code, BarcodeDetector, or page resources. If the page does not expose a decodable QR/login URL, ChatPost returns `browser_opened` and the human completes login in the browser. If Xiaohongshu marks the current network as risky, the CLI returns `LOGIN_BLOCKED` / `block_reason=network_risk` instead of pretending that a fallback login page is a QR URL.
+
+```bash
+XHS_PROFILE=xhs-personal
+"$CHATPOST" xiaohongshu status "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
+"$CHATPOST" xiaohongshu login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --output json   -I
+"$CHATPOST" xiaohongshu logout "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
+```
+
+Xiaohongshu draft currently performs local validation only and does not write remotely; the literal command name is `chatpost xiaohongshu draft`:
+
+```bash
+"$CHATPOST" xiaohongshu draft "$XHS_PROFILE" /absolute/path/to/note.md   --registry "$REGISTRY"   --dry-run   --output json   -I
+```
+
 ## Common Stops
 
 | Stop | Handling |
@@ -83,6 +104,7 @@ After a real login practice, this should return `LOGGED_IN`, ideally with page-v
 | `login` returns `LOGGED_IN` immediately | Expected: the Profile is already logged in. |
 | `login` emits `browser_opened` but no page-owned `login_url` | The browser is open for human login; do not use screenshots or private artifacts as login links. |
 | The login page asks for a slider or verification code | Stay in the human browser flow; do not put codes into CLI args or logs. |
+| `login` returns `LOGIN_BLOCKED` / `block_reason=network_risk` | The current egress was rejected by the platform, so no scannable QR can be generated; retry from a trusted network or local browser Profile. |
 | `status` returns `UNKNOWN` | Report unknown only; do not fall back to an adapter or read cookies/tokens. |
 
 ## 6. Draft dry-run and create through Wechatsync

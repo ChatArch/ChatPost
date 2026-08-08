@@ -1,6 +1,6 @@
-# Quickstart：浏览器登录与知乎草稿
+# Quickstart：浏览器登录、知乎草稿与小红书登录
 
-本页覆盖 ChatPost 的日常路径：先用纯浏览器登录基础层发现 Profile、检查知乎网页登录态、打开登录 handoff、登出/清理；再通过独立 `chatpost zhihu draft` 入口 dry-run 或创建一个知乎草稿。`login/status/logout` 不创建草稿、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。
+本页覆盖 ChatPost 的日常路径：先用纯浏览器登录基础层发现 Profile、检查知乎/小红书网页登录态、打开登录 handoff、登出/清理；再通过独立 `chatpost zhihu draft` 入口 dry-run 或创建一个知乎草稿。`login/status/logout` 不创建草稿、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。小红书 `draft` 当前只做本地 dry-run/source 校验；真实 create 在 adapter 接入前明确返回不支持。
 
 ## 0. 设定变量
 
@@ -24,12 +24,16 @@ ChatPost 默认把本地状态放在 ChatArch 内部目录 `~/.chatarch/chatpost
 
 "$CHATPOST" profiles   --platform zhihu   --registry "$REGISTRY"   --output json   -I
 
+"$CHATPOST" profiles   --platform xiaohongshu   --registry "$REGISTRY"   --output json   -I
+
 "$CHATPOST" zhihu profiles   --registry "$REGISTRY"   --output json   -I
+
+"$CHATPOST" xiaohongshu profiles   --registry "$REGISTRY"   --output json   -I
 ```
 
-这些发现命令只读 registry，不启动浏览器，不读取登录态。等价真实命令名是 `chatpost platforms`、`chatpost profiles` 和 `chatpost zhihu profiles`。
+这些发现命令只读 registry，不启动浏览器，不读取登录态。等价真实命令名是 `chatpost platforms`、`chatpost profiles`、`chatpost zhihu profiles` 和 `chatpost xiaohongshu profiles`。
 
-登录基础层的真实命令名是 `chatpost zhihu status`、`chatpost zhihu login` 和 `chatpost zhihu logout`。
+登录基础层的真实命令名是 `chatpost zhihu status`、`chatpost zhihu login`、`chatpost zhihu logout`、`chatpost xiaohongshu status`、`chatpost xiaohongshu login` 和 `chatpost xiaohongshu logout`。
 
 ## 2. 检查当前网页登录态
 
@@ -76,6 +80,23 @@ JSON 输出是 JSON Lines：先输出可交互 handoff 事件，最后输出登�
 
 `logout` 先做 browser-level status：未登录时返回 `ALREADY_LOGGED_OUT`；已登录时才清理知乎 origins 登录态。清理是浏览器命令，不读取任何 session 原值。
 
+## 5b. 小红书登录链接 handoff
+
+小红书与知乎保持同形平台入口。`login` 会打开小红书登录页，并尽量从页面二维码、BarcodeDetector 或页面资源中抽取 page-owned `login_url`；如果页面没有暴露可解析二维码链接，则返回 `browser_opened`，由人工在浏览器中完成登录。如果小红书把当前网络判为风险，CLI 会返回 `LOGIN_BLOCKED` / `block_reason=network_risk`，不会把 fallback 登录页伪装成二维码链接。
+
+```bash
+XHS_PROFILE=xhs-personal
+"$CHATPOST" xiaohongshu status "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
+"$CHATPOST" xiaohongshu login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --output json   -I
+"$CHATPOST" xiaohongshu logout "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
+```
+
+小红书 draft 当前只做本地校验，不写远端；真实命令名是 `chatpost xiaohongshu draft`：
+
+```bash
+"$CHATPOST" xiaohongshu draft "$XHS_PROFILE" /absolute/path/to/note.md   --registry "$REGISTRY"   --dry-run   --output json   -I
+```
+
 ## 常见停点
 
 | 停点 | 处理 |
@@ -83,6 +104,7 @@ JSON 输出是 JSON Lines：先输出可交互 handoff 事件，最后输出登�
 | `login` 直接返回 `LOGGED_IN` | 预期行为，说明 Profile 已登录。 |
 | `login` 输出 `browser_opened` 但没有 page-owned `login_url` | 浏览器已打开等待人工登录；不要用截图或私有 artifact 冒充登录链接。 |
 | 登录页需要滑块或验证码 | 停在人工浏览器流程，不把验证码写进 CLI 参数或日志。 |
+| `login` 返回 `LOGIN_BLOCKED` / `block_reason=network_risk` | 当前出口被平台拒绝，不能生成可扫码二维码；换可靠网络或本机浏览器 profile 后再试。 |
 | `status` 返回 `UNKNOWN` | 只报告未知；不要 fallback 到发布适配器或读取 Cookie/token。 |
 
 ## 附录：真实 CLI 运行记录（2026-08-08）

@@ -12,6 +12,11 @@ LOGIN_COMMANDS = (
     "chatpost zhihu status",
     "chatpost zhihu logout",
     "chatpost zhihu draft",
+    "chatpost xiaohongshu profiles",
+    "chatpost xiaohongshu login",
+    "chatpost xiaohongshu status",
+    "chatpost xiaohongshu logout",
+    "chatpost xiaohongshu draft",
 )
 
 FORBIDDEN_LOGIN_SURFACE = (
@@ -79,10 +84,10 @@ def test_home_readme_and_mkdocs_route_to_login_quickstart():
     en_home = (ROOT / "docs/index.en.md").read_text(encoding="utf-8")
     zh_readme = (ROOT / "README.md").read_text(encoding="utf-8")
     en_readme = (ROOT / "README.en.md").read_text(encoding="utf-8")
-    assert "Quickstart：浏览器登录与知乎草稿" in zh_home
-    assert "Quickstart: Browser Login and Zhihu Drafts" in en_home
-    assert "Quickstart：浏览器登录与知乎草稿" in zh_readme
-    assert "Quickstart: Browser Login and Zhihu Drafts" in en_readme
+    assert "Quickstart：浏览器登录、知乎草稿与小红书登录" in zh_home
+    assert "Quickstart: Browser Login, Zhihu Drafts, and Xiaohongshu Login" in en_home
+    assert "Quickstart：浏览器登录、知乎草稿与小红书登录" in zh_readme
+    assert "Quickstart: Browser Login, Zhihu Drafts, and Xiaohongshu Login" in en_readme
     for text in (zh_home, en_home, zh_readme, en_readme):
         assert "chatpost zhihu login" in text or "login/status/logout" in text
         assert "chatpost zhihu draft" in text

@@ -209,6 +209,13 @@ runner_config = "runners/zhihu-personal/runner.toml"
 profile = "zhihu-personal"
 label = "Personal Zhihu browser Profile"
 login_methods = ["qr"]
+
+[accounts."xhs-personal"]
+platform = "xiaohongshu"
+runner_config = "runners/xhs-personal/runner.toml"
+profile = "xhs-personal"
+label = "Personal Xiaohongshu browser Profile"
+login_methods = ["qr"]
 ```
 
 相对 `runner_config` 路径按 registry 所在目录解析，因此默认会落在 `~/.chatarch/chatpost/runners/...`。它不保存用户名、手机号、密码、Cookie、LocalStorage、IndexedDB、session、token 或验证码。平台返回的公开 display name 只能作为诊断结果，不应成为目标主键。

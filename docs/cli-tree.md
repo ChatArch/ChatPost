@@ -2,10 +2,10 @@
 
 `ChatPost 0.1.x` 当前暴露两层能力：
 
-1. 浏览器级登录基础层：平台发现、Profile 发现，以及知乎 `profiles/login/status/logout`。
-2. 独立 draft 入口：`chatpost zhihu draft PROFILE SOURCE` 通过 Wechatsync 做 dry-run 或创建一个知乎草稿。
+1. 浏览器级登录基础层：平台发现、Profile 发现，以及知乎/小红书 `profiles/login/status/logout`。
+2. 独立 draft 入口：`chatpost zhihu draft PROFILE SOURCE` 可通过 Wechatsync dry-run 或创建一个知乎草稿；`chatpost xiaohongshu draft PROFILE SOURCE` 当前只做本地 dry-run/source 校验，真实 create 在小红书 adapter 接入前明确返回不支持。
 
-这里的 `PROFILE` 是 registry alias / 浏览器用户数据目录 / 登录态容器，不是知乎账号 ID、Cookie、LocalStorage、IndexedDB、session 或 token。`draft` 复用同一个 Profile，但不会改变 `login/status/logout` 的纯浏览器语义。
+这里的 `PROFILE` 是 registry alias / 浏览器用户数据目录 / 登录态容器，不是平台账号 ID、Cookie、LocalStorage、IndexedDB、session 或 token。`draft` 复用同一个 Profile，但不会改变 `login/status/logout` 的纯浏览器语义。
 
 ## 当前真实命令
 
@@ -17,13 +17,19 @@ chatpost  # browser-level platform login and draft manager
 ├── --version  # Show package version.
 ├── --tree  # Print the registered CLI tree with command purpose and IO shape.
 ├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.
-├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.
-└── zhihu  # Zhihu browser login and Wechatsync draft capabilities
+├── profiles [--platform zhihu|xiaohongshu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.
+├── zhihu  # Zhihu browser login and Wechatsync draft capabilities
     ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.
     ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.
     ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only.
     ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.
     └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.
+└── xiaohongshu  # Xiaohongshu browser login and draft boundary
+    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Xiaohongshu browser Profiles.
+    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.
+    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Xiaohongshu web login state from page-visible browser state only.
+    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Xiaohongshu browser state after browser-level status.
+    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run local source validation; create is unsupported until a Xiaohongshu adapter is connected.
 ```
 
 查看真实 help：
@@ -39,30 +45,38 @@ chatpost zhihu login --help
 chatpost zhihu status --help
 chatpost zhihu logout --help
 chatpost zhihu draft --help
+chatpost xiaohongshu --help
+chatpost xiaohongshu profiles --help
+chatpost xiaohongshu login --help
+chatpost xiaohongshu status --help
+chatpost xiaohongshu logout --help
+chatpost xiaohongshu draft --help
 ```
 
 ## 命令注释
 
 - `chatpost platforms`：列出支持的平台；不启动浏览器，不读取登录态，不接发布适配器。
-- `chatpost profiles [--platform zhihu]`：列出 registry 中的浏览器 Profile；不启动浏览器，不读取登录态，不接发布适配器。
-- `chatpost zhihu profiles`：只列知乎 Profile；不启动浏览器，不读取登录态。
-- `chatpost zhihu status PROFILE`：启动/连接受控 Chromium Profile，用知乎网页 DOM/URL/可见菜单判断 `LOGGED_IN`、`LOGGED_OUT` 或 `UNKNOWN`；不读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token。
-- `chatpost zhihu login PROFILE`：先做 browser-page status；已登录直接返回 `LOGGED_IN`；未登录时打开知乎登录页，尽快输出 page-owned `login_url` 或 `browser_opened` handoff，然后保持浏览器等待登录完成。
-- `chatpost zhihu logout PROFILE`：先做 browser-page status；未登录返回 `ALREADY_LOGGED_OUT`；已登录才清理知乎 origins 登录态。清理不会读取任何 session 原值。
+- `chatpost profiles [--platform zhihu|xiaohongshu]`：列出 registry 中的浏览器 Profile；不启动浏览器，不读取登录态，不接发布适配器。
+- `chatpost zhihu profiles` / `chatpost xiaohongshu profiles`：只列对应平台 Profile；不启动浏览器，不读取登录态。
+- `chatpost zhihu status PROFILE` / `chatpost xiaohongshu status PROFILE`：启动/连接受控 Chromium Profile，用平台网页 DOM/URL/可见菜单判断 `LOGGED_IN`、`LOGGED_OUT` 或 `UNKNOWN`；不读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token。
+- `chatpost zhihu login PROFILE` / `chatpost xiaohongshu login PROFILE`：先做 browser-page status；已登录直接返回 `LOGGED_IN`；未登录时打开平台登录/首页，尽快输出 page-owned `login_url` 或 `browser_opened` handoff，然后保持浏览器等待登录完成。小红书若遇到平台网络风险拦截，会返回 `LOGIN_BLOCKED` / `block_reason=network_risk`，不会把 fallback 登录页伪装成二维码链接。
+- `chatpost zhihu logout PROFILE` / `chatpost xiaohongshu logout PROFILE`：先做 browser-page status；未登录返回 `ALREADY_LOGGED_OUT`；已登录才清理对应平台 origins 登录态。清理不会读取任何 session 原值。
 - `chatpost zhihu draft PROFILE SOURCE --dry-run`：通过 Wechatsync 解析源文档并返回 `DRY_RUN_OK`/preview，不启动浏览器，不写草稿。
 - `chatpost zhihu draft PROFILE SOURCE --receipt PATH`：启动配置好的浏览器/Profile/extension/bridge，通过 Wechatsync 创建一个知乎草稿，写入 mode `0600` receipt，并返回 `DRAFT_CREATED`、`draft_id` 和 `/edit` review URL；不点击最终发布。
+- `chatpost xiaohongshu draft PROFILE SOURCE --dry-run`：只做本地 source 读取、哈希和预览校验，不启动浏览器，不写草稿。
+- `chatpost xiaohongshu draft PROFILE SOURCE --receipt PATH`：当前明确失败为 `CREATE_NOT_SUPPORTED` 并写 mode `0600` receipt；不会尝试远程写入，也不会伪造草稿成功。
 
 ## 登录 Runner 配置
 
-登录基础层只需要浏览器字段：
+登录基础层只需要浏览器字段；知乎和小红书使用同形 TOML，仅 table 名不同：
 
 ```toml
-[zhihu]
+[xiaohongshu]
 playwright_version = "1.61.1"
 playwright_home = "/absolute/path/to/.chatarch/playwright"
-profile_dir = "/absolute/path/to/zhihu-profile"
+profile_dir = "/absolute/path/to/xiaohongshu-profile"
 cdp_host = "127.0.0.1"
-cdp_port = 9227
+cdp_port = 9237
 headless = true
 browser_args = ["--disable-dev-shm-usage"]
 attach_existing_cdp = false
@@ -70,26 +84,7 @@ attach_existing_cdp = false
 
 ## Draft Runner 配置
 
-`draft` 需要完整 runner 字段：browser/Profile 字段，加上 extension、Node、Wechatsync CLI、私有 env 文件和 bridge loopback 端口。registry 仍只保存 `runner_config` 路径和非敏感 metadata；私有 env 文件不写入文档、不打印值。
-
-```toml
-[zhihu]
-playwright_version = "1.61.1"
-playwright_home = "/absolute/path/to/.chatarch/playwright"
-profile_dir = "/absolute/path/to/zhihu-profile"
-extension_dir = "/absolute/path/to/Wechatsync/packages/extension/dist"
-node_bin = "/absolute/path/to/node"
-wechatsync_cli = "/absolute/path/to/Wechatsync/packages/cli/dist/index.js"
-env_file = "/absolute/path/to/private-bridge.env"
-cdp_host = "127.0.0.1"
-cdp_port = 9227
-bridge_host = "127.0.0.1"
-bridge_port = 9527
-extension_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-headless = true
-browser_args = ["--disable-dev-shm-usage"]
-attach_existing_cdp = false
-```
+知乎 `draft` 需要完整 runner 字段：browser/Profile 字段，加上 extension、Node、Wechatsync CLI、私有 env 文件和 bridge loopback 端口。小红书 `draft` 当前只读取 `[xiaohongshu]` 浏览器字段用于本地校验/receipt，不读取 adapter token，也不连接发布扩展。
 
 安全边界：
 
@@ -97,10 +92,11 @@ attach_existing_cdp = false
 - CDP 和 bridge 只能绑定数值 IPv4 loopback `127.0.0.1`；
 - `browser_args` 不能覆盖 Profile、CDP 或 extension 所有权参数；
 - registry/config/output 不保存 Cookie、LocalStorage、IndexedDB、session、验证码、手机号、密码或 token；
-- `draft create` 只创建草稿，不最终发布；如果结果是 `RESULT_UNKNOWN`，receipt 会保留证据，调用方不能自动重试。
+- 知乎 `draft create` 只创建草稿，不最终发布；如果结果是 `RESULT_UNKNOWN`，receipt 会保留证据，调用方不能自动重试；
+- 小红书 create adapter 未接入前只返回 `CREATE_NOT_SUPPORTED`，不进行远程写入。
 
 ## 仍不在当前 CLI 中
 
-account helper、QR helper、知乎 account helper、verify、doctor、same-ID 更新和最终发布都不是当前用户可见命令。
+account helper、QR helper、平台 account helper、verify、doctor、same-ID 更新和最终发布都不是当前用户可见命令。
 
 后续如果要做发布适配器 verify/doctor、same-ID 更新或最终发布，应作为独立 PR 和独立命令面设计，不能污染 `login/status/logout` 的纯浏览器语义。

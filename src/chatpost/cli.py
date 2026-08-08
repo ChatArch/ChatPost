@@ -12,6 +12,15 @@ import click
 
 from chatpost import __version__
 from chatpost.accounts import AccountRegistryError, load_accounts, resolve_account
+from chatpost.xiaohongshu import (
+    XiaohongshuDraftNotSupportedError,
+    browser_login as xiaohongshu_browser_login,
+    browser_logout as xiaohongshu_browser_logout,
+    browser_status as xiaohongshu_browser_status,
+    execute_task as xiaohongshu_execute_task,
+    load_browser_config as load_xiaohongshu_browser_config,
+    load_runner_config as load_xiaohongshu_runner_config,
+)
 from chatpost.zhihu import (
     RESULT_UNKNOWN,
     ResultUnknownError,
@@ -31,13 +40,19 @@ _CLI_TREE_LINES = (
     "├── --version  # Show package version.",
     "├── --tree  # Print the registered CLI tree with command purpose and IO shape.",
     "├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.",
-    "├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.",
-    "└── zhihu  # Zhihu browser login and Wechatsync draft capabilities",
+    "├── profiles [--platform zhihu|xiaohongshu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.",
+    "├── zhihu  # Zhihu browser login and Wechatsync draft capabilities",
     "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.",
     "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.",
     "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only.",
     "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.",
     "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.",
+    "└── xiaohongshu  # Xiaohongshu browser login and draft boundary",
+    "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Xiaohongshu browser Profiles.",
+    "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.",
+    "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Xiaohongshu web login state from page-visible browser state only.",
+    "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Xiaohongshu browser state after browser-level status.",
+    "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run local source validation; create is unsupported until a Xiaohongshu adapter is connected.",
 )
 _CLI_TREE_COMMAND_PATHS = (
     ("platforms",),
@@ -48,6 +63,12 @@ _CLI_TREE_COMMAND_PATHS = (
     ("zhihu", "status"),
     ("zhihu", "logout"),
     ("zhihu", "draft"),
+    ("xiaohongshu",),
+    ("xiaohongshu", "profiles"),
+    ("xiaohongshu", "login"),
+    ("xiaohongshu", "status"),
+    ("xiaohongshu", "logout"),
+    ("xiaohongshu", "draft"),
 )
 
 
@@ -59,7 +80,7 @@ def _emit(payload: dict[str, Any], output: str) -> None:
     if payload.get("platforms"):
         for platform in payload["platforms"]:
             click.echo(f"platform: {platform.get('name')}")
-            for key in ("profiles_command", "login_command", "status_command", "logout_command"):
+            for key in ("profiles_command", "login_command", "status_command", "logout_command", "draft_command"):
                 if platform.get(key):
                     click.echo(f"{key}: {platform[key]}")
     if payload.get("profiles"):
@@ -84,6 +105,7 @@ def _emit(payload: dict[str, Any], output: str) -> None:
         "review_url",
         "source_sha256",
         "preview",
+        "reason",
         "cleanup_status",
         "extension_cleanup_status",
         "adapter_cleanup_status",
@@ -128,7 +150,15 @@ def _platforms_payload() -> dict[str, Any]:
                 "status_command": "chatpost zhihu status PROFILE",
                 "logout_command": "chatpost zhihu logout PROFILE",
                 "draft_command": "chatpost zhihu draft PROFILE SOURCE",
-            }
+            },
+            {
+                "name": "xiaohongshu",
+                "profiles_command": "chatpost xiaohongshu profiles",
+                "login_command": "chatpost xiaohongshu login PROFILE",
+                "status_command": "chatpost xiaohongshu status PROFILE",
+                "logout_command": "chatpost xiaohongshu logout PROFILE",
+                "draft_command": "chatpost xiaohongshu draft PROFILE SOURCE",
+            },
         ],
     }
 
@@ -168,6 +198,13 @@ def _zhihu_account_or_click_error(registry: Path | None, target: str):
     return account
 
 
+def _xiaohongshu_account_or_click_error(registry: Path | None, target: str):
+    account = _account_or_click_error(registry, target)
+    if account.platform != "xiaohongshu":
+        raise click.ClickException(f"unsupported account platform: {account.platform}")
+    return account
+
+
 def _load_zhihu_browser_config(account):
     try:
         return load_browser_config(account.runner_config)
@@ -178,6 +215,20 @@ def _load_zhihu_browser_config(account):
 def _load_zhihu_runner_config(account):
     try:
         return load_runner_config(account.runner_config)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+
+
+def _load_xiaohongshu_browser_config(account):
+    try:
+        return load_xiaohongshu_browser_config(account.runner_config)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+
+
+def _load_xiaohongshu_runner_config(account):
+    try:
+        return load_xiaohongshu_runner_config(account.runner_config)
     except (OSError, RuntimeError, TypeError, ValueError) as error:
         raise click.ClickException(str(error)) from error
 
@@ -233,7 +284,7 @@ def platforms_command(output: str, no_interactive: bool) -> None:
 
 
 @main.command("profiles")
-@click.option("--platform", type=click.Choice(["zhihu"]), default=None)
+@click.option("--platform", type=click.Choice(["zhihu", "xiaohongshu"]), default=None)
 @click.option("--registry", type=click.Path(path_type=Path), default=None)
 @click.option("--output", type=_OUTPUT, default="text", show_default=True)
 @click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
@@ -400,6 +451,159 @@ def zhihu_draft_command(
             raise click.ClickException(
                 "DRAFT_CREATED result was obtained, but the receipt could not be written; "
                 "do not retry automatically."
+            ) from receipt_error
+    _emit(result, output)
+
+
+@main.group("xiaohongshu")
+def xiaohongshu_group() -> None:
+    """Run Xiaohongshu browser login/status/logout and draft boundary operations."""
+
+
+@xiaohongshu_group.command("profiles")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def xiaohongshu_profiles_command(registry: Path | None, output: str, no_interactive: bool) -> None:
+    """List configured Xiaohongshu browser Profiles."""
+
+    del no_interactive
+    _emit(_profiles_payload(registry, platform="xiaohongshu"), output)
+
+
+@xiaohongshu_group.command("status")
+@click.argument("profile")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def xiaohongshu_status_command(
+    profile: str,
+    registry: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Check PROFILE's Xiaohongshu web login state from browser-visible page state."""
+
+    del no_interactive
+    account = _xiaohongshu_account_or_click_error(registry, profile)
+    config = _load_xiaohongshu_browser_config(account)
+    try:
+        payload = xiaohongshu_browser_status(config)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    _emit(_with_target(account, payload), output)
+
+
+@xiaohongshu_group.command("login")
+@click.argument("profile")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--timeout", type=click.IntRange(min=1), default=900, show_default=True)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def xiaohongshu_login_command(
+    profile: str,
+    registry: Path | None,
+    timeout: int,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Open/check a pure browser login session and emit a page-owned handoff."""
+
+    del no_interactive
+    account = _xiaohongshu_account_or_click_error(registry, profile)
+    config = _load_xiaohongshu_browser_config(account)
+
+    def event_callback(payload: dict[str, Any]) -> None:
+        event = _with_target(account, payload)
+        if output == "json":
+            _emit_json_line(event)
+        else:
+            _emit(event, output)
+
+    try:
+        payload = xiaohongshu_browser_login(config, timeout=timeout, event_callback=event_callback)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    result = _with_target(account, payload)
+    if output == "json":
+        _emit_json_line(result)
+    else:
+        _emit(result, output)
+
+
+@xiaohongshu_group.command("logout")
+@click.argument("profile")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def xiaohongshu_logout_command(
+    profile: str,
+    registry: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Log out or clear PROFILE's Xiaohongshu browser state after browser-level status."""
+
+    del no_interactive
+    account = _xiaohongshu_account_or_click_error(registry, profile)
+    config = _load_xiaohongshu_browser_config(account)
+    try:
+        payload = xiaohongshu_browser_logout(config)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    _emit(_with_target(account, payload), output)
+
+
+@xiaohongshu_group.command("draft")
+@click.argument("profile")
+@click.argument("source", type=click.Path(path_type=Path))
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--dry-run", is_flag=True, help="Validate the source locally without starting a browser or writing.")
+@click.option("--receipt", type=click.Path(path_type=Path), default=None, help="Receipt path for a real draft create. Required unless --dry-run is used.")
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def xiaohongshu_draft_command(
+    profile: str,
+    source: Path,
+    registry: Path | None,
+    dry_run: bool,
+    receipt: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Dry-run source validation; create is unsupported until an adapter is connected."""
+
+    del no_interactive
+    if dry_run and receipt is not None:
+        raise click.ClickException("--receipt is only valid when creating a draft; omit it with --dry-run")
+    if not dry_run and receipt is None:
+        raise click.ClickException("--receipt is required when creating a draft; pass --dry-run for validation")
+    account = _xiaohongshu_account_or_click_error(registry, profile)
+    config = _load_xiaohongshu_runner_config(account)
+    mode = "dry-run" if dry_run else "create"
+    try:
+        payload = xiaohongshu_execute_task(config, source, mode=mode)
+    except XiaohongshuDraftNotSupportedError as error:
+        result = _with_target(account, dict(error.receipt))
+        if receipt is not None:
+            try:
+                _write_receipt(receipt, result)
+            except (OSError, TypeError, ValueError) as receipt_error:
+                _emit(result, output)
+                raise click.ClickException(
+                    "CREATE_NOT_SUPPORTED result was obtained, but the receipt could not be written."
+                ) from receipt_error
+        raise click.ClickException(str(error)) from error
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    result = _with_target(account, payload)
+    if not dry_run and receipt is not None:
+        try:
+            _write_receipt(receipt, result)
+        except (OSError, TypeError, ValueError) as receipt_error:
+            _emit(result, output)
+            raise click.ClickException(
+                "Draft result was obtained, but the receipt could not be written; do not retry automatically."
             ) from receipt_error
     _emit(result, output)
 

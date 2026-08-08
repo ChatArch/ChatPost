@@ -1,10 +1,10 @@
 # ChatPost Documentation
 
-ChatPost's current user-visible focus is the **pure browser login foundation plus a separate Zhihu draft entrypoint**: discover platforms, discover Profiles, check Zhihu web login state, open a login handoff, log out / clear state, and create Zhihu drafts through Wechatsync.
+ChatPost's current user-visible focus is the **pure browser login foundation plus separate draft entrypoints**: discover platforms, discover Profiles, check Zhihu/Xiaohongshu web login state, open a login handoff, log out / clear state, create Zhihu drafts through Wechatsync, and provide a Xiaohongshu browser-level login-link handoff.
 
 | Scenario | Document |
 | --- | --- |
-| Run login and draft flows now | [Quickstart: Browser Login and Zhihu Drafts](quickstart.md) |
+| Run login and draft flows now | [Quickstart: Browser Login, Zhihu Drafts, and Xiaohongshu Login](quickstart.md) |
 | Inspect the real CLI tree | [CLI Tree](cli-tree.md) |
 | Check implemented capabilities and boundaries | [Capability Map](capability-map.md) |
 | Understand overall resources and flow | [Overall Architecture](architecture.md) |
@@ -17,12 +17,18 @@ ChatPost's current user-visible focus is the **pure browser login foundation plu
 chatpost --tree
 chatpost platforms
 chatpost profiles --platform zhihu
+chatpost profiles --platform xiaohongshu
 chatpost zhihu profiles
 chatpost zhihu status PROFILE
 chatpost zhihu login PROFILE
 chatpost zhihu logout PROFILE
 chatpost zhihu draft PROFILE SOURCE --dry-run
 chatpost zhihu draft PROFILE SOURCE --receipt PATH
+chatpost xiaohongshu profiles
+chatpost xiaohongshu status PROFILE
+chatpost xiaohongshu login PROFILE
+chatpost xiaohongshu logout PROFILE
+chatpost xiaohongshu draft PROFILE SOURCE --dry-run
 ```
 
-The default registry is `~/.chatarch/chatpost/accounts.toml` (override explicitly with `CHATPOST_ACCOUNT_REGISTRY` or `--registry PATH`). `login/status/logout` are browser-level only: no publishing adapter, no publishing extension, no publishing token, and no reading/exporting cookies/local storage/IndexedDB/sessions/tokens. `chatpost zhihu draft` is a separate Wechatsync adapter entrypoint: dry-run uses the CLI parser for preview, while create uses the extension MCP direct bridge to create one draft and never final-publishes.
+The default registry is `~/.chatarch/chatpost/accounts.toml` (override explicitly with `CHATPOST_ACCOUNT_REGISTRY` or `--registry PATH`). `login/status/logout` are browser-level only: no publishing adapter, no publishing extension, no publishing token, and no reading/exporting cookies/local storage/IndexedDB/sessions/tokens. `chatpost zhihu draft` is a separate Wechatsync adapter entrypoint: dry-run uses the CLI parser for preview, while create uses the extension MCP direct bridge to create one draft and never final-publishes. `chatpost xiaohongshu draft` currently performs local dry-run/source validation only; create explicitly returns `CREATE_NOT_SUPPORTED` until a Xiaohongshu adapter is connected.

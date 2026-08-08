@@ -4,6 +4,9 @@
 
 ### Added
 
+- Add `chatpost xiaohongshu profiles/login/status/logout/draft` as a second platform group with the same browser-level login boundary as Zhihu.
+- Add Xiaohongshu page-owned login handoff extraction: the login command opens the login page and attempts to decode a QR/login URL from page-visible QR code elements, BarcodeDetector, or page resources before falling back to `browser_opened`, and reports `LOGIN_BLOCKED` for network-risk blocks instead of emitting a fake QR link.
+- Add Xiaohongshu local draft dry-run/source validation and explicit `CREATE_NOT_SUPPORTED` mode-`0600` receipt for create attempts until a proven adapter is connected.
 - Add a focused visible CLI surface: `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, `chatpost zhihu login/status/logout PROFILE`, and the separate direct-MCP-backed `chatpost zhihu draft PROFILE SOURCE` adapter entrypoint.
 - Add browser-only Zhihu runner loading via `load_browser_config`; login/status/logout require only Chromium/Profile/CDP fields and do not require adapter env, extension files, bridge ports, or publishing tokens.
 - Add browser-page status, login handoff, and logout helpers that infer login state from page-visible URL/DOM/account entrypoints without reading or exporting Cookie, LocalStorage, IndexedDB, session, or token values.
