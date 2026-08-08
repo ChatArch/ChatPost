@@ -26,38 +26,38 @@ def _json(result):
     return json.loads(result.output)
 
 
-def test_task_cli_exposes_login_only_zhihu_surface():
+def test_task_cli_exposes_login_and_draft_zhihu_surface():
     assert set(main.commands) == {"platforms", "profiles", "zhihu"}
     assert main.commands["platforms"].hidden is False
     assert main.commands["profiles"].hidden is False
 
     zhihu = main.commands["zhihu"]
-    assert set(zhihu.commands) == {"profiles", "login", "logout", "status"}
+    assert set(zhihu.commands) == {"profiles", "login", "logout", "status", "draft"}
     assert zhihu.commands["profiles"].hidden is False
     assert zhihu.commands["login"].hidden is False
     assert zhihu.commands["logout"].hidden is False
     assert zhihu.commands["status"].hidden is False
+    assert zhihu.commands["draft"].hidden is False
 
 
 def test_top_level_tree_prints_complete_login_only_registered_cli_tree():
     result = CliRunner().invoke(main, ["--tree"])
 
     assert result.exit_code == 0, result.output
-    assert "chatpost  # browser-level platform login manager" in result.output
+    assert "chatpost  # browser-level platform login and draft manager" in result.output
     assert "├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser." in result.output
     assert "├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state." in result.output
-    assert "└── zhihu  # Zhihu browser login capabilities" in result.output
+    assert "└── zhihu  # Zhihu browser login and WeChat sync draft capabilities" in result.output
     assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles." in result.output
     assert "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed." in result.output
     assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only." in result.output
-    assert "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status." in result.output
+    assert "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status." in result.output
+    assert "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish." in result.output
     forbidden = [
-        "draft",
         "account",
         "qr-artifact",
         "qr encode",
         "--qr",
-        "--receipt",
         "wechatsync",
         "WECHATSYNC_TOKEN",
         "MEDIA:ssh",
@@ -94,6 +94,7 @@ def test_platforms_lists_supported_login_platforms():
                 "login_command": "chatpost zhihu login PROFILE",
                 "status_command": "chatpost zhihu status PROFILE",
                 "logout_command": "chatpost zhihu logout PROFILE",
+                "draft_command": "chatpost zhihu draft PROFILE SOURCE",
             }
         ],
     }

@@ -19,8 +19,10 @@ chatpost.zhihu
 ├── browser_login(config, timeout=..., event_callback=...)
 ├── browser_logout(config)
 ├── browser_login_session(config)
-├── ZhihuRunnerConfig             # follow-up publishing adapter / Wechatsync runner boundary
-└── load_runner_config(path)      # publishing-runner only; not the default login/status/logout path
+├── ZhihuRunnerConfig             # draft / Wechatsync runner boundary
+├── load_runner_config(path)      # draft-runner only; not the default login/status/logout path
+├── execute_task(config, source, mode="dry-run"|"create")
+└── ResultUnknownError            # forbids automatic retry after ambiguous create results
 ```
 
 ## ChatUp / ChatBrowser Dependency
@@ -49,4 +51,4 @@ The default state root is `~/.chatarch/chatpost/`. Task-local experiments may pa
 
 ## Wechatsync Integration Boundary
 
-`ZhihuRunnerConfig` / `load_runner_config()` are reserved for follow-up publishing adapter integration. They may contain extension, bridge, env, and adapter CLI fields; however `browser_status()`, `browser_login()`, and `browser_logout()` must keep using `ZhihuBrowserConfig` and must not regain a dependency on Wechatsync, publishing tokens, cookies, local storage, or IndexedDB.
+`ZhihuRunnerConfig` / `load_runner_config()` / `execute_task()` are the adapter-layer entrypoints behind `chatpost zhihu draft`. They may contain extension, bridge, env, and adapter CLI fields; however `browser_status()`, `browser_login()`, and `browser_logout()` must keep using `ZhihuBrowserConfig` and must not regain a dependency on Wechatsync, publishing tokens, cookies, local storage, or IndexedDB.

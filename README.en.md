@@ -17,13 +17,13 @@
 
 # ChatPost
 
-ChatArch browser-level platform login foundation.
+ChatArch browser-level platform login foundation and draft entrypoint.
 
 Docs: <https://arch.gh.wzhecnu.cn/ChatPost/>
 
 | Scenario | Document |
 | --- | --- |
-| Run the login foundation now | [Quickstart: Pure Browser Login](docs/quickstart.en.md) |
+| Run login and draft flows now | [Quickstart: Browser Login and Zhihu Drafts](docs/quickstart.en.md) |
 | Inspect the real CLI tree | [CLI Tree](docs/cli-tree.en.md) |
 | Check current capabilities and boundaries | [Capability Map](docs/capability-map.md) |
 | Review Chrome/Profile state boundaries | [Configuration, Environment, and State](docs/configuration.en.md) |
@@ -42,12 +42,13 @@ chatpost zhihu profiles --help
 chatpost zhihu login --help
 chatpost zhihu status --help
 chatpost zhihu logout --help
+chatpost zhihu draft --help
 python -m pytest -q
 python -m build
 ```
 
 ## Current Boundary
 
-`chatpost zhihu login/status/logout PROFILE` is a pure browser login foundation: it manages only the controlled Chromium Profile and page-visible login state. It does not call a publishing adapter, load a publishing extension, require a publishing token, or read/export cookies/local storage/IndexedDB/sessions/tokens.
+`chatpost zhihu login/status/logout PROFILE` is a pure browser login foundation: it manages only the controlled Chromium Profile and page-visible login state. It does not call a publishing adapter, load a publishing extension, require a publishing token, or read/export cookies/local storage/IndexedDB/sessions/tokens. `chatpost zhihu draft PROFILE SOURCE` is a separate Wechatsync adapter entrypoint: dry-run uses the Wechatsync CLI parser for preview, while create talks directly to the Wechatsync extension MCP bridge to create one draft and never final-publishes.
 
-This package depends on `chatstyle>=0.1.1,<0.2.0`, `chatenv>=0.2.0,<0.3.0`, `chatup>=0.2.4,<0.3.0`, `chatbrowser>=0.1.2,<0.2.0`, `qrcode[pil]>=7.4,<9.0`, and `websocket-client>=1.8,<2.0`. ChatUp owns Playwright package/browser installation. ChatBrowser owns the browser runtime, Profile metadata, and CDP metadata safety boundary.
+This package depends on `chatstyle>=0.1.1,<0.2.0`, `chatenv>=0.2.0,<0.3.0`, `chatup>=0.2.4,<0.3.0`, `chatbrowser>=0.1.2,<0.2.0`, `qrcode[pil]>=7.4,<9.0`, `websocket-client>=1.8,<2.0`, and `websockets>=12.0,<16.0`. ChatUp owns Playwright package/browser installation. ChatBrowser owns the browser runtime, Profile metadata, and CDP metadata safety boundary.

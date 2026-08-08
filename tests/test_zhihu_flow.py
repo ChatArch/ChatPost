@@ -330,6 +330,82 @@ def test_create_invokes_adapter_exactly_once_and_returns_review_receipt(tmp_path
     assert result["source_sha256"]
 
 
+def test_default_create_uses_extension_mcp_directly(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    source = tmp_path / "article.md"
+    source.write_text("# Infra title\n\nCHATPOST-PLAYWRIGHT-INFRA-V1", encoding="utf-8")
+    calls = []
+
+    @contextmanager
+    def browser_session(_config):
+        yield (
+            {"browser_version": "149.0.7827.55", "browser_revision": "1228"},
+            _endpoint(),
+        )
+
+    def mcp_request(config_arg, environment, endpoint, method, params, *, timeout):
+        calls.append((config_arg, environment, endpoint, method, params, timeout))
+        return {
+            "results": [
+                {
+                    "platform": "zhihu",
+                    "success": True,
+                    "postId": "2067000000000000001",
+                    "postUrl": "https://zhuanlan.zhihu.com/p/2067000000000000001/edit",
+                    "draftOnly": True,
+                }
+            ],
+            "syncId": "sync-direct",
+        }
+
+    def forbidden_popen(*_args, **_kwargs):
+        raise AssertionError("create must not shell out to the Wechatsync CLI")
+
+    monkeypatch.setattr(zhihu, "_extension_mcp_request", mcp_request, raising=False)
+    monkeypatch.setattr(zhihu.subprocess, "Popen", forbidden_popen)
+
+    result = execute_task(config, source, mode="create", browser_session_factory=browser_session)
+
+    assert result["status"] == "DRAFT_CREATED"
+    assert result["draft_id"] == "2067000000000000001"
+    assert len(calls) == 1
+    _config_arg, environment, endpoint, method, params, timeout = calls[0]
+    assert environment["WECHATSYNC_TOKEN"] == "secret-value"
+    assert endpoint.extension_target_id == "extension-owned-target"
+    assert method == "syncArticle"
+    assert timeout == 360
+    assert params["platforms"] == ["zhihu"]
+    assert params["article"]["title"] == "Infra title"
+    assert "CHATPOST-PLAYWRIGHT-INFRA-V1" in params["article"]["markdown"]
+
+
+def test_default_auth_uses_extension_mcp_directly(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    calls = []
+
+    @contextmanager
+    def browser_session(_config):
+        yield (
+            {"browser_version": "149.0.7827.55", "browser_revision": "1228"},
+            _endpoint(),
+        )
+
+    def mcp_request(_config, _environment, _endpoint_value, method, params, *, timeout):
+        calls.append((method, params, timeout))
+        return {"isAuthenticated": True, "userId": "123", "username": "redacted"}
+
+    def forbidden_popen(*_args, **_kwargs):
+        raise AssertionError("auth must not shell out to the Wechatsync CLI")
+
+    monkeypatch.setattr(zhihu, "_extension_mcp_request", mcp_request, raising=False)
+    monkeypatch.setattr(zhihu.subprocess, "Popen", forbidden_popen)
+
+    result = execute_task(config, None, mode="auth", browser_session_factory=browser_session)
+
+    assert result["status"] == "READY"
+    assert calls == [("checkAuth", {"platform": "zhihu"}, 60)]
+
+
 def test_create_captures_source_hash_before_the_side_effect(tmp_path):
     config = load_runner_config(_config(tmp_path))
     source = tmp_path / "article.md"
@@ -436,6 +512,9 @@ def test_nonzero_create_receipt_includes_completed_cleanup(tmp_path):
     assert error.value.receipt["extension_cleanup_error"] == "popup close timed out"
     assert error.value.receipt["adapter_cleanup_status"] == "CLOSED"
     assert error.value.receipt["source_sha256"] == expected_sha256
+    assert error.value.receipt["result_unknown_reason"] == "adapter_nonzero_exit"
+    assert error.value.receipt["adapter_exit_code"] == 1
+    assert error.value.receipt["adapter_output_tail"] == "ambiguous create failure"
 
 
 def test_missing_review_url_receipt_includes_cleanup_failure(tmp_path):
@@ -454,7 +533,7 @@ def test_missing_review_url_receipt_includes_cleanup_failure(tmp_path):
         )
 
     def adapter(*_args):
-        return subprocess.CompletedProcess([], 0, "create may have succeeded", "")
+        return subprocess.CompletedProcess([], 0, "create may have succeeded", "platform error")
 
     with pytest.raises(ResultUnknownError) as error:
         execute_task(
@@ -469,6 +548,8 @@ def test_missing_review_url_receipt_includes_cleanup_failure(tmp_path):
     assert error.value.receipt["cleanup_error"] == "CDP close timed out"
     assert error.value.receipt["extension_cleanup_status"] == "CLOSED"
     assert error.value.receipt["adapter_cleanup_status"] == "CLOSED"
+    assert error.value.receipt["result_unknown_reason"] == "missing_review_url"
+    assert error.value.receipt["adapter_output_tail"] == "create may have succeeded\nplatform error"
 
 
 def test_browser_session_rechecks_preflight_before_process_start(monkeypatch, tmp_path):
@@ -1542,202 +1623,31 @@ def test_cleanup_type_error_never_masks_active_result_unknown(monkeypatch, tmp_p
     assert captured.value.receipt["cleanup_error"] == "malformed CDP metadata"
 
 
-def test_bridge_start_timeout_is_result_unknown_and_stops_adapter(monkeypatch, tmp_path):
+def test_direct_mcp_create_failure_is_result_unknown(monkeypatch, tmp_path):
     config = load_runner_config(_config(tmp_path))
     source = tmp_path / "article.md"
-    source.write_text("# title", encoding="utf-8")
-    terminated = []
+    source.write_text("# title\n\nbody", encoding="utf-8")
 
-    class Process:
-        returncode = None
+    @contextmanager
+    def browser_session(_config):
+        yield (
+            {"browser_version": "149.0.7827.55", "browser_revision": "1228"},
+            _endpoint(),
+        )
 
-        def poll(self):
-            return None
+    def failing_request(*_args, **_kwargs):
+        raise TimeoutError("MCP-TIMEOUT-SECRET should be redacted as generic output")
 
-        def terminate(self):
-            terminated.append(True)
-            self.returncode = -15
-
-        def communicate(self, timeout):
-            if not terminated:
-                raise subprocess.TimeoutExpired("wechatsync", timeout)
-            return "", "bridge unavailable"
-
-    times = iter([0.0, 16.0])
-    monkeypatch.setattr(zhihu.time, "monotonic", lambda: next(times))
-    monkeypatch.setattr(zhihu.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: False)
-    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
-
-    with pytest.raises(ResultUnknownError):
-        zhihu._run_adapter(config, source, "create", _endpoint())
-
-    assert terminated == [True]
-
-
-def test_extension_wake_cleanup_timeout_preserves_unknown_and_adapter_state(
-    monkeypatch, tmp_path
-):
-    config = load_runner_config(_config(tmp_path))
-    source = tmp_path / "article.md"
-    source.write_text("# title", encoding="utf-8")
-    terminated = []
-
-    class Process:
-        pid = 4242
-        returncode = None
-
-        def poll(self):
-            return None
-
-        def terminate(self):
-            terminated.append(True)
-
-        def communicate(self, timeout):
-            assert timeout == 10
-            raise subprocess.TimeoutExpired("wechatsync", timeout)
-
-    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
-    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
-    monkeypatch.setattr(zhihu, "_process_owns_listener", lambda *_args: True)
-    monkeypatch.setattr(
-        zhihu,
-        "_wake_extension",
-        lambda *_args: (_ for _ in ()).throw(RuntimeError("wake rejected")),
-    )
+    monkeypatch.setattr(zhihu, "_extension_mcp_request", failing_request)
 
     with pytest.raises(ResultUnknownError) as captured:
-        zhihu._run_adapter(config, source, "create", _endpoint())
+        execute_task(config, source, mode="create", browser_session_factory=browser_session)
 
-    assert terminated == [True]
     assert captured.value.receipt["status"] == RESULT_UNKNOWN
-    assert captured.value.receipt["adapter_cleanup_status"] == (
-        "MANUAL_RECOVERY_REQUIRED"
-    )
-    assert "left running" in captured.value.receipt["adapter_cleanup_error"]
-
-
-def test_create_timeout_cleanup_timeout_records_adapter_manual_recovery(
-    monkeypatch, tmp_path
-):
-    config = load_runner_config(_config(tmp_path))
-    source = tmp_path / "article.md"
-    source.write_text("# title", encoding="utf-8")
-    terminated = []
-    communicate_timeouts = []
-
-    class Process:
-        pid = 4242
-        returncode = None
-
-        def poll(self):
-            return None
-
-        def terminate(self):
-            terminated.append(True)
-
-        def communicate(self, timeout):
-            communicate_timeouts.append(timeout)
-            raise subprocess.TimeoutExpired("wechatsync", timeout)
-
-    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
-    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
-    monkeypatch.setattr(zhihu, "_process_owns_listener", lambda *_args: True)
-    monkeypatch.setattr(zhihu, "_wake_extension", lambda *_args: None)
-
-    with pytest.raises(ResultUnknownError) as captured:
-        zhihu._run_adapter(config, source, "create", _endpoint())
-
-    assert communicate_timeouts == [180, 10]
-    assert terminated == [True]
-    assert captured.value.receipt["adapter_cleanup_status"] == (
-        "MANUAL_RECOVERY_REQUIRED"
-    )
-    assert "left running" in captured.value.receipt["adapter_cleanup_error"]
-
-
-@pytest.mark.parametrize(
-    "communication_error",
-    [
-        OSError("oauth_token=POST-WAKE-COMMUNICATION-CANARY"),
-        ValueError("oauth_token=POST-WAKE-COMMUNICATION-CANARY"),
-    ],
-    ids=["os-error", "value-error"],
-)
-def test_create_communication_error_after_wake_preserves_unknown_and_cleanup(
-    monkeypatch, tmp_path, communication_error
-):
-    config = load_runner_config(_config(tmp_path))
-    source = tmp_path / "article.md"
-    source.write_text("# title", encoding="utf-8")
-    terminated = []
-    communicate_timeouts = []
-
-    class Process:
-        pid = 4242
-        returncode = None
-
-        def poll(self):
-            return self.returncode
-
-        def terminate(self):
-            terminated.append(True)
-            self.returncode = -15
-
-        def communicate(self, timeout):
-            communicate_timeouts.append(timeout)
-            if timeout == 180:
-                raise type(communication_error)(str(communication_error))
-            assert timeout == 10
-            return "", ""
-
-    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
-    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
-    monkeypatch.setattr(zhihu, "_process_owns_listener", lambda *_args: True)
-    monkeypatch.setattr(zhihu, "_wake_extension", lambda *_args: None)
-
-    with pytest.raises(ResultUnknownError) as captured:
-        zhihu._run_adapter(config, source, "create", _endpoint())
-
-    assert terminated == [True]
-    assert communicate_timeouts == [180, 10]
-    assert captured.value.receipt["status"] == RESULT_UNKNOWN
+    assert captured.value.receipt["result_unknown_reason"] == "mcp_request_failed"
     assert captured.value.receipt["adapter_cleanup_status"] == "CLOSED"
-    assert "POST-WAKE-COMMUNICATION-CANARY" not in str(captured.value)
-
-
-def test_create_communication_error_after_process_exit_records_closed_cleanup(
-    monkeypatch, tmp_path
-):
-    config = load_runner_config(_config(tmp_path))
-    source = tmp_path / "article.md"
-    source.write_text("# title", encoding="utf-8")
-    terminated = []
-
-    class Process:
-        pid = 4242
-        returncode = 0
-
-        def poll(self):
-            return self.returncode
-
-        def terminate(self):
-            terminated.append(True)
-
-        def communicate(self, timeout):
-            raise ValueError(f"output stream unavailable after timeout={timeout}")
-
-    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
-    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
-    monkeypatch.setattr(zhihu, "_process_owns_listener", lambda *_args: True)
-    monkeypatch.setattr(zhihu, "_wake_extension", lambda *_args: None)
-
-    with pytest.raises(ResultUnknownError) as captured:
-        zhihu._run_adapter(config, source, "create", _endpoint())
-
-    assert terminated == []
-    assert captured.value.receipt["adapter_cleanup_status"] == "CLOSED"
-    assert "adapter_cleanup_error" not in captured.value.receipt
+    assert captured.value.receipt["source_sha256"] == zhihu._source_sha256(source)
+    assert "MCP-TIMEOUT-SECRET" in captured.value.receipt["adapter_output_tail"]
 
 
 def test_adapter_output_redaction_blocks_dynamic_credentials_but_keeps_review_url():
@@ -1840,93 +1750,23 @@ def test_dry_run_adapter_path_structurally_redacts_dynamic_credentials(
     assert review_url in result.stderr
 
 
-def test_foreign_bridge_listener_is_rejected_before_extension_wake(monkeypatch, tmp_path):
-    config = load_runner_config(_config(tmp_path))
-    source = tmp_path / "article.md"
-    source.write_text("# title", encoding="utf-8")
-    terminated = []
-    endpoint = zhihu._CdpEndpoint(
-        base_url="http://127.0.0.1:9227",
-        browser_websocket_url="ws://127.0.0.1:9227/devtools/browser/owned",
-    )
-
-    class Process:
-        pid = 4242
-        returncode = None
-
-        def poll(self):
-            return self.returncode
-
-        def terminate(self):
-            terminated.append(True)
-            self.returncode = -15
-
-        def communicate(self, timeout):
-            assert timeout == 10
-            return "", "foreign listener"
-
-    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
-    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
-    monkeypatch.setattr(
-        zhihu,
-        "_process_owns_listener",
-        lambda pid, host, port: (pid, host, port) == (4242, "127.0.0.1", 9999),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        zhihu,
-        "_wake_extension",
-        lambda *_args: (_ for _ in ()).throw(
-            AssertionError("foreign bridge must not wake the extension")
-        ),
-    )
-
-    with pytest.raises(ResultUnknownError, match="not owned"):
-        zhihu._run_adapter(config, source, "create", endpoint)
-
-    assert terminated == [True]
-
-
-def test_owned_bridge_listener_wakes_extension_with_captured_endpoint(
-    monkeypatch, tmp_path
-):
+def test_run_adapter_auth_passes_configured_endpoint_to_direct_mcp(monkeypatch, tmp_path):
     config = load_runner_config(_config(tmp_path))
     endpoint = _endpoint()
-    wake_calls = []
+    calls = []
 
-    class Process:
-        pid = 4242
-        returncode = 0
+    def mcp_request(actual_config, environment, actual_endpoint, method, params, *, timeout):
+        calls.append((actual_config, environment["WECHATSYNC_TOKEN"], actual_endpoint, method, params, timeout))
+        return {"isAuthenticated": True}
 
-        def poll(self):
-            return None
-
-        def communicate(self, timeout):
-            assert timeout == 180
-            return "authenticated", ""
-
-        def terminate(self):
-            raise AssertionError("owned bridge must not be terminated")
-
-    monkeypatch.setattr(zhihu.subprocess, "Popen", lambda *_args, **_kwargs: Process())
-    monkeypatch.setattr(zhihu, "_port_is_open", lambda *_args: True)
-    monkeypatch.setattr(
-        zhihu,
-        "_process_owns_listener",
-        lambda pid, host, port: (pid, host, port) == (4242, "127.0.0.1", 9527),
-    )
-    monkeypatch.setattr(
-        zhihu,
-        "_wake_extension",
-        lambda actual_config, environment, actual_endpoint: wake_calls.append(
-            (actual_config, bool(environment["WECHATSYNC_TOKEN"]), actual_endpoint)
-        ),
-    )
+    monkeypatch.setattr(zhihu, "_extension_mcp_request", mcp_request)
 
     result = zhihu._run_adapter(config, None, "auth", endpoint)
 
     assert result.returncode == 0
-    assert wake_calls == [(config, True, endpoint)]
+    assert calls == [
+        (config, "secret-value", endpoint, "checkAuth", {"platform": "zhihu"}, 60)
+    ]
 
 
 def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, tmp_path):

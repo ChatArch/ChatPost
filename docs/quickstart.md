@@ -1,6 +1,6 @@
-# Quickstart：纯浏览器登录
+# Quickstart：浏览器登录与知乎草稿
 
-本页只覆盖 ChatPost 的登录基础层：发现 Profile、检查知乎网页登录态、打开登录 handoff、以及登出/清理。它不创建草稿、不发布内容、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。
+本页覆盖 ChatPost 的日常路径：先用纯浏览器登录基础层发现 Profile、检查知乎网页登录态、打开登录 handoff、登出/清理；再通过独立 `chatpost zhihu draft` 入口 dry-run 或创建一个知乎草稿。`login/status/logout` 不创建草稿、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。
 
 ## 0. 设定变量
 
@@ -103,7 +103,7 @@ exit: 0
 stdout:
 Usage: chatpost [OPTIONS] [COMMAND] [ARGS]...
 
-  ChatPost browser-login command line interface.
+  ChatPost browser login and draft command line interface.
 
 Options:
   --version  Show the version and exit.
@@ -113,7 +113,7 @@ Options:
 Commands:
   platforms  List supported platforms.
   profiles   List configured browser Profiles without reading login state.
-  zhihu      Run pure browser-level Zhihu login/status/logout operations.
+  zhihu      Run Zhihu browser login/status/logout and draft operations.
 ```
 
 ### root_version
@@ -131,17 +131,18 @@ chatpost, version 0.1.0
 $ chatpost --tree
 exit: 0
 stdout:
-chatpost  # browser-level platform login manager
+chatpost  # browser-level platform login and draft manager
 ├── --help  # Show help for the current command.
 ├── --version  # Show package version.
 ├── --tree  # Print the registered CLI tree with command purpose and IO shape.
 ├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.
 ├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.
-└── zhihu  # Zhihu browser login capabilities
+└── zhihu  # Zhihu browser login and WeChat sync draft capabilities
     ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.
     ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.
     ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only.
-    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.
+    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.
+    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.
 ```
 
 ### platforms
@@ -352,3 +353,31 @@ stdout:
   "target": "zhihu@zhihu-practice-quickstart"
 }
 ```
+
+## 6. Draft dry-run and create through Wechatsync
+
+`chatpost zhihu draft` is intentionally separate from the browser-level login commands. It reuses the same registry alias and runner config, but it loads the full runner fields for Wechatsync, extension, bridge, and private env file only inside the draft flow. `login/status/logout` must continue to use `load_browser_config` and must not require adapter readiness.
+
+Dry-run validates the source without starting a browser or writing a draft:
+
+```bash
+ARTICLE=/absolute/path/to/article.md
+chatpost zhihu draft zhihu-practice-quickstart "$ARTICLE" \
+  --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml \
+  --dry-run \
+  --output json \
+  -I
+```
+
+A real create requires an explicit receipt path and creates exactly one Zhihu draft. It does not final-publish:
+
+```bash
+RECEIPT=~/.chatarch/chatpost/runners/zhihu-practice-quickstart/run/zhihu-draft-receipt.json
+chatpost zhihu draft zhihu-practice-quickstart "$ARTICLE" \
+  --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml \
+  --receipt "$RECEIPT" \
+  --output json \
+  -I
+```
+
+Expected successful statuses are `DRY_RUN_OK` for dry-run and `DRAFT_CREATED` for create. Create writes a mode `0600` receipt with the draft id, `/edit` review URL, source digest, and cleanup statuses. If the create path returns `RESULT_UNKNOWN`, do not retry automatically; inspect the receipt and the browser before deciding next steps.

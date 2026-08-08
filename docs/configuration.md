@@ -94,7 +94,7 @@ platform = "zhihu"
 runner = "zhihu-personal"
 ```
 
-`attach_existing_cdp = false` 是默认值：ChatPost 启动并拥有一个 browser process，结束时通过启动时捕获的 browser CDP endpoint 关闭它。如果一个已知 browser 已经持有该 Profile 且暴露 loopback CDP，可设置 `attach_existing_cdp = true` 并让 `cdp_port` 指向现有 endpoint。attach 模式只创建/关闭本轮 extension popup，保留现有 browser 运行，并在 receipt 中记录 `cleanup_status=LEFT_RUNNING_EXISTING_CDP`。
+`attach_existing_cdp = false` 是默认值：ChatPost 启动并拥有一个 browser process，结束时通过启动时捕获的 browser CDP endpoint 关闭它。如果一个已知 browser 已经持有该 Profile 且暴露 loopback CDP，可设置 `attach_existing_cdp = true` 并让 `cdp_port` 指向现有 endpoint。attach 模式只创建/关闭本次 extension popup，保留现有 browser 运行，并在 receipt 中记录 `cleanup_status=LEFT_RUNNING_EXISTING_CDP`。
 
 ## ChatEnv 只存秘密
 

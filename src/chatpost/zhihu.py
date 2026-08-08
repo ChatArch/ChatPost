@@ -8,6 +8,7 @@ binary directly and uses Wechatsync's loopback bridge.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -1312,6 +1313,187 @@ def _redact(text: str, values: Sequence[str]) -> str:
     return redacted
 
 
+def _adapter_output_tail(output: str, *, limit: int = 2000) -> str:
+    """Return a bounded, public-safe adapter output tail for recovery receipts."""
+
+    if not output.strip():
+        return ""
+    redacted = _redact(output, ())
+    redacted = _DIAGNOSTIC_URL.sub("[REDACTED]", redacted)
+    redacted = redacted.strip()
+    return redacted[-limit:]
+
+
+def _source_article_payload(source: Path) -> dict[str, str]:
+    text = source.read_text(encoding="utf-8")
+    suffix = source.suffix.lower()
+    if suffix in {".html", ".htm"}:
+        title = None
+        title_match = re.search(r"<title[^>]*>([^<]+)</title>", text, re.IGNORECASE)
+        if title_match:
+            title = title_match.group(1).strip()
+        if not title:
+            heading_match = re.search(r"<h1[^>]*>([^<]+)</h1>", text, re.IGNORECASE)
+            if heading_match:
+                title = heading_match.group(1).strip()
+        return {"title": title or source.stem, "content": text, "html": text}
+
+    title = None
+    body = text
+    frontmatter = re.match(r"^---\s*\n([\s\S]*?)\n---\s*\n", text)
+    if frontmatter:
+        title_match = re.search(
+            r"(?m)^title:\s*[\"']?(.+?)[\"']?\s*$",
+            frontmatter.group(1),
+        )
+        if title_match:
+            title = title_match.group(1).strip()
+        body = text[frontmatter.end() :]
+    if not title:
+        heading = re.search(r"(?m)^#\s+(.+?)\s*$", body)
+        if heading:
+            title = heading.group(1).strip()
+            body = body[: heading.start()] + body[heading.end() :]
+    markdown = body.strip() or text.strip()
+    return {"title": title or source.stem, "markdown": markdown}
+
+
+def _extension_mcp_request(
+    config: ZhihuRunnerConfig,
+    environment: dict[str, str],
+    endpoint: _CdpEndpoint,
+    method: str,
+    params: dict[str, Any],
+    *,
+    timeout: float,
+) -> Any:
+    """Serve one bounded Wechatsync MCP request directly to the extension."""
+
+    token = environment.get("WECHATSYNC_TOKEN")
+    if not token:
+        raise RuntimeError("WECHATSYNC_TOKEN is missing")
+
+    async def run_once() -> Any:
+        import websockets
+
+        loop = asyncio.get_running_loop()
+        response: asyncio.Future[Any] = loop.create_future()
+
+        async def handler(connection: Any) -> None:
+            if response.done():
+                return
+            message = {
+                "id": f"chatpost-{int(time.time() * 1000)}",
+                "method": method,
+                "token": token,
+                "params": params,
+            }
+            try:
+                await connection.send(json.dumps(message, ensure_ascii=False))
+                raw = await asyncio.wait_for(connection.recv(), timeout=timeout)
+                payload = json.loads(raw)
+                if payload.get("error"):
+                    error = payload["error"]
+                    if isinstance(error, dict):
+                        raise RuntimeError(str(error.get("message") or error))
+                    raise RuntimeError(str(error))
+                if not response.done():
+                    response.set_result(payload.get("result"))
+            except Exception as error:  # pragma: no cover - exercised via caller paths
+                if not response.done():
+                    response.set_exception(error)
+
+        async with websockets.serve(handler, config.bridge_host, config.bridge_port):
+            await asyncio.to_thread(_wake_extension, config, environment, endpoint)
+            return await asyncio.wait_for(response, timeout=timeout + 5)
+
+    return asyncio.run(run_once())
+
+
+def _run_extension_mcp_adapter(
+    config: ZhihuRunnerConfig,
+    source: Path | None,
+    mode: str,
+    endpoint: _CdpEndpoint,
+) -> subprocess.CompletedProcess[str]:
+    environment, redactions = _adapter_environment(config)
+    try:
+        if mode == "auth":
+            result = _extension_mcp_request(
+                config,
+                environment,
+                endpoint,
+                "checkAuth",
+                {"platform": "zhihu"},
+                timeout=60,
+            )
+            if isinstance(result, dict) and result.get("isAuthenticated"):
+                return subprocess.CompletedProcess(
+                    ["extension-mcp", "checkAuth"],
+                    0,
+                    "zhihu auth ready",
+                    "",
+                )
+            error = result.get("error") if isinstance(result, dict) else None
+            return subprocess.CompletedProcess(
+                ["extension-mcp", "checkAuth"],
+                1,
+                "",
+                _redact(str(error or "Zhihu auth check failed"), redactions),
+            )
+
+        if mode != "create" or source is None:
+            raise ValueError(f"Unsupported extension MCP adapter mode: {mode}")
+        article = _source_article_payload(source)
+        result = _extension_mcp_request(
+            config,
+            environment,
+            endpoint,
+            "syncArticle",
+            {"platforms": ["zhihu"], "article": article},
+            timeout=360,
+        )
+    except Exception as error:
+        if mode == "create":
+            raise ResultUnknownError(
+                f"Wechatsync extension MCP request failed: {error}; do not retry automatically",
+                receipt={
+                    "status": RESULT_UNKNOWN,
+                    "result_unknown_reason": "mcp_request_failed",
+                    "adapter_cleanup_status": "CLOSED",
+                    "adapter_output_tail": _adapter_output_tail(str(error)),
+                },
+            ) from error
+        raise RuntimeError(f"Wechatsync extension MCP request failed: {error}") from error
+
+    results = result.get("results") if isinstance(result, dict) else None
+    zhihu_result = None
+    if isinstance(results, list):
+        zhihu_result = next(
+            (item for item in results if isinstance(item, dict) and item.get("platform") == "zhihu"),
+            results[0] if results and isinstance(results[0], dict) else None,
+        )
+    if isinstance(zhihu_result, dict) and zhihu_result.get("success"):
+        review_url = str(zhihu_result.get("postUrl") or "")
+        draft_id = str(zhihu_result.get("postId") or "")
+        stdout = "\n".join(part for part in (review_url, draft_id) if part)
+        return subprocess.CompletedProcess(
+            ["extension-mcp", "syncArticle"],
+            0,
+            _redact(stdout, redactions),
+            "",
+        )
+    error = "Zhihu draft create failed"
+    if isinstance(zhihu_result, dict) and zhihu_result.get("error"):
+        error = str(zhihu_result["error"])
+    return subprocess.CompletedProcess(
+        ["extension-mcp", "syncArticle"],
+        1,
+        "",
+        _redact(error, redactions),
+    )
+
+
 def _adapter_command(
     config: ZhihuRunnerConfig,
     source: Path | None,
@@ -1393,135 +1575,7 @@ def _run_adapter(
 
     if endpoint is None:
         raise ValueError("An owned browser CDP endpoint is required")
-
-    process = subprocess.Popen(
-        command,
-        env=environment,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    bridge_ready = False
-    foreign_bridge = False
-    deadline = time.monotonic() + 15
-    while time.monotonic() < deadline:
-        if process.poll() is not None:
-            break
-        if _port_is_open(config.bridge_host, config.bridge_port):
-            bridge_ready = _process_owns_listener(
-                process.pid,
-                config.bridge_host,
-                config.bridge_port,
-            )
-            foreign_bridge = not bridge_ready
-            break
-        time.sleep(0.1)
-
-    if not bridge_ready:
-        stdout, stderr, adapter_cleanup = _stop_adapter_after_failure(
-            process,
-            reason="Bridge startup did not complete",
-        )
-        result = subprocess.CompletedProcess(
-            command,
-            process.returncode,
-            _redact(stdout, redactions),
-            _redact(stderr, redactions),
-        )
-        if mode == "create":
-            if foreign_bridge:
-                message = (
-                    "Bridge listener is not owned by this Wechatsync process; "
-                    "do not retry automatically"
-                )
-            else:
-                message = (
-                    "Wechatsync create exited before the bridge became ready; "
-                    "do not retry automatically"
-                )
-            if "adapter_cleanup_error" in adapter_cleanup:
-                message = f"{message}; {adapter_cleanup['adapter_cleanup_error']}"
-            raise ResultUnknownError(
-                message,
-                receipt={"status": RESULT_UNKNOWN, **adapter_cleanup},
-            )
-        if "adapter_cleanup_error" in adapter_cleanup:
-            raise RuntimeError(adapter_cleanup["adapter_cleanup_error"])
-        return result
-
-    try:
-        _wake_extension(config, environment, endpoint)
-    except (
-        OSError,
-        RuntimeError,
-        TypeError,
-        ValueError,
-        websocket.WebSocketException,
-    ) as wake_error:
-        stdout, stderr, adapter_cleanup = _stop_adapter_after_failure(
-            process,
-            reason="Extension wake failed",
-        )
-        del stdout, stderr
-        safe_error = _sanitize_browser_diagnostics(config, [str(wake_error)])
-        message = f"Extension wake failed: {safe_error}"
-        if "adapter_cleanup_error" in adapter_cleanup:
-            message = f"{message}; {adapter_cleanup['adapter_cleanup_error']}"
-        if mode == "create":
-            raise ResultUnknownError(
-                message,
-                receipt={"status": RESULT_UNKNOWN, **adapter_cleanup},
-            ) from wake_error
-        raise RuntimeError(message) from wake_error
-
-    try:
-        stdout, stderr = process.communicate(timeout=180)
-    except subprocess.TimeoutExpired as timeout_error:
-        _stdout, _stderr, adapter_cleanup = _stop_adapter_after_failure(
-            process,
-            reason="Adapter execution timed out",
-        )
-        message = (
-            "Wechatsync create timed out after the bridge connected; "
-            "do not retry automatically"
-        )
-        if "adapter_cleanup_error" in adapter_cleanup:
-            message = f"{message}; {adapter_cleanup['adapter_cleanup_error']}"
-        if mode == "create":
-            raise ResultUnknownError(
-                message,
-                receipt={"status": RESULT_UNKNOWN, **adapter_cleanup},
-            ) from timeout_error
-        if "adapter_cleanup_error" in adapter_cleanup:
-            raise RuntimeError(adapter_cleanup["adapter_cleanup_error"]) from timeout_error
-        raise RuntimeError("Wechatsync auth timed out") from timeout_error
-    except (OSError, ValueError):
-        _stdout, _stderr, adapter_cleanup = _stop_adapter_after_failure(
-            process,
-            reason="Adapter execution result could not be read",
-        )
-        message = (
-            "Wechatsync create result could not be read after the bridge connected; "
-            "do not retry automatically"
-        )
-        if "adapter_cleanup_error" in adapter_cleanup:
-            message = f"{message}; {adapter_cleanup['adapter_cleanup_error']}"
-        if mode == "create":
-            raise ResultUnknownError(
-                message,
-                receipt={"status": RESULT_UNKNOWN, **adapter_cleanup},
-            ) from None
-        if "adapter_cleanup_error" in adapter_cleanup:
-            raise RuntimeError(adapter_cleanup["adapter_cleanup_error"]) from None
-        raise RuntimeError("Wechatsync auth result could not be read") from None
-
-    return subprocess.CompletedProcess(
-        command,
-        process.returncode,
-        _redact(stdout, redactions),
-        _redact(stderr, redactions),
-    )
+    return _run_extension_mcp_adapter(config, source, mode, endpoint)
 
 
 def _source_sha256(source: Path) -> str:
@@ -1535,12 +1589,22 @@ def _source_sha256(source: Path) -> str:
 def _result_unknown_receipt(
     source_sha256: str,
     browser: dict[str, Any],
+    *,
+    reason: str,
+    adapter_exit_code: int | None = None,
+    adapter_output: str = "",
 ) -> dict[str, Any]:
     receipt: dict[str, Any] = {
         "status": RESULT_UNKNOWN,
         "source_sha256": source_sha256,
+        "result_unknown_reason": reason,
         "adapter_cleanup_status": "CLOSED",
     }
+    if adapter_exit_code is not None:
+        receipt["adapter_exit_code"] = adapter_exit_code
+    output_tail = _adapter_output_tail(adapter_output)
+    if output_tail:
+        receipt["adapter_output_tail"] = output_tail
     for key in (
         "cleanup_status",
         "cleanup_error",
@@ -2367,6 +2431,7 @@ def execute_task(
             result = adapter_runner(config, source_path, mode, endpoint)
     except ResultUnknownError as error:
         if mode == "create" and source_sha256 is not None:
+            error.receipt.setdefault("result_unknown_reason", "adapter_result_unknown")
             error.receipt["source_sha256"] = source_sha256
         raise
 
@@ -2377,7 +2442,13 @@ def execute_task(
                 raise RuntimeError("Create source digest was not established")
             raise ResultUnknownError(
                 "Wechatsync create did not return a definitive success; do not retry automatically",
-                receipt=_result_unknown_receipt(source_sha256, browser),
+                receipt=_result_unknown_receipt(
+                    source_sha256,
+                    browser,
+                    reason="adapter_nonzero_exit",
+                    adapter_exit_code=result.returncode,
+                    adapter_output=output,
+                ),
             )
         raise RuntimeError(output.strip() or "Zhihu auth check failed")
 
@@ -2390,7 +2461,13 @@ def execute_task(
     if match is None:
         raise ResultUnknownError(
             "Wechatsync exited successfully without a review URL; do not retry automatically",
-            receipt=_result_unknown_receipt(source_sha256, browser),
+            receipt=_result_unknown_receipt(
+                source_sha256,
+                browser,
+                reason="missing_review_url",
+                adapter_exit_code=result.returncode,
+                adapter_output=output,
+            ),
         )
     return {
         "status": "DRAFT_CREATED",

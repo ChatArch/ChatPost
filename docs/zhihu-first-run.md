@@ -88,7 +88,7 @@ test -f packages/cli/dist/index.js
 test -f packages/extension/dist/manifest.json
 ```
 
-ChatPost 不复制 Wechatsync 的知乎业务逻辑，只编排其 CLI、扩展和回执。
+ChatPost 不复制 Wechatsync 的知乎业务逻辑，只编排其 dry-run CLI parser、扩展 MCP bridge 和回执；create 通过 extension MCP direct bridge 发送 `syncArticle`。
 
 ## 4. 创建 Profile 与私密 bridge env
 
@@ -224,15 +224,15 @@ RECEIPT="$RUNNER_HOME/run/zhihu-draft-receipt.json"
 
 每次 browser 启动都会生成随机 `data:text/plain,chatpost-run-*` marker。ChatPost 只有在配置的 loopback 端口同时看到该 marker 和对应 browser WebSocket UUID 后，才把 CDP 绑定为本次进程所有。
 
-扩展发现、`Target.attachToTarget`、扩展求值和登录页创建全部通过这个已捕获的 browser WebSocket 完成。`Target.createTarget` 返回本轮 popup ID；ChatPost 将这个 exact identity 贯穿 browser session，并在 attach 前重验其精确 popup URL 和 `page` / `background_page` 类型。恢复出来的旧 popup、其他 stale popup 和 service worker 均不会被选择，也不会跟随后来从可复用 CDP 端口发现的 target-level WebSocket。只有 loopback bridge 的 listener PID（由监听 socket 反查）属于本次启动的 Node 子进程时才判定 ready；foreign listener 或 Wechatsync secondary mode 会在唤醒扩展前 fail closed。create 在这条歧义路径上返回 `RESULT_UNKNOWN`，不得自动重试。
+扩展发现、`Target.attachToTarget`、扩展求值和登录页创建全部通过这个已捕获的 browser WebSocket 完成。`Target.createTarget` 返回本次 popup ID；ChatPost 将这个 exact identity 贯穿 browser session，并在 attach 前重验其精确 popup URL 和 `page` / `background_page` 类型。恢复出来的旧 popup、其他 stale popup 和 service worker 均不会被选择，也不会跟随后来从可复用 CDP 端口发现的 target-level WebSocket。create 时 ChatPost 自己在配置的 loopback bridge 端口上服务一次有界 Wechatsync extension MCP 请求，唤醒扩展后发送 `syncArticle`；端口占用、连接失败、MCP 请求失败或缺少 review URL 都按 `RESULT_UNKNOWN` 保守处理，不得自动重试。
 
 正常清理通过启动时捕获的 browser WebSocket endpoint 发送 CDP `Browser.close`，不会重新发现后来可能占用同一端口的其他浏览器，也不会发送进程终止信号。若草稿结果已经明确、但清理失败，receipt 仍保留 `DRAFT_CREATED`，并附带 `cleanup_status=MANUAL_RECOVERY_REQUIRED`；此时人工恢复进程，不能再次执行 create。browser 启动失败时，ChatPost 会先等待 stderr drain，再返回限长诊断；Profile 路径、私密赋值、URL/连接信息和运行 marker 均经过脱敏。若私有 env 在 preflight 后消失、不可读或不再包含预期 token，diagnostics 会 fail-closed 为 `[REDACTED]`，外围错误仍保留 browser 退出码。
 
-receipt 分别记录 browser `cleanup_status`、本轮 popup `extension_cleanup_status` 与 adapter `adapter_cleanup_status`；只有需要人工恢复时才写对应 error 字段。该契约同时适用于 `DRAFT_CREATED` 与 `RESULT_UNKNOWN`，包括 adapter 非零退出、成功退出但缺 review URL、扩展唤醒失败、adapter 超时和唤醒后的输出读取失败。cleanup 会通过 browser-level `Target.closeTarget` 重验并只关闭本轮创建的 popup，然后请求 `Browser.close`；popup cleanup 失败会被独立记录，不会阻止 browser close 尝试，也不会覆盖 authoritative result。若本轮 adapter 子进程在一次有界停止请求后仍未退出，create 仍保持 `RESULT_UNKNOWN`，记录 `adapter_cleanup_status=MANUAL_RECOVERY_REQUIRED`，保留主结果和子进程供人工恢复，并单独报告 adapter cleanup error。`source_sha256 在 browser 或 adapter 启动前捕获`；成功或歧义 receipt 均复用该值，因此后续 source 文件被修改、删除或无法读取都不会覆盖 authoritative result。receipt 不写入 target ID、browser endpoint、token 或连接信息。
+receipt 分别记录 browser `cleanup_status`、本次 popup `extension_cleanup_status` 与 adapter `adapter_cleanup_status`；只有需要人工恢复时才写对应 error 字段。该契约同时适用于 `DRAFT_CREATED` 与 `RESULT_UNKNOWN`，包括 MCP 请求失败、create 返回失败、成功返回但缺 review URL，以及 browser/popup cleanup 失败。cleanup 会通过 browser-level `Target.closeTarget` 重验并只关闭本次创建的 popup，然后请求 `Browser.close`；popup cleanup 失败会被独立记录，不会阻止 browser close 尝试，也不会覆盖 authoritative result。`source_sha256` 在 browser 或 adapter 启动前捕获；成功或歧义 receipt 均复用该值，因此后续 source 文件被修改、删除或无法读取都不会覆盖 authoritative result。receipt 不写入 target ID、browser endpoint、token 或连接信息。
 
 如果 authoritative result 已经产生但 receipt 无法落盘，ChatPost 不会用普通文件系统异常覆盖主结果：明确成功时先输出 `DRAFT_CREATED`；歧义写入时继续明确 `RESULT_UNKNOWN`；随后报告 receipt 无法写入，并明确不得自动重试。
 
-adapter stdout/stderr 除了替换私有 env 的精确值，还会结构化遮蔽动态私密赋值，包括跨行结构化私密赋值中的嵌套 object/array 与跨行 quoted value；若无法证明私密值的闭合边界，则丢弃其后的未知文本，只恢复用于 authoritative result 的严格知乎 `/edit` review URL 白名单。WebSocket URL、loopback 连接信息和 ownership marker 也会被遮蔽。
+adapter diagnostic tail 除了替换私有 env 的精确值，还会结构化遮蔽动态私密赋值、WebSocket URL、loopback 连接信息和 ownership marker；`RESULT_UNKNOWN` receipt 只保留有界、脱敏后的 `adapter_output_tail` 供人工恢复。
 
 图片上传失败可以与草稿创建成功同时发生；必须按编辑页实际内容报告，不能把 CLI exit 0 当成图片完整证明。
 
@@ -254,6 +254,6 @@ adapter stdout/stderr 除了替换私有 env 的精确值，还会结构化遮�
 ## 两仓协作结论
 
 - ChatUp 只向上提供 Playwright package/browser substrate；不创建 Profile、不启动浏览器、不懂知乎。
-- ChatPost 面向任务管理 Profile、进程、CDP、bridge、登录 checkpoint、单次写入和 receipt；不复制 Playwright 下载逻辑，也不读取登录数据库。
+- ChatPost 面向任务管理 Profile、进程、CDP、extension MCP bridge、登录 checkpoint、单次写入和 receipt；不复制 Playwright 下载逻辑，也不读取登录数据库。
 - Wechatsync 是知乎 adapter；其协议变化应在 ChatPost adapter 边界显式兼容。
 - 文章 update 必须基于已保存的 draft/article ID 另开验收，不能用标题匹配或再次 create 冒充 update。
