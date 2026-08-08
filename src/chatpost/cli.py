@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -11,26 +13,31 @@ import click
 from chatpost import __version__
 from chatpost.accounts import AccountRegistryError, load_accounts, resolve_account
 from chatpost.zhihu import (
+    RESULT_UNKNOWN,
+    ResultUnknownError,
     browser_login,
     browser_logout,
     browser_status,
+    execute_task,
     load_browser_config,
+    load_runner_config,
 )
 
 _OUTPUT = click.Choice(["text", "json"])
 
 _CLI_TREE_LINES = (
-    "chatpost  # browser-level platform login manager",
+    "chatpost  # browser-level platform login and draft manager",
     "├── --help  # Show help for the current command.",
     "├── --version  # Show package version.",
     "├── --tree  # Print the registered CLI tree with command purpose and IO shape.",
     "├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.",
     "├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.",
-    "└── zhihu  # Zhihu browser login capabilities",
+    "└── zhihu  # Zhihu browser login and Wechatsync draft capabilities",
     "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.",
     "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.",
     "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only.",
-    "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.",
+    "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.",
+    "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.",
 )
 _CLI_TREE_COMMAND_PATHS = (
     ("platforms",),
@@ -40,6 +47,7 @@ _CLI_TREE_COMMAND_PATHS = (
     ("zhihu", "login"),
     ("zhihu", "status"),
     ("zhihu", "logout"),
+    ("zhihu", "draft"),
 )
 
 
@@ -72,9 +80,37 @@ def _emit(payload: dict[str, Any], output: str) -> None:
         "logout_method",
         "browser_attachment",
         "browser_version",
+        "draft_id",
+        "review_url",
+        "source_sha256",
+        "preview",
+        "cleanup_status",
+        "extension_cleanup_status",
+        "adapter_cleanup_status",
     ):
         if payload.get(key):
             click.echo(f"{key}: {payload[key]}")
+
+
+def _write_receipt(path: Path, payload: dict[str, Any]) -> None:
+    destination = path.expanduser().resolve()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.",
+        suffix=".tmp",
+        dir=destination.parent,
+        text=True,
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream, ensure_ascii=False, indent=2, sort_keys=True)
+            stream.write("\n")
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, destination)
+        os.chmod(destination, 0o600)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _emit_json_line(payload: dict[str, Any]) -> None:
@@ -91,6 +127,7 @@ def _platforms_payload() -> dict[str, Any]:
                 "login_command": "chatpost zhihu login PROFILE",
                 "status_command": "chatpost zhihu status PROFILE",
                 "logout_command": "chatpost zhihu logout PROFILE",
+                "draft_command": "chatpost zhihu draft PROFILE SOURCE",
             }
         ],
     }
@@ -138,6 +175,13 @@ def _load_zhihu_browser_config(account):
         raise click.ClickException(str(error)) from error
 
 
+def _load_zhihu_runner_config(account):
+    try:
+        return load_runner_config(account.runner_config)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+
+
 def _target_context(account) -> dict[str, str]:
     return {
         "target": account.target(),
@@ -171,7 +215,7 @@ def _render_cli_tree(root: click.Group) -> str:
 @click.option("--tree", "show_tree", is_flag=True, is_eager=True, help="Print the registered CLI tree.")
 @click.pass_context
 def main(ctx: click.Context, show_tree: bool) -> None:
-    """ChatPost browser-login command line interface."""
+    """ChatPost browser login and draft command line interface."""
 
     if show_tree:
         click.echo(_render_cli_tree(ctx.command))
@@ -207,7 +251,7 @@ def profiles_command(
 
 @main.group("zhihu")
 def zhihu_group() -> None:
-    """Run pure browser-level Zhihu login/status/logout operations."""
+    """Run Zhihu browser login/status/logout and draft operations."""
 
 
 @zhihu_group.command("profiles")
@@ -302,6 +346,62 @@ def zhihu_logout_command(
     except (OSError, RuntimeError, TypeError, ValueError) as error:
         raise click.ClickException(str(error)) from error
     _emit(_with_target(account, payload), output)
+
+
+@zhihu_group.command("draft")
+@click.argument("profile")
+@click.argument("source", type=click.Path(path_type=Path))
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--dry-run", is_flag=True, help="Validate the source through Wechatsync without starting a browser or writing.")
+@click.option("--receipt", type=click.Path(path_type=Path), default=None, help="Receipt path for a real draft create. Required unless --dry-run is used.")
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def zhihu_draft_command(
+    profile: str,
+    source: Path,
+    registry: Path | None,
+    dry_run: bool,
+    receipt: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Dry-run or create one Zhihu draft through Wechatsync; never final-publish."""
+
+    del no_interactive
+    if dry_run and receipt is not None:
+        raise click.ClickException("--receipt is only valid when creating a draft; omit it with --dry-run")
+    if not dry_run and receipt is None:
+        raise click.ClickException("--receipt is required when creating a draft; pass --dry-run for validation")
+    account = _zhihu_account_or_click_error(registry, profile)
+    config = _load_zhihu_runner_config(account)
+    mode = "dry-run" if dry_run else "create"
+    try:
+        payload = execute_task(config, source, mode=mode)
+    except ResultUnknownError as error:
+        result = _with_target(account, dict(error.receipt))
+        if receipt is None:
+            raise click.ClickException(str(error)) from error
+        try:
+            _write_receipt(receipt, result)
+        except (OSError, TypeError, ValueError) as receipt_error:
+            _emit(result, output)
+            raise click.ClickException(
+                f"{RESULT_UNKNOWN}: {error}. Receipt could not be written; do not retry automatically."
+            ) from receipt_error
+        raise click.ClickException(str(error)) from error
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    result = _with_target(account, payload)
+    if not dry_run and receipt is not None:
+        try:
+            _write_receipt(receipt, result)
+        except (OSError, TypeError, ValueError) as receipt_error:
+            _emit(result, output)
+            raise click.ClickException(
+                "DRAFT_CREATED result was obtained, but the receipt could not be written; "
+                "do not retry automatically."
+            ) from receipt_error
+    _emit(result, output)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # 能力地图
 
-本页区分 `ChatPost 0.1.x` 当前真实用户入口和仍属后续工作的边界。
+本页区分 `ChatPost 0.1.x` 当前真实用户入口、login/status/logout 的纯浏览器边界，以及仍属后续工作的能力。
 
 ## 已实现
 
@@ -11,14 +11,16 @@
 | 知乎纯浏览器登录/状态/登出 | 已实现 | `chatpost zhihu login/status/logout PROFILE` 只操作受控 Chromium Profile。`status` 用页面 DOM/URL/可见账号入口判断 `LOGGED_IN`、`LOGGED_OUT` 或 `UNKNOWN`；`login` 已登录直接返回，未登录时输出 page-owned `login_url` 或 `browser_opened` handoff；`logout` 先 status，未登录 no-op，已登录才清理知乎 origins。全程不调用发布适配器、不加载发布扩展、不要求发布 token、不读取或导出 Cookie/LocalStorage/IndexedDB/session/token。 |
 | Browser-only runner config | 已实现 | 登录基础层只需要 `playwright_version`、`playwright_home`、`profile_dir`、`cdp_host`、`cdp_port`、`headless`、`browser_args`、`attach_existing_cdp`。 |
 | ChatArch state root | 已实现 | 默认本地状态根目录是 `~/.chatarch/chatpost/`；默认 registry 是 `~/.chatarch/chatpost/accounts.toml`，可用 `CHATPOST_HOME` / `CHATPOST_ACCOUNT_REGISTRY` / `--registry PATH` 显式覆盖。任务实验可显式传 `--registry`，但默认账号/runner/Profile/receipt 不落在仓库根目录或临时 project 目录。 |
+| 知乎 draft / Wechatsync adapter | 已实现 | `chatpost zhihu draft PROFILE SOURCE --dry-run` 调用 Wechatsync CLI parser 做 adapter preview，不启动浏览器也不写草稿；`chatpost zhihu draft PROFILE SOURCE --receipt PATH` 启动受控 Chromium + Wechatsync extension，并通过 extension MCP direct bridge 创建一个知乎草稿，写 mode `0600` receipt，返回 `DRAFT_CREATED`、`draft_id` 和 `/edit` review URL；不最终发布，不做 same-ID 更新。 |
 | Secret redaction / state boundary | 已实现 | 输出只包含页面可见账号名/主页 URL 等非 secret 状态；诊断继续遮蔽 WebSocket、loopback、ownership marker 和私密赋值。 |
 
 ## 已验证事实
 
-- 单元测试锁定 login-only CLI：`platforms`、`profiles`、`zhihu profiles/login/status/logout`。
+- 单元测试锁定 CLI：`platforms`、`profiles`、`zhihu profiles/login/status/logout/draft`。
 - 单元测试锁定 `load_browser_config` 不需要 adapter/env/extension 字段。
 - 单元测试锁定 browser-only Chrome 启动命令不带 `--load-extension` / `--disable-extensions-except`。
 - 单元测试锁定 `status/login/logout` 走 browser-level API，而不是发布适配器 auth。
+- 单元测试锁定 `draft` 走 `load_runner_config` / `execute_task`，create 前必须显式传 `--receipt`，receipt 写入 mode `0600`。
 
 ## 责任边界
 
@@ -26,18 +28,17 @@
 |---|---|---|
 | ChatUp | Playwright package/browser 安装、版本、revision、路径、doctor | Profile、登录状态判断 |
 | ChatBrowser | 浏览器 runtime、Profile metadata、CDP session metadata | 平台 adapter、内容发布、Cookie 导出 |
-| ChatPost | Profile alias、受控 Chromium lifecycle、CDP、网页登录状态判断、login handoff、logout 清理 | 下载 browser、读取 secrets、最终发布、平台 media 上传 |
-| 人工 | 首次登录、滑块/验证码、最终账号确认 | 自动化 secret 导出 |
+| ChatPost | Profile alias、ChatArch-owned state root、受控 Chromium lifecycle、CDP、网页登录状态判断、login handoff、logout 清理、Wechatsync draft orchestration | 下载 browser、读取 secrets、最终发布、平台 media 上传 |
+| 人工 | 首次登录、滑块/验证码、最终账号确认、draft review 后人工发布 | 自动化 secret 导出 |
 
-## 不在当前登录基础层
+## 不在 login/status/logout 登录基础层
 
+- `chatpost zhihu draft ...` 已实现，但它是独立发布 adapter 入口，不在 `login/status/logout` 登录基础层；
 - `chatpost account ...`；
 - `chatpost qr ...`；
 - `chatpost zhihu account ...`；
-- `chatpost zhihu draft ...`；
 - 发布适配器 verify/doctor；
-- Wechatsync adapter draft/create integration；
 - same-ID 文章更新；
 - 自动最终发布。
 
-这些能力若需要，应另起独立设计和 PR，不能改变 `login/status/logout` 的纯浏览器语义。
+这些后续能力若需要，应另起独立设计和 PR，不能改变 `login/status/logout` 的纯浏览器语义。

@@ -19,8 +19,10 @@ chatpost.zhihu
 ├── browser_login(config, timeout=..., event_callback=...)
 ├── browser_logout(config)
 ├── browser_login_session(config)
-├── ZhihuRunnerConfig             # 后续发布 adapter/Wechatsync runner 配置边界
-└── load_runner_config(path)      # 发布 runner 专用；不得被 login/status/logout 默认调用
+├── ZhihuRunnerConfig             # draft/Wechatsync runner 配置边界
+├── load_runner_config(path)      # draft runner 专用；不得被 login/status/logout 默认调用
+├── execute_task(config, source, mode="dry-run"|"create")
+└── ResultUnknownError            # create 结果不确定时禁止自动重试
 ```
 
 ## ChatUp / ChatBrowser dependency
@@ -49,4 +51,4 @@ status = browser_status(config)
 
 ## Wechatsync 接入边界
 
-`ZhihuRunnerConfig` / `load_runner_config()` 保留给后续发布 adapter 接入。它可以包含 extension、bridge、env 和 adapter CLI 字段；但 `browser_status()`、`browser_login()` 和 `browser_logout()` 必须继续使用 `ZhihuBrowserConfig`，不能为了发布接入重新依赖 Wechatsync、发布 token、Cookie、LocalStorage 或 IndexedDB。
+`ZhihuRunnerConfig` / `load_runner_config()` / `execute_task()` 是 `chatpost zhihu draft` 的 adapter 层入口。它可以包含 extension、bridge、env 和 adapter CLI 字段；但 `browser_status()`、`browser_login()` 和 `browser_logout()` 必须继续使用 `ZhihuBrowserConfig`，不能为了 draft 接入重新依赖 Wechatsync、发布 token、Cookie、LocalStorage 或 IndexedDB。

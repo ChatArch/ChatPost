@@ -1,6 +1,6 @@
-# Quickstart: Pure Browser Login
+# Quickstart: Browser Login and Zhihu Drafts
 
-This page covers only ChatPost's login foundation: discover Profiles, check Zhihu web login state, open a login handoff, and log out / clear browser state. It does not create drafts, publish content, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens.
+This page covers ChatPost's daily path: use the pure browser login foundation to discover Profiles, check Zhihu web login state, open a login handoff, and log out / clear browser state; then use the separate `chatpost zhihu draft` entrypoint to dry-run or create one Zhihu draft. `login/status/logout` do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens.
 
 ## 0. Set Variables
 
@@ -84,3 +84,31 @@ After a real login practice, this should return `LOGGED_IN`, ideally with page-v
 | `login` emits `browser_opened` but no page-owned `login_url` | The browser is open for human login; do not use screenshots or private artifacts as login links. |
 | The login page asks for a slider or verification code | Stay in the human browser flow; do not put codes into CLI args or logs. |
 | `status` returns `UNKNOWN` | Report unknown only; do not fall back to an adapter or read cookies/tokens. |
+
+## 6. Draft dry-run and create through Wechatsync
+
+`chatpost zhihu draft` is intentionally separate from the browser-level login commands. It reuses the same registry alias and runner config, but it loads the full runner fields for Wechatsync, extension, bridge, and private env file only inside the draft flow. `login/status/logout` must continue to use `load_browser_config` and must not require adapter readiness.
+
+Dry-run validates the source without starting a browser or writing a draft:
+
+```bash
+ARTICLE=/absolute/path/to/article.md
+chatpost zhihu draft zhihu-practice-quickstart "$ARTICLE" \
+  --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml \
+  --dry-run \
+  --output json \
+  -I
+```
+
+A real create requires an explicit receipt path and creates exactly one Zhihu draft. It does not final-publish:
+
+```bash
+RECEIPT=~/.chatarch/chatpost/runners/zhihu-practice-quickstart/run/zhihu-draft-receipt.json
+chatpost zhihu draft zhihu-practice-quickstart "$ARTICLE" \
+  --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml \
+  --receipt "$RECEIPT" \
+  --output json \
+  -I
+```
+
+Expected successful statuses are `DRY_RUN_OK` for dry-run and `DRAFT_CREATED` for create. Create writes a mode `0600` receipt with the draft id, `/edit` review URL, source digest, and cleanup statuses. If the create path returns `RESULT_UNKNOWN`, do not retry automatically; inspect the receipt and the browser before deciding next steps.

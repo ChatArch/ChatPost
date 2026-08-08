@@ -1,4 +1,5 @@
 import json
+import stat
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -34,9 +35,8 @@ def _json_lines(result):
 def test_zhihu_cli_registers_login_only_surface_without_unreleased_compatibility():
     zhihu = main.commands["zhihu"]
 
-    assert set(zhihu.commands) == {"profiles", "login", "status", "logout"}
+    assert set(zhihu.commands) == {"profiles", "login", "status", "logout", "draft"}
     assert all(command.hidden is False for command in zhihu.commands.values())
-    assert "draft" not in zhihu.commands
     assert "account" not in zhihu.commands
     assert "qr" not in main.commands
     assert "account" not in main.commands
@@ -49,10 +49,186 @@ def test_removed_unreleased_surfaces_fail_as_commands():
         ["qr", "encode", "https://example.com", "--artifact", "x.png"],
         ["account", "list"],
         ["zhihu", "account", "status", "zhihu-test"],
-        ["zhihu", "draft", "zhihu-test", "article.md"],
     ):
         result = runner.invoke(main, args)
         assert result.exit_code != 0, (args, result.output)
+
+
+def test_draft_dry_run_dispatches_wechat_sync_runner_without_browser_login(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    source = tmp_path / "article.md"
+    source.write_text("# Title\n\nmarker", encoding="utf-8")
+    sentinel = object()
+    calls = []
+
+    monkeypatch.setattr(command, "load_runner_config", lambda _path: sentinel)
+    monkeypatch.setattr(
+        command,
+        "execute_task",
+        lambda config, source_path, *, mode: calls.append((config, source_path, mode))
+        or {
+            "status": "DRY_RUN_OK",
+            "source_sha256": "sha256-preview",
+            "preview": "adapter preview",
+        },
+    )
+    monkeypatch.setattr(
+        command,
+        "browser_status",
+        lambda _config: (_ for _ in ()).throw(AssertionError("draft must not call browser_status")),
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
+            "draft",
+            "zhihu-test",
+            str(source),
+            "--registry",
+            str(registry),
+            "--dry-run",
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+    payload = _json(result)
+
+    assert calls == [(sentinel, source, "dry-run")]
+    assert payload == {
+        "target": "zhihu@zhihu-test",
+        "profile": "zhihu-test",
+        "platform": "zhihu",
+        "status": "DRY_RUN_OK",
+        "source_sha256": "sha256-preview",
+        "preview": "adapter preview",
+    }
+
+
+def test_draft_create_requires_receipt_before_adapter_call(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    source = tmp_path / "article.md"
+    source.write_text("# Title\n\nmarker", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(command, "load_runner_config", lambda _path: object())
+    monkeypatch.setattr(
+        command,
+        "execute_task",
+        lambda *_args, **_kwargs: calls.append((_args, _kwargs)) or {"status": "DRAFT_CREATED"},
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
+            "draft",
+            "zhihu-test",
+            str(source),
+            "--registry",
+            str(registry),
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "--receipt is required" in result.output
+    assert calls == []
+
+
+def test_draft_create_writes_mode_0600_receipt(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    source = tmp_path / "article.md"
+    receipt = tmp_path / "run" / "receipt.json"
+    source.write_text("# Title\n\nmarker", encoding="utf-8")
+    sentinel = object()
+    calls = []
+
+    monkeypatch.setattr(command, "load_runner_config", lambda _path: sentinel)
+    monkeypatch.setattr(
+        command,
+        "execute_task",
+        lambda config, source_path, *, mode: calls.append((config, source_path, mode))
+        or {
+            "status": "DRAFT_CREATED",
+            "draft_id": "12345",
+            "review_url": "https://zhuanlan.zhihu.com/p/12345/edit",
+            "source_sha256": "sha256-created",
+        },
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
+            "draft",
+            "zhihu-test",
+            str(source),
+            "--registry",
+            str(registry),
+            "--receipt",
+            str(receipt),
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+    payload = _json(result)
+
+    assert calls == [(sentinel, source, "create")]
+    assert payload["status"] == "DRAFT_CREATED"
+    assert json.loads(receipt.read_text(encoding="utf-8"))["status"] == "DRAFT_CREATED"
+    assert stat.S_IMODE(receipt.stat().st_mode) == 0o600
+
+
+def test_draft_result_unknown_writes_receipt_with_recovery_reason(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    source = tmp_path / "article.md"
+    receipt = tmp_path / "run" / "unknown.json"
+    source.write_text("# Title\n\nmarker", encoding="utf-8")
+
+    monkeypatch.setattr(command, "load_runner_config", lambda _path: object())
+
+    def ambiguous(*_args, **_kwargs):
+        raise command.ResultUnknownError(
+            "Wechatsync exited successfully without a review URL; do not retry automatically",
+            receipt={
+                "status": command.RESULT_UNKNOWN,
+                "source_sha256": "sha256-unknown",
+                "result_unknown_reason": "missing_review_url",
+                "cleanup_status": "CLOSED",
+                "adapter_cleanup_status": "CLOSED",
+            },
+        )
+
+    monkeypatch.setattr(command, "execute_task", ambiguous)
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "zhihu",
+            "draft",
+            "zhihu-test",
+            str(source),
+            "--registry",
+            str(registry),
+            "--receipt",
+            str(receipt),
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+
+    assert result.exit_code != 0
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    assert payload["status"] == command.RESULT_UNKNOWN
+    assert payload["result_unknown_reason"] == "missing_review_url"
+    assert payload["target"] == "zhihu@zhihu-test"
+    assert stat.S_IMODE(receipt.stat().st_mode) == 0o600
+    assert "do not retry automatically" in result.output
 
 
 def test_status_dispatches_browser_level_status_without_adapter_auth(monkeypatch, tmp_path):
