@@ -2244,3 +2244,64 @@ def test_browser_logout_clears_zhihu_origins_only_after_logged_in_precheck(tmp_p
             ("https://www.zhihu.com", "https://zhuanlan.zhihu.com"),
         )
     ]
+
+
+def test_clear_zhihu_browser_state_uses_attached_page_session(monkeypatch):
+    endpoint = _endpoint(None)
+    sent = []
+    closed = []
+
+    class Socket:
+        def __init__(self):
+            self.response = None
+
+        def send(self, payload):
+            message = json.loads(payload)
+            sent.append(message)
+            if message["method"] == "Target.attachToTarget":
+                self.response = {
+                    "id": message["id"],
+                    "result": {"sessionId": "page-session"},
+                }
+            else:
+                self.response = {"id": message["id"], "result": {}}
+
+        def recv(self):
+            return json.dumps(self.response)
+
+        def close(self):
+            pass
+
+    @contextmanager
+    def socket(_endpoint_value):
+        yield Socket()
+
+    monkeypatch.setattr(zhihu, "_owned_browser_socket", socket)
+    monkeypatch.setattr(zhihu, "_create_browser_page", lambda _endpoint, url: f"target:{url}")
+    monkeypatch.setattr(zhihu, "_close_browser_page", lambda _endpoint, target_id: closed.append(target_id))
+
+    zhihu._clear_zhihu_browser_state(
+        endpoint,
+        ("https://www.zhihu.com", "https://zhuanlan.zhihu.com"),
+    )
+
+    assert [message["method"] for message in sent] == [
+        "Target.attachToTarget",
+        "Network.enable",
+        "Network.clearBrowserCookies",
+        "Storage.clearCookies",
+        "Storage.clearDataForOrigin",
+        "Storage.clearDataForStorageKey",
+        "Storage.clearDataForOrigin",
+        "Storage.clearDataForStorageKey",
+        "Target.detachFromTarget",
+    ]
+    assert all(
+        message.get("sessionId") == "page-session"
+        for message in sent[1:]
+        if message["method"] != "Target.detachFromTarget"
+    )
+    assert sent[3]["method"] == "Storage.clearCookies"
+    assert sent[4]["params"] == {"origin": "https://www.zhihu.com", "storageTypes": "all"}
+    assert sent[5]["params"] == {"storageKey": "https://www.zhihu.com/", "storageTypes": "all"}
+    assert closed == ["target:https://www.zhihu.com"]

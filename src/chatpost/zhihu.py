@@ -2240,17 +2240,77 @@ def _clear_zhihu_browser_state(
     endpoint: _CdpEndpoint,
     origins: tuple[str, ...],
 ) -> None:
-    with _owned_browser_socket(endpoint) as debug_socket:
-        for index, origin in enumerate(origins, start=1):
+    """Clear Zhihu browser state from a page target session.
+
+    Chromium 149 returns a root-session ``Storage.clearDataForOrigin`` internal
+    error for these Profile-backed sessions, while the same operation succeeds
+    from an attached page target session.  Keep logout browser-level: do not read
+    or export cookie/storage values, and do not call the publishing adapter.
+    """
+
+    target_id = _create_browser_page(endpoint, origins[0])
+    session_id: str | None = None
+    try:
+        with _owned_browser_socket(endpoint) as debug_socket:
+            attached = _cdp_command(
+                debug_socket,
+                1,
+                "Target.attachToTarget",
+                {"targetId": target_id, "flatten": True},
+            )
+            raw_session_id = attached.get("sessionId")
+            if not isinstance(raw_session_id, str) or not raw_session_id:
+                raise TypeError("Browser target attach did not return a session id")
+            session_id = raw_session_id
+            _cdp_command(debug_socket, 2, "Network.enable", session_id=session_id)
+            _cdp_command(debug_socket, 3, "Network.clearBrowserCookies", session_id=session_id)
+            _cdp_command(debug_socket, 4, "Storage.clearCookies", session_id=session_id)
+            index = 5
+            for origin in origins:
+                _cdp_command(
+                    debug_socket,
+                    index,
+                    "Storage.clearDataForOrigin",
+                    {
+                        "origin": origin,
+                        "storageTypes": "all",
+                    },
+                    session_id=session_id,
+                )
+                index += 1
+                _cdp_command(
+                    debug_socket,
+                    index,
+                    "Storage.clearDataForStorageKey",
+                    {
+                        "storageKey": origin.rstrip("/") + "/",
+                        "storageTypes": "all",
+                    },
+                    session_id=session_id,
+                )
+                index += 1
             _cdp_command(
                 debug_socket,
-                index,
-                "Storage.clearDataForOrigin",
-                {
-                    "origin": origin,
-                    "storageTypes": "cookies,local_storage,indexeddb,cache_storage,service_workers,websql",
-                },
+                999,
+                "Target.detachFromTarget",
+                {"sessionId": session_id},
             )
+            session_id = None
+    finally:
+        try:
+            if session_id is not None:
+                with _owned_browser_socket(endpoint) as debug_socket:
+                    _cdp_command(
+                        debug_socket,
+                        999,
+                        "Target.detachFromTarget",
+                        {"sessionId": session_id},
+                    )
+        finally:
+            try:
+                _close_browser_page(endpoint, target_id)
+            except (OSError, RuntimeError, TypeError, ValueError, websocket.WebSocketException):
+                pass
 
 
 def browser_logout(
