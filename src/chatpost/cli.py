@@ -32,7 +32,7 @@ _CLI_TREE_LINES = (
     "├── --tree  # Print the registered CLI tree with command purpose and IO shape.",
     "├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.",
     "├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.",
-    "└── zhihu  # Zhihu browser login and WeChat sync draft capabilities",
+    "└── zhihu  # Zhihu browser login and Wechatsync draft capabilities",
     "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.",
     "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.",
     "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only.",

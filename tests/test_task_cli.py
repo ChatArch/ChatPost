@@ -47,7 +47,7 @@ def test_top_level_tree_prints_complete_login_only_registered_cli_tree():
     assert "chatpost  # browser-level platform login and draft manager" in result.output
     assert "├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser." in result.output
     assert "├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state." in result.output
-    assert "└── zhihu  # Zhihu browser login and WeChat sync draft capabilities" in result.output
+    assert "└── zhihu  # Zhihu browser login and Wechatsync draft capabilities" in result.output
     assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles." in result.output
     assert "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed." in result.output
     assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only." in result.output

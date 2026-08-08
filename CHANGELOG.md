@@ -13,6 +13,7 @@
 
 - Remove unreleased user-facing `account`, `qr`, and `zhihu account ...` commands from the registered CLI tree while keeping `draft` as the explicit adapter path.
 - Update README, CLI tree, Quickstart, MkDocs home, and capability map to describe the login boundary plus the separate draft adapter path.
+- Normalize the visible CLI tree wording to use the project name `Wechatsync` consistently.
 - Document `~/.chatarch/chatpost/` as the default ChatArch-owned state root and `~/.chatarch/chatpost/accounts.toml` as the default non-sensitive registry, with `CHATPOST_HOME`, `CHATPOST_ACCOUNT_REGISTRY`, and `--registry PATH` as explicit overrides.
 - Align configuration and Python interface docs to the current browser-login API while documenting `load_runner_config` / `execute_task` as the draft adapter boundary.
 - Redact live login URLs, account names, and account/profile URLs from the public Quickstart transcript while preserving `LOGGED_IN` evidence.
