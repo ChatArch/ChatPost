@@ -91,9 +91,10 @@ def test_xhs_status_dispatches_browser_level_status_without_adapter(monkeypatch,
     assert "cookie" not in lower
 
 
-def test_xhs_login_dispatches_browser_level_handoff(monkeypatch, tmp_path):
+def test_xhs_login_dispatches_browser_level_qr_handoff(monkeypatch, tmp_path):
     registry = _registry(tmp_path)
     sentinel = object()
+    qr_path = tmp_path / "xhs-login-qr.png"
     calls = []
     monkeypatch.setattr(command, "load_xhs_browser_config", lambda _path: sentinel)
 
@@ -102,10 +103,10 @@ def test_xhs_login_dispatches_browser_level_handoff(monkeypatch, tmp_path):
         assert event_callback is not None
         event_callback(
             {
-                "event": "login_url",
+                "event": "login_handoff",
                 "status": "LOGIN_REQUIRED",
-                "login_url": "https://www.xiaohongshu.com/explore",
-                "handoff_kind": "browser_opened",
+                "login_url": "https://customer.xiaohongshu.com/loginconfirm?qrCodeId=SECRET",
+                "handoff_kind": "page_owned_qr_login_url",
                 "check_method": "browser_page",
             }
         )
@@ -129,6 +130,8 @@ def test_xhs_login_dispatches_browser_level_handoff(monkeypatch, tmp_path):
             str(registry),
             "--timeout",
             "60",
+            "--qrcode",
+            str(qr_path),
             "--output",
             "json",
             "-I",
@@ -137,15 +140,16 @@ def test_xhs_login_dispatches_browser_level_handoff(monkeypatch, tmp_path):
     events = _json_lines(result)
 
     assert calls == [(sentinel, 60, calls[0][2])]
+    assert qr_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert events == [
         {
-            "event": "login_url",
+            "event": "login_handoff",
             "target": "xhs@xhs-test",
             "profile": "xhs-test",
             "platform": "xhs",
             "status": "LOGIN_REQUIRED",
-            "login_url": "https://www.xiaohongshu.com/explore",
-            "handoff_kind": "browser_opened",
+            "handoff_kind": "qrcode_image",
+            "qrcode_path": str(qr_path.resolve()),
             "check_method": "browser_page",
         },
         {
@@ -160,6 +164,8 @@ def test_xhs_login_dispatches_browser_level_handoff(monkeypatch, tmp_path):
         },
     ]
     lower = result.output.lower()
+    assert "loginconfirm" not in lower
+    assert "qrcodeid" not in lower
     assert "wechatsync" not in lower
     assert "media:ssh" not in lower
     assert "receipt" not in lower
@@ -228,7 +234,6 @@ def test_xhs_login_writes_qrcode_artifact_and_suppresses_data_url(monkeypatch, t
             "profile": "xhs-test",
             "platform": "xhs",
             "status": "LOGIN_REQUIRED",
-            "login_url": None,
             "handoff_kind": "qrcode_image",
             "qrcode_path": str(qr_path.resolve()),
             "check_method": "browser_page",
@@ -239,12 +244,15 @@ def test_xhs_login_writes_qrcode_artifact_and_suppresses_data_url(monkeypatch, t
             "profile": "xhs-test",
             "platform": "xhs",
             "status": "LOGIN_TIMEOUT",
-            "login_url": None,
             "handoff_kind": "qrcode_image",
             "qrcode_path": str(qr_path.resolve()),
             "check_method": "browser_page",
         },
     ]
+    lower = result.output.lower()
+    assert "login_url" not in lower
+    assert "data:image" not in lower
+    assert "base64," not in lower
     assert "qrcode_data_url" not in result.output
     assert "iVBOR" not in result.output
 

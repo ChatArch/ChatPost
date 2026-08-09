@@ -14,6 +14,7 @@ import click
 
 from chatpost import __version__
 from chatpost.accounts import AccountRegistryError, load_accounts, resolve_account
+from chatpost.qr import generate_qr_code_image
 from chatpost.xhs import (
     browser_login as xhs_browser_login,
     browser_logout as xhs_browser_logout,
@@ -169,8 +170,17 @@ def _write_data_url_artifact(data_url: str, destination: Path) -> Path:
 def _xhs_login_payload_for_emit(payload: dict[str, Any], qrcode_path: Path | None) -> dict[str, Any]:
     event = dict(payload)
     data_url = event.pop("qrcode_data_url", None)
+    login_url = event.pop("login_url", None)
+    wrote_qr = False
     if isinstance(data_url, str) and data_url and qrcode_path is not None:
         event["qrcode_path"] = str(_write_data_url_artifact(data_url, qrcode_path))
+        wrote_qr = True
+    elif isinstance(login_url, str) and login_url.strip() and qrcode_path is not None:
+        artifact = generate_qr_code_image(login_url.strip(), qrcode_path)
+        event["qrcode_path"] = str(artifact["artifact_path"])
+        wrote_qr = True
+    if wrote_qr:
+        event["handoff_kind"] = "qrcode_image"
     return event
 
 
