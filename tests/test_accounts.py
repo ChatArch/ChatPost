@@ -22,7 +22,7 @@ def _registry_toml(runner: Path) -> str:
 def _xiaohongshu_registry_toml(runner: Path) -> str:
     return (
         '[accounts."xhs-test"]\n'
-        'platform = "xiaohongshu"\n'
+        'platform = "xhs"\n'
         f'runner_config = {json.dumps(str(runner))}\n'
     )
 
@@ -72,8 +72,8 @@ def test_load_accounts_accepts_xiaohongshu_platform(tmp_path: Path):
 
     account = load_accounts(registry)["xhs-test"]
 
-    assert account.platform == "xiaohongshu"
-    assert account.target() == "xiaohongshu@xhs-test"
+    assert account.platform == "xhs"
+    assert account.target() == "xhs@xhs-test"
     assert account.runner_config == runner.resolve()
 
 

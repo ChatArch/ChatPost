@@ -9,8 +9,8 @@ from chatpost.cli import main
 def _registry(tmp_path: Path) -> Path:
     zhihu_runner = tmp_path / "zhihu-runner.toml"
     zhihu_runner.write_text("[zhihu]\n", encoding="utf-8")
-    xhs_runner = tmp_path / "xiaohongshu-runner.toml"
-    xhs_runner.write_text("[xiaohongshu]\n", encoding="utf-8")
+    xhs_runner = tmp_path / "xhs-runner.toml"
+    xhs_runner.write_text("[xhs]\n", encoding="utf-8")
     registry = tmp_path / "accounts.toml"
     registry.write_text(
         '[accounts."zhihu-test"]\n'
@@ -23,10 +23,10 @@ def _registry(tmp_path: Path) -> Path:
     with registry.open("a", encoding="utf-8") as stream:
         stream.write(
             '\n[accounts."xhs-test"]\n'
-            'platform = "xiaohongshu"\n'
+            'platform = "xhs"\n'
             f'runner_config = {json.dumps(str(xhs_runner))}\n'
             'profile = "xhs-test"\n'
-            'label = "Xiaohongshu test account"\n'
+            'label = "XHS test account"\n'
         )
     return registry
 
@@ -52,7 +52,7 @@ def _json(result):
 
 
 def test_task_cli_exposes_login_and_draft_platform_surfaces():
-    assert set(main.commands) == {"platforms", "profiles", "zhihu", "xiaohongshu"}
+    assert set(main.commands) == {"platforms", "profiles", "zhihu", "xhs"}
     assert main.commands["platforms"].hidden is False
     assert main.commands["profiles"].hidden is False
 
@@ -64,9 +64,9 @@ def test_task_cli_exposes_login_and_draft_platform_surfaces():
     assert zhihu.commands["status"].hidden is False
     assert zhihu.commands["draft"].hidden is False
 
-    xiaohongshu = main.commands["xiaohongshu"]
-    assert set(xiaohongshu.commands) == {"profiles", "login", "logout", "status", "draft"}
-    assert all(command.hidden is False for command in xiaohongshu.commands.values())
+    xhs = main.commands["xhs"]
+    assert set(xhs.commands) == {"profiles", "login", "logout", "status"}
+    assert all(command.hidden is False for command in xhs.commands.values())
 
 
 def test_top_level_tree_prints_complete_login_only_registered_cli_tree():
@@ -75,24 +75,23 @@ def test_top_level_tree_prints_complete_login_only_registered_cli_tree():
     assert result.exit_code == 0, result.output
     assert "chatpost  # browser-level platform login and draft manager" in result.output
     assert "├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser." in result.output
-    assert "├── profiles [--platform zhihu|xiaohongshu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state." in result.output
+    assert "├── profiles [--platform zhihu|xhs] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state." in result.output
     assert "├── zhihu  # Zhihu browser login and Wechatsync draft capabilities" in result.output
     assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles." in result.output
     assert "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed." in result.output
     assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only." in result.output
     assert "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status." in result.output
     assert "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish." in result.output
-    assert "└── xiaohongshu  # Xiaohongshu browser login and draft boundary" in result.output
-    assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Xiaohongshu browser Profiles." in result.output
-    assert "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed." in result.output
-    assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Xiaohongshu web login state from page-visible browser state only." in result.output
-    assert "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Xiaohongshu browser state after browser-level status." in result.output
-    assert "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run local source validation; create is unsupported until a Xiaohongshu adapter is connected." in result.output
+    assert "└── xhs  # XHS browser login system" in result.output
+    assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured XHS browser Profiles." in result.output
+    assert "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the creator login page's own QR handoff and write the QR artifact." in result.output
+    assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check XHS web login state from page-visible browser state only." in result.output
+    assert "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear XHS browser state after browser-level status." in result.output
     forbidden = [
         "account",
         "qr-artifact",
         "qr encode",
-        "--qr",
+        "\n  qr",
         "wechatsync",
         "WECHATSYNC_TOKEN",
         "MEDIA:ssh",
@@ -109,7 +108,7 @@ def test_top_level_help_shows_discovery_and_platform_groups_only():
     assert "platforms" in result.output
     assert "profiles" in result.output
     assert "zhihu" in result.output
-    assert "xiaohongshu" in result.output
+    assert "xhs" in result.output
     assert "\n  account" not in result.output
     assert "\n  qr" not in result.output
     assert "\n  login" not in result.output
@@ -133,12 +132,11 @@ def test_platforms_lists_supported_login_platforms():
                 "draft_command": "chatpost zhihu draft PROFILE SOURCE",
             },
             {
-                "name": "xiaohongshu",
-                "profiles_command": "chatpost xiaohongshu profiles",
-                "login_command": "chatpost xiaohongshu login PROFILE",
-                "status_command": "chatpost xiaohongshu status PROFILE",
-                "logout_command": "chatpost xiaohongshu logout PROFILE",
-                "draft_command": "chatpost xiaohongshu draft PROFILE SOURCE",
+                "name": "xhs",
+                "profiles_command": "chatpost xhs profiles",
+                "login_command": "chatpost xhs login PROFILE",
+                "status_command": "chatpost xhs status PROFILE",
+                "logout_command": "chatpost xhs logout PROFILE",
             }
         ],
     }
@@ -188,19 +186,19 @@ def test_top_level_profiles_filters_xiaohongshu_platform(tmp_path):
 
     result = CliRunner().invoke(
         main,
-        ["profiles", "--platform", "xiaohongshu", "--registry", str(registry), "--output", "json", "-I"],
+        ["profiles", "--platform", "xhs", "--registry", str(registry), "--output", "json", "-I"],
     )
     payload = _json(result)
 
     assert payload["status"] == "READY"
-    assert payload["platform"] == "xiaohongshu"
+    assert payload["platform"] == "xhs"
     assert payload["profiles"] == [
         {
             "alias": "xhs-test",
-            "platform": "xiaohongshu",
+            "platform": "xhs",
             "profile": "xhs-test",
-            "label": "Xiaohongshu test account",
-            "runner_config": str(tmp_path / "xiaohongshu-runner.toml"),
+            "label": "XHS test account",
+            "runner_config": str(tmp_path / "xhs-runner.toml"),
         }
     ]
 
@@ -210,10 +208,10 @@ def test_xiaohongshu_profiles_lists_xiaohongshu_browser_profile_configs(tmp_path
 
     result = CliRunner().invoke(
         main,
-        ["xiaohongshu", "profiles", "--registry", str(registry), "--output", "json", "-I"],
+        ["xhs", "profiles", "--registry", str(registry), "--output", "json", "-I"],
     )
     payload = _json(result)
 
     assert payload["status"] == "READY"
-    assert payload["platform"] == "xiaohongshu"
+    assert payload["platform"] == "xhs"
     assert payload["profiles"][0]["alias"] == "xhs-test"

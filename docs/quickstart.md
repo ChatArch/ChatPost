@@ -24,16 +24,16 @@ ChatPost 默认把本地状态放在 ChatArch 内部目录 `~/.chatarch/chatpost
 
 "$CHATPOST" profiles   --platform zhihu   --registry "$REGISTRY"   --output json   -I
 
-"$CHATPOST" profiles   --platform xiaohongshu   --registry "$REGISTRY"   --output json   -I
+"$CHATPOST" profiles   --platform xhs   --registry "$REGISTRY"   --output json   -I
 
 "$CHATPOST" zhihu profiles   --registry "$REGISTRY"   --output json   -I
 
-"$CHATPOST" xiaohongshu profiles   --registry "$REGISTRY"   --output json   -I
+"$CHATPOST" xhs profiles   --registry "$REGISTRY"   --output json   -I
 ```
 
-这些发现命令只读 registry，不启动浏览器，不读取登录态。等价真实命令名是 `chatpost platforms`、`chatpost profiles`、`chatpost zhihu profiles` 和 `chatpost xiaohongshu profiles`。
+这些发现命令只读 registry，不启动浏览器，不读取登录态。等价真实命令名是 `chatpost platforms`、`chatpost profiles`、`chatpost zhihu profiles` 和 `chatpost xhs profiles`。
 
-登录基础层的真实命令名是 `chatpost zhihu status`、`chatpost zhihu login`、`chatpost zhihu logout`、`chatpost xiaohongshu status`、`chatpost xiaohongshu login` 和 `chatpost xiaohongshu logout`。
+登录基础层的真实命令名是 `chatpost zhihu status`、`chatpost zhihu login`、`chatpost zhihu logout`、`chatpost xhs status`、`chatpost xhs login` 和 `chatpost xhs logout`。
 
 ## 2. 检查当前网页登录态
 
@@ -86,15 +86,15 @@ JSON 输出是 JSON Lines：先输出可交互 handoff 事件，最后输出登�
 
 ```bash
 XHS_PROFILE=xhs-personal
-"$CHATPOST" xiaohongshu status "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
-"$CHATPOST" xiaohongshu login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --output json   -I
-"$CHATPOST" xiaohongshu logout "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
+"$CHATPOST" xhs status "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
+"$CHATPOST" xhs login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --output json   -I
+"$CHATPOST" xhs logout "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
 ```
 
-小红书 draft 当前只做本地校验，不写远端；真实命令名是 `chatpost xiaohongshu draft`：
+小红书 draft 当前只做本地校验，不写远端；真实命令名是 `chatpost xhs draft`：
 
 ```bash
-"$CHATPOST" xiaohongshu draft "$XHS_PROFILE" /absolute/path/to/note.md   --registry "$REGISTRY"   --dry-run   --output json   -I
+"$CHATPOST" xhs draft "$XHS_PROFILE" /absolute/path/to/note.md   --registry "$REGISTRY"   --dry-run   --output json   -I
 ```
 
 ## 常见停点

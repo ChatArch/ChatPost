@@ -61,7 +61,7 @@ personal persona
 
 brand persona
 ├── zhihu@brand
-└── xiaohongshu@brand
+└── xhs@brand
 ```
 
 One persona may hold sessions for the same identity across different platforms. Deployments that need stronger cross-platform separation can use one persona per platform account.

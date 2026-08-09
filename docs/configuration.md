@@ -211,10 +211,10 @@ label = "Personal Zhihu browser Profile"
 login_methods = ["qr"]
 
 [accounts."xhs-personal"]
-platform = "xiaohongshu"
+platform = "xhs"
 runner_config = "runners/xhs-personal/runner.toml"
 profile = "xhs-personal"
-label = "Personal Xiaohongshu browser Profile"
+label = "Personal XHS browser Profile"
 login_methods = ["qr"]
 ```
 

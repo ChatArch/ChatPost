@@ -61,7 +61,7 @@ personal persona
 
 brand persona
 ├── zhihu@brand
-└── xiaohongshu@brand
+└── xhs@brand
 ```
 
 同一 persona 可以保存不同平台的同一身份组合。如果希望平台之间也完全隔离，可以继续拆成一账号一 persona。
