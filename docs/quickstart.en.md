@@ -1,6 +1,6 @@
-# Quickstart: Browser Login, Zhihu Drafts, and XHS Login
+# Quickstart: Browser Login, Zhihu Drafts, and XHS QR Login
 
-This page covers ChatPost's daily path: use the pure browser login foundation to discover Profiles, check Zhihu/XHS web login state, open a login handoff, and log out / clear browser state; then use the separate `chatpost zhihu draft` entrypoint to dry-run or create one Zhihu draft. `login/status/logout` do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens. XHS `draft` currently performs local dry-run/source validation only; create explicitly returns unsupported until an adapter is connected.
+This page covers ChatPost's daily path: use the pure browser login foundation to discover Profiles, check Zhihu/XHS web login state, open a login handoff, and log out / clear browser state; then use the separate `chatpost zhihu draft` entrypoint to dry-run or create one Zhihu draft. `login/status/logout` do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens. XHS currently exposes only `profiles/login/status/logout`, and its user-facing login handoff is QR-image-only.
 
 ## 0. Set Variables
 
@@ -80,29 +80,28 @@ After a real login practice, this should return `LOGGED_IN`, ideally with page-v
 
 `logout` first runs browser-level status. It returns `ALREADY_LOGGED_OUT` when already logged out, and clears Zhihu origins only after a logged-in precheck. Clearing state is a browser command; it does not read session values.
 
-## 5b. XHS Login Link Handoff
+## 5b. XHS QR Image Handoff
 
-XHS keeps the same platform shape as Zhihu. `login` opens the XHS login page and tries to extract a page-owned `login_url` from the page QR code, BarcodeDetector, or page resources. If the page does not expose a decodable QR/login URL, ChatPost returns `browser_opened` and the human completes login in the browser. If XHS marks the current network as risky, the CLI returns `LOGIN_BLOCKED` / `block_reason=network_risk` instead of pretending that a fallback login page is a QR URL.
+XHS keeps the same platform shape as Zhihu, but the handoff shape is different: the user-facing XHS login path is QR-image-only. `login` opens the XHS creator login page, switches to QR login, and writes the page-owned short-lived QR payload as a PNG artifact. User-visible output contains only `qrcode_path`; it never prints `login_url`, `loginconfirm`, raw data URLs, base64, or QR tokens. The QR is valid only while the same browser login page stays alive and polling; if the login command times out, is terminated, or the browser closes, the generated QR is invalid.
 
 ```bash
 XHS_PROFILE=xhs-personal
+XHS_QR="$CHATPOST_HOME/xhs-login-qrcode.png"
 "$CHATPOST" xhs status "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
-"$CHATPOST" xhs login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --output json   -I
+"$CHATPOST" xhs login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --qrcode "$XHS_QR"   --output json   -I
 "$CHATPOST" xhs logout "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
 ```
 
-XHS draft currently performs local validation only and does not write remotely; the literal command name is `chatpost xhs draft`:
-
-```bash
-"$CHATPOST" xhs draft "$XHS_PROFILE" /absolute/path/to/note.md   --registry "$REGISTRY"   --dry-run   --output json   -I
-```
+When QR generation succeeds, the first JSON Lines event has `event=login_handoff`, `status=LOGIN_REQUIRED`, `handoff_kind=qrcode_image`, and `qrcode_path=/path/to/png`. If the page does not expose a real decodable QR, ChatPost returns `LOGIN_HANDOFF_UNAVAILABLE` / `reason=qrcode_not_found`; if XHS marks the current network as risky, it returns `LOGIN_BLOCKED` / `block_reason=network_risk`. These failures must not be disguised as a scannable QR.
 
 ## Common Stops
 
 | Stop | Handling |
 | --- | --- |
 | `login` returns `LOGGED_IN` immediately | Expected: the Profile is already logged in. |
-| `login` emits `browser_opened` but no page-owned `login_url` | The browser is open for human login; do not use screenshots or private artifacts as login links. |
+| `xhs login` emits `qrcode_path` | Expected handoff: send that PNG to the user and keep the same login command/browser page polling. |
+| `xhs login` returns `LOGIN_HANDOFF_UNAVAILABLE` / `qrcode_not_found` | The page did not expose a real decodable QR; do not use screenshots, switch icons, or private artifacts as QR substitutes. |
+| `zhihu login` emits `browser_opened` but no page-owned `login_url` | The browser is open for human login; do not use screenshots or private artifacts as login links. |
 | The login page asks for a slider or verification code | Stay in the human browser flow; do not put codes into CLI args or logs. |
 | `login` returns `LOGIN_BLOCKED` / `block_reason=network_risk` | The current egress was rejected by the platform, so no scannable QR can be generated; retry from a trusted network or local browser Profile. |
 | `status` returns `UNKNOWN` | Report unknown only; do not fall back to an adapter or read cookies/tokens. |

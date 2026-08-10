@@ -1,6 +1,6 @@
-# Quickstart：浏览器登录、知乎草稿与小红书登录
+# Quickstart：浏览器登录、知乎草稿与小红书二维码登录
 
-本页覆盖 ChatPost 的日常路径：先用纯浏览器登录基础层发现 Profile、检查知乎/小红书网页登录态、打开登录 handoff、登出/清理；再通过独立 `chatpost zhihu draft` 入口 dry-run 或创建一个知乎草稿。`login/status/logout` 不创建草稿、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。小红书 `draft` 当前只做本地 dry-run/source 校验；真实 create 在 adapter 接入前明确返回不支持。
+本页覆盖 ChatPost 的日常路径：先用纯浏览器登录基础层发现 Profile、检查知乎/小红书网页登录态、打开登录 handoff、登出/清理；再通过独立 `chatpost zhihu draft` 入口 dry-run 或创建一个知乎草稿。`login/status/logout` 不创建草稿、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。小红书当前只提供 `profiles/login/status/logout`，登录用户侧只支持二维码图片 handoff。
 
 ## 0. 设定变量
 
@@ -80,29 +80,28 @@ JSON 输出是 JSON Lines：先输出可交互 handoff 事件，最后输出登�
 
 `logout` 先做 browser-level status：未登录时返回 `ALREADY_LOGGED_OUT`；已登录时才清理知乎 origins 登录态。清理是浏览器命令，不读取任何 session 原值。
 
-## 5b. 小红书登录链接 handoff
+## 5b. 小红书二维码图片 handoff
 
-小红书与知乎保持同形平台入口。`login` 会打开小红书登录页，并尽量从页面二维码、BarcodeDetector 或页面资源中抽取 page-owned `login_url`；如果页面没有暴露可解析二维码链接，则返回 `browser_opened`，由人工在浏览器中完成登录。如果小红书把当前网络判为风险，CLI 会返回 `LOGIN_BLOCKED` / `block_reason=network_risk`，不会把 fallback 登录页伪装成二维码链接。
+小红书与知乎保持同形平台入口，但 handoff 形态不同：小红书用户侧只支持二维码图片。`login` 会打开小红书创作者中心登录页，切到二维码登录，并把页面自己的短期二维码 payload 写成 PNG artifact。用户可见输出只包含 `qrcode_path`，不会输出 `login_url`、`loginconfirm`、raw data URL、base64 或二维码 token。二维码必须绑定仍然活着、正在轮询的同一个浏览器登录页；如果登录命令 timeout、被终止或浏览器关闭，已生成的二维码立即作废。
 
 ```bash
 XHS_PROFILE=xhs-personal
+XHS_QR="$CHATPOST_HOME/xhs-login-qrcode.png"
 "$CHATPOST" xhs status "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
-"$CHATPOST" xhs login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --output json   -I
+"$CHATPOST" xhs login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --qrcode "$XHS_QR"   --output json   -I
 "$CHATPOST" xhs logout "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
 ```
 
-小红书 draft 当前只做本地校验，不写远端；真实命令名是 `chatpost xhs draft`：
-
-```bash
-"$CHATPOST" xhs draft "$XHS_PROFILE" /absolute/path/to/note.md   --registry "$REGISTRY"   --dry-run   --output json   -I
-```
+当二维码成功生成时，首个 JSON Lines 事件形态为 `event=login_handoff`、`status=LOGIN_REQUIRED`、`handoff_kind=qrcode_image`、`qrcode_path=/path/to/png`。如果页面没有暴露真实可解码二维码，返回 `LOGIN_HANDOFF_UNAVAILABLE` / `reason=qrcode_not_found`；如果小红书把当前网络判为风险，返回 `LOGIN_BLOCKED` / `block_reason=network_risk`。这些失败都不能伪装成可扫码二维码。
 
 ## 常见停点
 
 | 停点 | 处理 |
 | --- | --- |
 | `login` 直接返回 `LOGGED_IN` | 预期行为，说明 Profile 已登录。 |
-| `login` 输出 `browser_opened` 但没有 page-owned `login_url` | 浏览器已打开等待人工登录；不要用截图或私有 artifact 冒充登录链接。 |
+| `xhs login` 输出 `qrcode_path` | 预期 handoff；把该 PNG 发给用户扫码，并保持同一登录命令/浏览器页继续轮询。 |
+| `xhs login` 返回 `LOGIN_HANDOFF_UNAVAILABLE` / `qrcode_not_found` | 页面未暴露真实可解码二维码；不能把截图、切换图标或私有 artifact 冒充二维码。 |
+| `zhihu login` 输出 `browser_opened` 但没有 page-owned `login_url` | 浏览器已打开等待人工登录；不要用截图或私有 artifact 冒充登录链接。 |
 | 登录页需要滑块或验证码 | 停在人工浏览器流程，不把验证码写进 CLI 参数或日志。 |
 | `login` 返回 `LOGIN_BLOCKED` / `block_reason=network_risk` | 当前出口被平台拒绝，不能生成可扫码二维码；换可靠网络或本机浏览器 profile 后再试。 |
 | `status` 返回 `UNKNOWN` | 只报告未知；不要 fallback 到发布适配器或读取 Cookie/token。 |

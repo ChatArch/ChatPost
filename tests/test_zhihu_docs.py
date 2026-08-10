@@ -16,15 +16,14 @@ LOGIN_COMMANDS = (
     "chatpost xhs login",
     "chatpost xhs status",
     "chatpost xhs logout",
-    "chatpost xhs draft",
 )
 
 FORBIDDEN_LOGIN_SURFACE = (
     "chatpost account",
     "chatpost qr",
     "chatpost zhihu account",
+    "chatpost xhs draft",
     "qr-artifact",
-    "--qr",
     "WECHATSYNC_TOKEN",
     "auth zhihu",
 )
@@ -39,6 +38,8 @@ def test_cli_tree_documents_login_only_registered_surface():
             assert forbidden not in text
         assert "browser-level" in text or "浏览器" in text
         assert "page-owned `login_url`" in text
+        assert "--qrcode PATH" in text
+        assert "qrcode_path" in text
         assert "LOGGED_IN" in text
         assert "LOGGED_OUT" in text
         assert "UNKNOWN" in text
@@ -62,6 +63,8 @@ def test_quickstart_covers_login_and_draft_while_preserving_login_boundary():
         assert "~/.chatarch/chatpost" in text
         assert "CHATPOST_ACCOUNT_REGISTRY" in text
         assert "page-owned `login_url`" in text
+        assert "--qrcode" in text
+        assert "qrcode_path" in text
         assert "--dry-run" in text
         assert "--receipt" in text
         assert "browser_opened" in text
@@ -84,13 +87,15 @@ def test_home_readme_and_mkdocs_route_to_login_quickstart():
     en_home = (ROOT / "docs/index.en.md").read_text(encoding="utf-8")
     zh_readme = (ROOT / "README.md").read_text(encoding="utf-8")
     en_readme = (ROOT / "README.en.md").read_text(encoding="utf-8")
-    assert "Quickstart：浏览器登录、知乎草稿与小红书登录" in zh_home
-    assert "Quickstart: Browser Login, Zhihu Drafts, and XHS Login" in en_home
-    assert "Quickstart：浏览器登录、知乎草稿与小红书登录" in zh_readme
-    assert "Quickstart: Browser Login, Zhihu Drafts, and XHS Login" in en_readme
+    assert "Quickstart：浏览器登录、知乎草稿与小红书二维码登录" in zh_home
+    assert "Quickstart: Browser Login, Zhihu Drafts, and XHS QR Login" in en_home
+    assert "Quickstart：浏览器登录、知乎草稿与小红书二维码登录" in zh_readme
+    assert "Quickstart: Browser Login, Zhihu Drafts, and XHS QR Login" in en_readme
     for text in (zh_home, en_home, zh_readme, en_readme):
         assert "chatpost zhihu login" in text or "login/status/logout" in text
         assert "chatpost zhihu draft" in text
+        assert "chatpost xhs draft" not in text
+        assert "qrcode_path" in text
         assert "WECHATSYNC_TOKEN" not in text
     for text in (zh_home, en_home):
         assert "~/.chatarch/chatpost/accounts.toml" in text
@@ -140,6 +145,7 @@ def test_capability_map_says_browser_login_does_not_touch_adapter():
     zh_text = (ROOT / "docs/capability-map.md").read_text(encoding="utf-8")
     en_text = (ROOT / "docs/capability-map.en.md").read_text(encoding="utf-8")
     assert "知乎纯浏览器登录/状态/登出" in zh_text
+    assert "小红书二维码登录/状态/登出" in zh_text
     assert "不调用发布适配器" in zh_text
     assert "不加载发布扩展" in zh_text
     assert "不要求发布 token" in zh_text
@@ -153,4 +159,6 @@ def test_capability_map_says_browser_login_does_not_touch_adapter():
         assert "ChatArch state root" in text or "ChatArch state root" in en_text
         assert "load_browser_config" in text
         assert "chatpost zhihu draft" in text
+        assert "chatpost xhs draft/create" in text
+        assert "qrcode_path" in text
         assert "Wechatsync" in text

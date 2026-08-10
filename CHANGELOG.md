@@ -4,9 +4,9 @@
 
 ### Added
 
-- Add `chatpost xhs profiles/login/status/logout/draft` as a second platform group with the same browser-level login boundary as Zhihu.
-- Add XHS page-owned login handoff extraction: the login command opens the login page and attempts to decode a QR/login URL from page-visible QR code elements, BarcodeDetector, or page resources before falling back to `browser_opened`, and reports `LOGIN_BLOCKED` for network-risk blocks instead of emitting a fake QR link.
-- Add XHS local draft dry-run/source validation and explicit `CREATE_NOT_SUPPORTED` mode-`0600` receipt for create attempts until a proven adapter is connected.
+- Add `chatpost xhs profiles/login/status/logout` as a second platform group with the same browser-level login boundary as Zhihu.
+- Add XHS QR-image login handoff extraction: the login command opens the creator login page, switches to QR login, writes a mode-`0600` QR PNG through `--qrcode PATH` or the browser Profile default, and emits only `qrcode_path` as the user-facing handoff. Internal `login_url` / `loginconfirm` / QR tokens / raw data URLs are not exposed as user output.
+- Add explicit XHS handoff failure states such as `LOGIN_HANDOFF_UNAVAILABLE` / `qrcode_not_found` and `LOGIN_BLOCKED` / `block_reason=network_risk` instead of emitting a fake QR.
 - Add a focused visible CLI surface: `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, `chatpost zhihu login/status/logout PROFILE`, and the separate direct-MCP-backed `chatpost zhihu draft PROFILE SOURCE` adapter entrypoint.
 - Add browser-only Zhihu runner loading via `load_browser_config`; login/status/logout require only Chromium/Profile/CDP fields and do not require adapter env, extension files, bridge ports, or publishing tokens.
 - Add browser-page status, login handoff, and logout helpers that infer login state from page-visible URL/DOM/account entrypoints without reading or exporting Cookie, LocalStorage, IndexedDB, session, or token values.
@@ -20,6 +20,7 @@
 - Document `~/.chatarch/chatpost/` as the default ChatArch-owned state root and `~/.chatarch/chatpost/accounts.toml` as the default non-sensitive registry, with `CHATPOST_HOME`, `CHATPOST_ACCOUNT_REGISTRY`, and `--registry PATH` as explicit overrides.
 - Align configuration and Python interface docs to the current browser-login API while documenting `load_runner_config` / `execute_task` as the draft adapter boundary.
 - Redact live login URLs, account names, and account/profile URLs from the public Quickstart transcript while preserving `LOGGED_IN` evidence.
+- Document XHS as QR-image-only login and keep XHS draft/publish out of the current user-visible CLI surface until a proven adapter exists.
 - Preserve publishing-adapter code/tests as an internal historical path, but keep it out of `login/status/logout` and out of the current user-visible CLI.
 
 ## 0.1.0 - 2026-08-04
