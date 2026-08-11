@@ -1,16 +1,17 @@
-"""Browser-level CSDN login/status/logout support.
+"""Browser-level CSDN login/status/logout/draft support.
 
-CSDN support is intentionally browser-level for now: ChatPost owns the
-platform/profile command surface and verifies login state from page-visible
-browser state. Draft/create is intentionally not connected here; future posting
-should go through the proven Wechatsync adapter path after login/profile is
-stable.
+CSDN support owns the platform/profile command surface, verifies login state
+from page-visible browser state, and saves private editor drafts only. It never
+final-publishes posts; direct public posting must be added as a separate,
+explicitly authorized capability.
 """
 
 from __future__ import annotations
 
-import time
+import hashlib
 import json
+import re
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -40,10 +41,12 @@ _CSDN_LOGIN_URL = "https://passport.csdn.net/login"
 _CSDN_STATUS_URL = "https://mp.csdn.net/"
 _CSDN_IDENTITY_URL = "https://www.csdn.net/"
 _CSDN_NETWORK_IDENTITY_URL = "https://mp.csdn.net/edit"
+_CSDN_EDITOR_URL = "https://mp.csdn.net/edit"
 _CSDN_USER_RESPONSE_MARKERS = (
     "/blog-console-api/v1/user/info",
     "/blog-console-api/v3/editor/getBaseInfo",
 )
+_CSDN_DRAFT_RESPONSE_PATH = re.compile(r"(save|draft|article|editor|blog-console)", re.IGNORECASE)
 _CSDN_ORIGINS = (
     "https://www.csdn.net",
     "https://passport.csdn.net",
@@ -197,8 +200,6 @@ _CSDN_QR_HANDOFF_EXPRESSION = r"""
   };
 })()
 """.strip()
-
-
 @dataclass(frozen=True)
 class CSDNBrowserConfig:
     playwright_version: str
@@ -286,6 +287,270 @@ def browser_login_session(
 
     with _browser_login_session(config) as session:
         yield session
+
+
+def _source_sha256(source: Path) -> str:
+    digest = hashlib.sha256()
+    with source.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _source_title_and_body(source: str | Path) -> tuple[Path, str, str, str]:
+    source_path = Path(source).expanduser().resolve()
+    if not source_path.is_file():
+        raise ValueError(f"Source file does not exist: {source_path}")
+    body = source_path.read_text(encoding="utf-8")
+    source_sha256 = _source_sha256(source_path)
+    title = ""
+    for line in body.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            stripped = stripped.lstrip("#").strip()
+        title = stripped
+        break
+    if not title:
+        title = f"ChatPost CSDN draft {source_sha256[:8]}"
+    title = title[:100]
+    if len(title) < 5:
+        title = f"{title} - ChatPost"[:100]
+    return source_path, title, body, source_sha256
+
+
+def _redacted_csdn_url(url: str) -> str:
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return "[URL_REDACTED]"
+    if not parsed.scheme or not parsed.netloc:
+        return "[URL_REDACTED]"
+    return f"{parsed.scheme}://{parsed.netloc}{parsed.path}{'?[REDACTED]' if parsed.query else ''}"
+
+
+def _extract_csdn_draft_id(value: Any, *, depth: int = 0) -> str | None:
+    if depth > 6:
+        return None
+    if isinstance(value, dict):
+        for key in ("articleId", "article_id", "draftId", "draft_id", "id"):
+            raw = value.get(key)
+            if isinstance(raw, str) and raw.strip() and raw.strip() not in {"0", "null", "None"}:
+                return raw.strip()
+            if isinstance(raw, int) and raw > 0:
+                return str(raw)
+        for child in value.values():
+            found = _extract_csdn_draft_id(child, depth=depth + 1)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for child in value[:12]:
+            found = _extract_csdn_draft_id(child, depth=depth + 1)
+            if found:
+                return found
+    return None
+
+
+def _summarize_csdn_draft_json(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {"type": type(value).__name__}
+    summary: dict[str, Any] = {"keys": sorted(str(key) for key in value.keys())[:30]}
+    for key in ("code", "msg", "message", "success", "status"):
+        raw = value.get(key)
+        if isinstance(raw, str | int | bool):
+            summary[key] = raw
+    draft_id = _extract_csdn_draft_id(value)
+    if draft_id:
+        summary["draft_id"] = draft_id
+    return summary
+
+
+def _save_csdn_browser_editor_draft(
+    endpoint: _CdpEndpoint,
+    title: str,
+    body: str,
+    *,
+    cdp_host: str = "127.0.0.1",
+    cdp_port: int | None = None,
+) -> dict[str, Any]:
+    """Save one CSDN editor draft through Playwright CDP; never click publish."""
+
+    del endpoint
+    if cdp_port is None:
+        raise TypeError("CSDN draft save requires a CDP port")
+    try:
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+        from playwright.sync_api import sync_playwright
+    except ImportError as error:  # pragma: no cover - dependency contract guards this.
+        raise RuntimeError("CSDN draft save requires playwright>=1.50,<2.0") from error
+
+    events: list[dict[str, Any]] = []
+    page_state: dict[str, Any] = {}
+    save_payload: Any = None
+    save_response_url = ""
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.connect_over_cdp(f"http://{cdp_host}:{cdp_port}")
+        page = None
+        try:
+            if not browser.contexts:
+                raise RuntimeError("CSDN draft CDP browser has no persistent context")
+            context = browser.contexts[0]
+            page = context.new_page()
+
+            def _record_response(response: Any) -> None:
+                url = getattr(response, "url", "")
+                if not isinstance(url, str):
+                    return
+                path = urlsplit(url).path
+                if not _CSDN_DRAFT_RESPONSE_PATH.search(path):
+                    return
+                status = getattr(response, "status", None)
+                events.append({"url": _redacted_csdn_url(url), "status_code": status})
+
+            page.on("response", _record_response)
+            page.goto(_CSDN_EDITOR_URL, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_selector("pre.editor__inner[contenteditable='true']", timeout=25000)
+            page.locator(".article-bar__title-display").click(timeout=10000)
+            title_input = page.locator("input[placeholder*='文章标题']")
+            title_input.wait_for(state="visible", timeout=10000)
+            title_input.fill(title, timeout=10000)
+            editor = page.locator("pre.editor__inner[contenteditable='true']")
+            editor.click(timeout=10000)
+            page.keyboard.press("Control+A")
+            page.keyboard.insert_text(body)
+            page.wait_for_timeout(1500)
+            save_button = page.get_by_role("button", name="保存草稿")
+            try:
+                with page.expect_response(
+                    lambda response: "/mdeditor/saveArticle" in response.url,
+                    timeout=35000,
+                ) as response_info:
+                    save_button.click(timeout=10000)
+                response = response_info.value
+                save_response_url = _redacted_csdn_url(response.url)
+                try:
+                    save_payload = response.json()
+                except (ValueError, TypeError):
+                    save_payload = None
+            except PlaywrightTimeoutError:
+                save_button.click(timeout=10000)
+                page.wait_for_timeout(8000)
+
+            page_state = page.evaluate(
+                """
+                () => {
+                  const clean = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+                  const bodyText = clean(document.body ? document.body.innerText : '');
+                  return {
+                    href: location.origin + location.pathname + (location.search ? '?[REDACTED]' : ''),
+                    title: document.title || '',
+                    titleValue: document.querySelector('input[placeholder*=文章标题]')?.value || '',
+                    titleDisplay: clean(document.querySelector('.article-bar__title-display')?.innerText || ''),
+                    editorSample: clean(document.querySelector('pre.editor__inner[contenteditable=true]')?.innerText || '').slice(0, 260),
+                    toastText: clean(Array.from(document.querySelectorAll('.el-message,.el-notification,.toast,[class*=message],[class*=toast]')).map(el => el.innerText || el.textContent || '').join(' ')).slice(0, 400),
+                    bodySample: bodyText.slice(0, 800),
+                    saveButtonTexts: Array.from(document.querySelectorAll('button')).map(btn => clean(btn.innerText || btn.textContent || btn.getAttribute('data-title') || '')).filter(Boolean).filter(text => /(保存|草稿|发布|标题)/.test(text)).slice(0, 20),
+                  };
+                }
+                """
+            )
+        finally:
+            if page is not None:
+                try:
+                    page.close()
+                except Exception:
+                    pass
+            try:
+                browser.close()
+            except Exception:
+                pass
+
+    draft_id = _extract_csdn_draft_id(save_payload)
+    result: dict[str, Any] = {
+        "page_state": page_state,
+        "network_events": events[-12:],
+    }
+    if save_response_url:
+        result["save_response_url"] = save_response_url
+    if save_payload is not None:
+        result["save_response"] = _summarize_csdn_draft_json(save_payload)
+    if draft_id:
+        result.update({"status": "DRAFT_CREATED", "draft_id": draft_id})
+        return result
+    successful_save_event = any(
+        isinstance(event.get("status_code"), int)
+        and int(event["status_code"]) < 400
+        and "mdeditor/saveArticle" in str(event.get("url", ""))
+        for event in events
+    )
+    if successful_save_event:
+        result.update({"status": "DRAFT_CREATED", "draft_id": "UNKNOWN_FROM_SAVE_ARTICLE_200"})
+        return result
+    toast_text = ""
+    if isinstance(page_state, dict):
+        toast_text = str(page_state.get("toastText") or page_state.get("bodySample") or "")
+    if "保存" in toast_text and "成功" in toast_text:
+        result.update({"status": "DRAFT_CREATED", "draft_id": "UNKNOWN_FROM_TOAST"})
+        return result
+    result.update({"status": "RESULT_UNKNOWN", "result_unknown_reason": "save_receipt_not_observed"})
+    return result
+
+
+def create_draft(
+    config: CSDNBrowserConfig,
+    source: str | Path,
+    *,
+    dry_run: bool = False,
+    browser_session_factory: Callable[[CSDNBrowserConfig], Any] | None = None,
+    status_reader: Callable[[_CdpEndpoint], dict[str, Any]] | None = None,
+    draft_saver: Callable[[_CdpEndpoint, str, str], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Dry-run or save one CSDN browser editor draft; never final-publish."""
+
+    _source_path, title, body, source_sha256 = _source_title_and_body(source)
+    preview = body[:200].rstrip()
+    if dry_run:
+        return {
+            "status": "DRY_RUN_OK",
+            "source_sha256": source_sha256,
+            "title": title,
+            "preview": preview,
+        }
+    browser_session_factory = browser_session_factory or browser_login_session
+    status_reader = status_reader or _read_csdn_browser_page_status
+    use_default_draft_saver = draft_saver is None
+    draft_saver = draft_saver or _save_csdn_browser_editor_draft
+    with browser_session_factory(config) as session:
+        browser, endpoint = session
+        login_status = status_reader(endpoint)
+        if login_status.get("status") != "LOGGED_IN":
+            return {
+                "status": "LOGIN_REQUIRED",
+                "source_sha256": source_sha256,
+                "check_method": login_status.get("check_method", "browser_page"),
+                **browser,
+            }
+        if use_default_draft_saver and hasattr(config, "cdp_host") and hasattr(config, "cdp_port"):
+            draft_result = draft_saver(
+                endpoint,
+                title,
+                body,
+                cdp_host=config.cdp_host,
+                cdp_port=config.cdp_port,
+            )
+        else:
+            draft_result = draft_saver(endpoint, title, body)
+        result = {
+            **draft_result,
+            "source_sha256": source_sha256,
+            "title": title,
+            **browser,
+        }
+        account_name = login_status.get("account_name")
+        if isinstance(account_name, str) and account_name.strip():
+            result["account_name"] = account_name.strip()
+        return result
 
 
 def _status_from_visible_state(value: Any) -> dict[str, Any]:
@@ -891,5 +1156,6 @@ __all__ = [
     "browser_login",
     "browser_logout",
     "browser_status",
+    "create_draft",
     "load_browser_config",
 ]
