@@ -1,9 +1,9 @@
 # Browser Runner 与账号隔离
 
 !!! warning "状态：部分实现，部分提案"
-    `ChatPost 0.1.x` 已实现 task-specific 知乎 Runner 生命周期、非敏感 Profile registry 读取和 `chatpost zhihu login/status/logout/draft` 入口。文中通用 `runner` 管理、多账号调度和远端模型仍是提案。
+    `ChatPost 0.1.x` 已实现 task-specific 知乎/CSDN Runner 生命周期、非敏感 Profile registry 读取、`chatpost zhihu login/status/logout/draft` 和 `chatpost csdn login/status/logout/draft` 入口。文中通用 `runner` 管理、多账号调度和远端模型仍是提案。
 
-总体资源关系见 [总体架构设计](architecture.md)，持久化 schema 见 [配置、环境与状态设计](configuration.md)，具体任务见 [知乎首次设置与草稿验收](zhihu-first-run.md)。
+总体资源关系见 [总体架构设计](architecture.md)，持久化 schema 见 [配置、环境与状态设计](configuration.md)，知乎旧验收记录见 [知乎首次设置与草稿验收](zhihu-first-run.md)。CSDN 复用同一 Wechatsync draft contract，但当前 adapter 只保存草稿，不公开发布。
 
 ## 直接答案
 
@@ -61,7 +61,7 @@ personal persona
 
 brand persona
 ├── zhihu@brand
-└── xiaohongshu@brand
+└── xhs@brand
 ```
 
 同一 persona 可以保存不同平台的同一身份组合。如果希望平台之间也完全隔离，可以继续拆成一账号一 persona。

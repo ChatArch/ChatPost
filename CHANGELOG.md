@@ -4,7 +4,12 @@
 
 ### Added
 
-- Add a focused visible CLI surface: `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, `chatpost zhihu login/status/logout PROFILE`, and the separate direct-MCP-backed `chatpost zhihu draft PROFILE SOURCE` adapter entrypoint.
+- Add `chatpost xhs profiles/login/status/logout` as a second platform group with the same browser-level login boundary as Zhihu.
+- Add XHS QR-image login handoff extraction: the login command opens the creator login page, switches to QR login, writes a mode-`0600` QR PNG through `--qrcode PATH` or the browser Profile default, and emits only `qrcode_path` as the user-facing handoff. Internal `login_url` / `loginconfirm` / QR tokens / raw data URLs are not exposed as user output.
+- Add explicit XHS handoff failure states such as `LOGIN_HANDOFF_UNAVAILABLE` / `qrcode_not_found` and `LOGIN_BLOCKED` / `block_reason=network_risk` instead of emitting a fake QR.
+- Add `chatpost csdn profiles/login/status/logout` as a third platform group with the same browser-level login boundary, plus QR-image login handoff for logged-out profiles.
+- Add `chatpost csdn draft PROFILE SOURCE` as a Wechatsync adapter entrypoint: dry-run invokes the Wechatsync parser with platform `csdn`, while receipt-backed create sends `syncArticle` through the extension MCP bridge and accepts only `draftOnly=true` CSDN draft results.
+- Add a focused visible CLI surface: `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles/login/status/logout/draft`, `chatpost xhs profiles/login/status/logout`, and `chatpost csdn profiles/login/status/logout/draft`.
 - Add browser-only Zhihu runner loading via `load_browser_config`; login/status/logout require only Chromium/Profile/CDP fields and do not require adapter env, extension files, bridge ports, or publishing tokens.
 - Add browser-page status, login handoff, and logout helpers that infer login state from page-visible URL/DOM/account entrypoints without reading or exporting Cookie, LocalStorage, IndexedDB, session, or token values.
 - Reintroduce `chatpost zhihu draft PROFILE SOURCE` as an explicit Wechatsync adapter entrypoint: `--dry-run` uses the Wechatsync CLI parser for preview, while receipt-backed create sends `syncArticle` through the Wechatsync extension MCP direct bridge; it remains separate from `login/status/logout` and never final-publishes.
@@ -17,6 +22,8 @@
 - Document `~/.chatarch/chatpost/` as the default ChatArch-owned state root and `~/.chatarch/chatpost/accounts.toml` as the default non-sensitive registry, with `CHATPOST_HOME`, `CHATPOST_ACCOUNT_REGISTRY`, and `--registry PATH` as explicit overrides.
 - Align configuration and Python interface docs to the current browser-login API while documenting `load_runner_config` / `execute_task` as the draft adapter boundary.
 - Redact live login URLs, account names, and account/profile URLs from the public Quickstart transcript while preserving `LOGGED_IN` evidence.
+- Document XHS as QR-image-only login and keep XHS draft/publish out of the current user-visible CLI surface until a proven adapter exists.
+- Document CSDN as browser-login plus Wechatsync draft-only; ChatPost does not expose CSDN public `post/publish`, and does not hand-write CSDN editor DOM/CDP automation.
 - Preserve publishing-adapter code/tests as an internal historical path, but keep it out of `login/status/logout` and out of the current user-visible CLI.
 
 ## 0.1.0 - 2026-08-04

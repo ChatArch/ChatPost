@@ -1,13 +1,13 @@
 # 配置、环境与状态设计
 
 !!! warning "状态：设计提案"
-    `ChatPost 0.1.0` 已读取 task-specific `[zhihu]` Runner TOML 和权限 `0600` 的 bridge env 文件；本页其余通用 Runner/Account/ledger schema 仍是提案。
+    `ChatPost 0.1.x` 已读取 task-specific `[zhihu]` / `[csdn]` Runner TOML 和权限 `0600` 的 bridge env 文件；本页其余通用 Runner/Account/ledger schema 仍是提案。
 
 ## 设计结论
 
 ChatPost 不应该把所有内容塞进 `.env`。配置分成四类：
 
-1. **机器依赖与版本化制品**：Playwright package/browser 由 ChatUp 管理，扩展由 ChatPost/adapter 管理；
+1. **机器依赖与版本化制品**：Playwright package/browser 由 ChatUp 管理，浏览器 Profile metadata 由 ChatBrowser 管理，扩展由 ChatPost/adapter 管理；
 2. **非秘密配置**：Runner、Account、端口策略和路径引用；
 3. **秘密**：每个 bridge/远端 Runner 的 token，放 ChatEnv；
 4. **运行状态与业务台账**：进程健康状态和 publication ledger，分别持久化。
@@ -64,6 +64,41 @@ chatup playwright install <chatpost-tested-version> --browser chromium --output 
 ```
 
 ChatPost 启动 Runner 时只调用 `chatup.playwright.resolve(...)`：读取 Playwright version、browser revision/version、binary path、package/browser roots 与 Node version。它不调用安装 API，不保存另一份 browser registry，也不下载浏览器。descriptor 缺失或版本不兼容时 fail closed，并提示运行 `chatup playwright install <chatpost-tested-version> --browser chromium`。
+
+## ChatBrowser Profile metadata dependency
+
+ChatBrowser 管 browser backend、Profile metadata 与 CDP session registry。ChatPost 配置只引用它，不复制浏览器 registry：
+
+```toml
+[zhihu]
+browser_profile = "zhihu-test"
+profile_dir = "/home/zhihong/.chatarch/chatpost/profiles/test/zhihu"
+
+[csdn]
+browser_profile = "csdn-test"
+profile_dir = "/home/zhihong/.chatarch/chatpost/profiles/test/csdn"
+```
+
+`browser_profile` 通过 `chatbrowser.registry.profile_path()` 解析；如果同时保留 `profile_dir`，必须和 ChatBrowser registry 中的路径一致。ChatPost 仍拥有平台账号 alias、platform/profile 映射、Wechatsync extension/bridge/env/receipt 字段；ChatBrowser 不判断“登录了哪个平台账号”，也不创建草稿。
+
+```bash
+chatbrowser profile create zhihu-test \
+  --path "$HOME/.chatarch/chatpost/profiles/test/zhihu" \
+  --backend chatup-playwright \
+  --label owner=chatpost \
+  --label platform=zhihu \
+  --label logical_profile=test \
+  --output json
+chatbrowser profile show zhihu-test --output json
+chatbrowser profile create csdn-test \
+  --path "$HOME/.chatarch/chatpost/profiles/test/csdn" \
+  --backend chatup-playwright \
+  --label owner=chatpost \
+  --label platform=csdn \
+  --label logical_profile=test \
+  --output json
+chatbrowser profile show csdn-test --output json
+```
 
 ## 非秘密配置示例
 
@@ -208,6 +243,20 @@ platform = "zhihu"
 runner_config = "runners/zhihu-personal/runner.toml"
 profile = "zhihu-personal"
 label = "Personal Zhihu browser Profile"
+login_methods = ["qr"]
+
+[accounts."xhs-personal"]
+platform = "xhs"
+runner_config = "runners/xhs-personal/runner.toml"
+profile = "xhs-personal"
+label = "Personal XHS browser Profile"
+login_methods = ["qr"]
+
+[accounts."csdn-personal"]
+platform = "csdn"
+runner_config = "runners/csdn-personal/runner.toml"
+profile = "csdn-personal"
+label = "Personal CSDN browser Profile"
 login_methods = ["qr"]
 ```
 

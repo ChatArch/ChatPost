@@ -1,13 +1,13 @@
 # Configuration, Environment, and State Design
 
 !!! warning "Status: design proposal"
-    `ChatPost 0.1.0` reads the task-specific `[zhihu]` Runner TOML and a mode-`0600` bridge environment file. The remaining generic Runner/Account/ledger schemas on this page are proposals.
+    `ChatPost 0.1.x` reads the task-specific `[zhihu]` / `[csdn]` Runner TOML and a mode-`0600` bridge environment file. The remaining generic Runner/Account/ledger schemas on this page are proposals.
 
 ## Decision
 
 ChatPost should not put every value in `.env`. Configuration has four classes:
 
-1. **Machine dependencies and versioned artifacts**: ChatUp owns the Playwright package/browser; ChatPost/the adapter owns the extension;
+1. **Machine dependencies and versioned artifacts**: ChatUp owns the Playwright package/browser, ChatBrowser owns browser Profile metadata, and ChatPost/the adapter owns the extension;
 2. **Non-secret configuration**: runners, accounts, port policy, and path references;
 3. **Secrets**: per-bridge or remote-runner tokens in ChatEnv;
 4. **Runtime/business state**: process health and the publication ledger, persisted separately.
@@ -64,6 +64,41 @@ chatup playwright install <chatpost-tested-version> --browser chromium --output 
 ```
 
 When starting a runner, ChatPost only calls `chatup.playwright.resolve(...)` to read the Playwright version, browser revision/version, binary path, package/browser roots, and Node version. It does not call an install API, maintain another browser registry, or download a browser. A missing or incompatible descriptor fails closed and points to `chatup playwright install <chatpost-tested-version> --browser chromium`.
+
+## ChatBrowser Profile Metadata Dependency
+
+ChatBrowser owns browser backends, Profile metadata, and the CDP session registry. ChatPost references that layer instead of copying a browser registry:
+
+```toml
+[zhihu]
+browser_profile = "zhihu-test"
+profile_dir = "/home/zhihong/.chatarch/chatpost/profiles/test/zhihu"
+
+[csdn]
+browser_profile = "csdn-test"
+profile_dir = "/home/zhihong/.chatarch/chatpost/profiles/test/csdn"
+```
+
+`browser_profile` is resolved through `chatbrowser.registry.profile_path()`. If `profile_dir` is also present, it must match the path recorded by the ChatBrowser registry. ChatPost still owns platform account aliases, platform/profile mapping, Wechatsync extension/bridge/env/receipt fields; ChatBrowser does not decide which platform account is logged in and does not create drafts.
+
+```bash
+chatbrowser profile create zhihu-test \
+  --path "$HOME/.chatarch/chatpost/profiles/test/zhihu" \
+  --backend chatup-playwright \
+  --label owner=chatpost \
+  --label platform=zhihu \
+  --label logical_profile=test \
+  --output json
+chatbrowser profile show zhihu-test --output json
+chatbrowser profile create csdn-test \
+  --path "$HOME/.chatarch/chatpost/profiles/test/csdn" \
+  --backend chatup-playwright \
+  --label owner=chatpost \
+  --label platform=csdn \
+  --label logical_profile=test \
+  --output json
+chatbrowser profile show csdn-test --output json
+```
 
 ## Non-Secret Configuration Example
 
@@ -208,6 +243,20 @@ platform = "zhihu"
 runner_config = "runners/zhihu-personal/runner.toml"
 profile = "zhihu-personal"
 label = "Personal Zhihu browser Profile"
+login_methods = ["qr"]
+
+[accounts."xhs-personal"]
+platform = "xhs"
+runner_config = "runners/xhs-personal/runner.toml"
+profile = "xhs-personal"
+label = "Personal XHS browser Profile"
+login_methods = ["qr"]
+
+[accounts."csdn-personal"]
+platform = "csdn"
+runner_config = "runners/csdn-personal/runner.toml"
+profile = "csdn-personal"
+label = "Personal CSDN browser Profile"
 login_methods = ["qr"]
 ```
 

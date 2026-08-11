@@ -19,6 +19,14 @@ def _registry_toml(runner: Path) -> str:
     )
 
 
+def _xiaohongshu_registry_toml(runner: Path) -> str:
+    return (
+        '[accounts."xhs-test"]\n'
+        'platform = "xhs"\n'
+        f'runner_config = {json.dumps(str(runner))}\n'
+    )
+
+
 def test_default_paths_live_under_chatarch_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("CHATPOST_HOME", raising=False)
@@ -54,6 +62,18 @@ def test_load_accounts_uses_default_registry_override(monkeypatch: pytest.Monkey
 
     account = load_accounts()["zhihu-test"]
 
+    assert account.runner_config == runner.resolve()
+
+
+def test_load_accounts_accepts_xiaohongshu_platform(tmp_path: Path):
+    runner = tmp_path / "xhs-runner.toml"
+    registry = tmp_path / "accounts.toml"
+    registry.write_text(_xiaohongshu_registry_toml(runner), encoding="utf-8")
+
+    account = load_accounts(registry)["xhs-test"]
+
+    assert account.platform == "xhs"
+    assert account.target() == "xhs@xhs-test"
     assert account.runner_config == runner.resolve()
 
 
