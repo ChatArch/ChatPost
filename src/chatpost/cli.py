@@ -15,6 +15,12 @@ import click
 from chatpost import __version__
 from chatpost.accounts import Account, AccountRegistryError, load_accounts, resolve_account
 from chatpost.qr import generate_qr_code_image
+from chatpost.csdn import (
+    browser_login as csdn_browser_login,
+    browser_logout as csdn_browser_logout,
+    browser_status as csdn_browser_status,
+    load_browser_config as load_csdn_browser_config,
+)
 from chatpost.xhs import (
     browser_login as xhs_browser_login,
     browser_logout as xhs_browser_logout,
@@ -40,18 +46,23 @@ _CLI_TREE_LINES = (
     "├── --version  # Show package version.",
     "├── --tree  # Print the registered CLI tree with command purpose and IO shape.",
     "├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.",
-    "├── profiles [--platform zhihu|xhs] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.",
+    "├── profiles [--platform zhihu|xhs|csdn] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.",
     "├── zhihu  # Zhihu browser login and Wechatsync draft capabilities",
     "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.",
     "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.",
     "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only.",
     "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.",
     "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.",
-    "└── xhs  # XHS browser login system",
+    "├── xhs  # XHS browser login system",
     "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured XHS browser Profiles.",
     "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the creator login page's own QR handoff and write the QR artifact.",
     "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check XHS web login state from page-visible browser state only.",
     "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear XHS browser state after browser-level status.",
+    "└── csdn  # CSDN browser login system",
+    "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured CSDN browser Profiles.",
+    "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the CSDN login page's own QR handoff and write the QR artifact.",
+    "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check CSDN web login state from page-visible browser state only.",
+    "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear CSDN browser state after browser-level status.",
 )
 _CLI_TREE_COMMAND_PATHS = (
     ("platforms",),
@@ -67,6 +78,11 @@ _CLI_TREE_COMMAND_PATHS = (
     ("xhs", "login"),
     ("xhs", "status"),
     ("xhs", "logout"),
+    ("csdn",),
+    ("csdn", "profiles"),
+    ("csdn", "login"),
+    ("csdn", "status"),
+    ("csdn", "logout"),
 )
 
 
@@ -167,7 +183,7 @@ def _write_data_url_artifact(data_url: str, destination: Path) -> Path:
     return output
 
 
-def _xhs_login_payload_for_emit(payload: dict[str, Any], qrcode_path: Path | None) -> dict[str, Any]:
+def _qr_login_payload_for_emit(payload: dict[str, Any], qrcode_path: Path | None) -> dict[str, Any]:
     event = dict(payload)
     data_url = event.pop("qrcode_data_url", None)
     login_url = event.pop("login_url", None)
@@ -182,6 +198,14 @@ def _xhs_login_payload_for_emit(payload: dict[str, Any], qrcode_path: Path | Non
     if wrote_qr:
         event["handoff_kind"] = "qrcode_image"
     return event
+
+
+def _xhs_login_payload_for_emit(payload: dict[str, Any], qrcode_path: Path | None) -> dict[str, Any]:
+    return _qr_login_payload_for_emit(payload, qrcode_path)
+
+
+def _csdn_login_payload_for_emit(payload: dict[str, Any], qrcode_path: Path | None) -> dict[str, Any]:
+    return _qr_login_payload_for_emit(payload, qrcode_path)
 
 
 def _platforms_payload() -> dict[str, Any]:
@@ -202,6 +226,13 @@ def _platforms_payload() -> dict[str, Any]:
                 "login_command": "chatpost xhs login PROFILE",
                 "status_command": "chatpost xhs status PROFILE",
                 "logout_command": "chatpost xhs logout PROFILE",
+            },
+            {
+                "name": "csdn",
+                "profiles_command": "chatpost csdn profiles",
+                "login_command": "chatpost csdn login PROFILE",
+                "status_command": "chatpost csdn status PROFILE",
+                "logout_command": "chatpost csdn logout PROFILE",
             },
         ],
     }
@@ -279,6 +310,10 @@ def _xiaohongshu_account_or_click_error(registry: Path | None, target: str):
     return _platform_account_or_click_error(registry, target, "xhs")
 
 
+def _csdn_account_or_click_error(registry: Path | None, target: str):
+    return _platform_account_or_click_error(registry, target, "csdn")
+
+
 def _load_zhihu_browser_config(account):
     try:
         return load_browser_config(account.runner_config)
@@ -296,6 +331,13 @@ def _load_zhihu_runner_config(account):
 def _load_xhs_browser_config(account):
     try:
         return load_xhs_browser_config(account.runner_config)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+
+
+def _load_csdn_browser_config(account):
+    try:
+        return load_csdn_browser_config(account.runner_config)
     except (OSError, RuntimeError, TypeError, ValueError) as error:
         raise click.ClickException(str(error)) from error
 
@@ -351,7 +393,7 @@ def platforms_command(output: str, no_interactive: bool) -> None:
 
 
 @main.command("profiles")
-@click.option("--platform", type=click.Choice(["zhihu", "xhs"]), default=None)
+@click.option("--platform", type=click.Choice(["zhihu", "xhs", "csdn"]), default=None)
 @click.option("--registry", type=click.Path(path_type=Path), default=None)
 @click.option("--output", type=_OUTPUT, default="text", show_default=True)
 @click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
@@ -629,6 +671,118 @@ def xiaohongshu_logout_command(
     config = _load_xhs_browser_config(account)
     try:
         payload = xhs_browser_logout(config)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    _emit(_with_target(account, payload), output)
+
+
+@main.group("csdn")
+def csdn_group() -> None:
+    """Run CSDN browser login/status/logout operations."""
+
+
+@csdn_group.command("profiles")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def csdn_profiles_command(registry: Path | None, output: str, no_interactive: bool) -> None:
+    """List configured CSDN browser Profiles."""
+
+    del no_interactive
+    _emit(_profiles_payload(registry, platform="csdn"), output)
+
+
+@csdn_group.command("status")
+@click.argument("profile")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def csdn_status_command(
+    profile: str,
+    registry: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Check PROFILE's CSDN web login state from browser-visible page state."""
+
+    del no_interactive
+    account = _csdn_account_or_click_error(registry, profile)
+    config = _load_csdn_browser_config(account)
+    try:
+        payload = csdn_browser_status(config)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    _emit(_with_target(account, payload), output)
+
+
+@csdn_group.command("login")
+@click.argument("profile")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--timeout", type=click.IntRange(min=1), default=900, show_default=True)
+@click.option(
+    "--qrcode",
+    "qrcode_path",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Write the page-owned CSDN login QR image to PATH; defaults under the browser Profile.",
+)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def csdn_login_command(
+    profile: str,
+    registry: Path | None,
+    timeout: int,
+    qrcode_path: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Open/check a pure browser login session and emit a page-owned handoff."""
+
+    del no_interactive
+    account = _csdn_account_or_click_error(registry, profile)
+    config = _load_csdn_browser_config(account)
+    qrcode_destination = qrcode_path
+    if qrcode_destination is None:
+        profile_dir = getattr(config, "profile_dir", None)
+        if profile_dir is not None:
+            qrcode_destination = Path(profile_dir) / "artifacts" / "csdn-login-qrcode.png"
+
+    def event_callback(payload: dict[str, Any]) -> None:
+        event = _with_target(account, _csdn_login_payload_for_emit(payload, qrcode_destination))
+        if output == "json":
+            _emit_json_line(event)
+        else:
+            _emit(event, output)
+
+    try:
+        payload = csdn_browser_login(config, timeout=timeout, event_callback=event_callback)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    result = _with_target(account, _csdn_login_payload_for_emit(payload, qrcode_destination))
+    if output == "json":
+        _emit_json_line(result)
+    else:
+        _emit(result, output)
+
+
+@csdn_group.command("logout")
+@click.argument("profile")
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def csdn_logout_command(
+    profile: str,
+    registry: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Log out or clear PROFILE's CSDN browser state after browser-level status."""
+
+    del no_interactive
+    account = _csdn_account_or_click_error(registry, profile)
+    config = _load_csdn_browser_config(account)
+    try:
+        payload = csdn_browser_logout(config)
     except (OSError, RuntimeError, TypeError, ValueError) as error:
         raise click.ClickException(str(error)) from error
     _emit(_with_target(account, payload), output)
