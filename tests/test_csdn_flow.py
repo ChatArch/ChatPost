@@ -1,4 +1,157 @@
+import json
+import subprocess
+from pathlib import Path
+
 import chatpost.csdn as csdn
+
+
+def _runner_config(tmp_path: Path, *, browser_profile: str | None = None, include_profile_dir: bool = True) -> Path:
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    profile.chmod(0o700)
+    extension = tmp_path / "extension"
+    extension.mkdir()
+    (extension / "manifest.json").write_text("{}", encoding="utf-8")
+    node = tmp_path / "node"
+    node.write_text("#!/bin/sh\n", encoding="utf-8")
+    node.chmod(0o755)
+    wechatsync = tmp_path / "wechatsync.cjs"
+    wechatsync.write_text("// wechatsync\n", encoding="utf-8")
+    env_file = tmp_path / "env"
+    env_file.write_text("WECHATSYNC_TOKEN=secret-token\n", encoding="utf-8")
+    env_file.chmod(0o600)
+    lines = [
+        "[csdn]",
+        'playwright_version = "1.0.0"',
+        f"playwright_home = {json.dumps(str(tmp_path / 'pw'))}",
+    ]
+    if browser_profile is not None:
+        lines.append(f"browser_profile = {json.dumps(browser_profile)}")
+    if include_profile_dir:
+        lines.append(f"profile_dir = {json.dumps(str(profile))}")
+    lines.extend(
+        [
+            f"extension_dir = {json.dumps(str(extension))}",
+            f"node_bin = {json.dumps(str(node))}",
+            f"wechatsync_cli = {json.dumps(str(wechatsync))}",
+            f"env_file = {json.dumps(str(env_file))}",
+            'cdp_host = "127.0.0.1"',
+            "cdp_port = 9444",
+            'bridge_host = "127.0.0.1"',
+            "bridge_port = 9555",
+            'extension_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
+            "headless = true",
+            "browser_args = []",
+        ]
+    )
+    path = tmp_path / "csdn-runner.toml"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def test_csdn_runner_config_resolves_profile_dir_from_chatbrowser_profile(monkeypatch, tmp_path):
+    registered_profile = tmp_path / "registered-profile"
+    registered_profile.mkdir()
+    registered_profile.chmod(0o700)
+    path = _runner_config(tmp_path, browser_profile="csdn-test", include_profile_dir=False)
+    calls = []
+
+    def fake_profile_path(name):
+        calls.append(name)
+        return registered_profile
+
+    monkeypatch.setattr(csdn, "chatbrowser_profile_path", fake_profile_path)
+
+    config = csdn.load_runner_config(path)
+
+    assert calls == ["csdn-test"]
+    assert config.browser_profile == "csdn-test"
+    assert config.profile_dir == registered_profile.resolve()
+
+
+def test_csdn_adapter_command_targets_wechatsync_csdn_platform(tmp_path):
+    path = _runner_config(tmp_path)
+    source = tmp_path / "article.md"
+    source.write_text("# Title\n\nbody\n", encoding="utf-8")
+
+    command = csdn._adapter_command(csdn.load_runner_config(path), source, "dry-run")
+
+    assert command[-3:] == ["--platforms", "csdn", "--dry-run"]
+
+
+def test_csdn_extension_mcp_create_uses_csdn_platform_and_accepts_draft_only(monkeypatch, tmp_path):
+    path = _runner_config(tmp_path)
+    source = tmp_path / "article.md"
+    source.write_text("# Title\n\nbody\n", encoding="utf-8")
+    config = csdn.load_runner_config(path)
+    calls = []
+
+    def fake_request(config_arg, environment, endpoint, method, payload, *, timeout):
+        calls.append((config_arg, environment["WECHATSYNC_TOKEN"], endpoint, method, payload, timeout))
+        return {
+            "results": [
+                {
+                    "platform": "csdn",
+                    "success": True,
+                    "postId": "163",
+                    "postUrl": "https://editor.csdn.net/md?articleId=163",
+                    "draftOnly": True,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(csdn, "_extension_mcp_request", fake_request)
+
+    result = csdn._run_adapter(config, source, "create", object())
+
+    assert result.args == ["extension-mcp", "syncArticle"]
+    assert result.returncode == 0
+    assert result.stdout == "https://editor.csdn.net/md?articleId=163\n163"
+    assert result.stderr == ""
+    assert calls[0][3] == "syncArticle"
+    assert calls[0][4]["platforms"] == ["csdn"]
+    assert calls[0][4]["article"]["title"] == "Title"
+
+
+def test_csdn_execute_task_parses_csdn_draft_receipt(tmp_path):
+    path = _runner_config(tmp_path)
+    source = tmp_path / "article.md"
+    source.write_text("# Title\n\nbody\n", encoding="utf-8")
+    config = csdn.load_runner_config(path)
+
+    def session_factory(_config):
+        class Session:
+            def __enter__(self):
+                return {"browser_attachment": "OWNED_BROWSER", "cleanup_status": "CLOSED"}, object()
+
+            def __exit__(self, *_exc_info):
+                return False
+
+        return Session()
+
+    def adapter_runner(_config, task_source, mode, endpoint):
+        assert mode == "create"
+        assert task_source == source.resolve()
+        assert endpoint is not None
+        return subprocess.CompletedProcess(
+            ["extension-mcp", "syncArticle"],
+            0,
+            "https://editor.csdn.net/md?articleId=163\n163",
+            "",
+        )
+
+    result = csdn.execute_task(
+        config,
+        source,
+        mode="create",
+        adapter_runner=adapter_runner,
+        browser_session_factory=session_factory,
+    )
+
+    assert result["status"] == "DRAFT_CREATED"
+    assert result["draft_id"] == "163"
+    assert result["review_url"] == "https://editor.csdn.net/md?articleId=163"
+    assert result["source_sha256"]
 
 
 def test_csdn_status_prefers_public_api_display_name_without_sensitive_urls():

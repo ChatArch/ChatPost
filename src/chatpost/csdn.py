@@ -9,8 +9,11 @@ stable.
 
 from __future__ import annotations
 
-import time
+import hashlib
 import json
+import re
+import subprocess
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -19,16 +22,27 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import websocket
+from chatbrowser.registry import RegistryError as ChatBrowserRegistryError
+from chatbrowser.registry import profile_path as chatbrowser_profile_path
 
 from chatpost.zhihu import (
+    RESULT_UNKNOWN,
     _CdpEndpoint,
+    _adapter_environment,
+    _adapter_output_tail,
     _cdp_command,
     _clear_zhihu_browser_state,
     _close_browser_page,
     _create_browser_page,
     _evaluate_visible_page_state,
+    _extension_mcp_request,
     _owned_browser_socket,
+    _redact,
+    _result_unknown_receipt,
+    _source_article_payload,
     browser_login_session as _browser_login_session,
+    browser_session as _wechatsync_browser_session,
+    ResultUnknownError,
 )
 
 try:
@@ -52,6 +66,8 @@ _CSDN_ORIGINS = (
     "https://blog.csdn.net",
 )
 _LOOPBACK_HOSTS = {"127.0.0.1"}
+_EXTENSION_ID = re.compile(r"^[a-p]{32}$")
+_CSDN_DRAFT_URL = re.compile(r"https://editor\.csdn\.net/md/?\?articleId=(?P<id>[0-9]+)")
 _PROTECTED_BROWSER_ARGS = (
     "--user-data-dir",
     "--remote-debugging-address",
@@ -204,8 +220,29 @@ class CSDNBrowserConfig:
     playwright_version: str
     playwright_home: Path
     profile_dir: Path
+    browser_profile: str | None
     cdp_host: str
     cdp_port: int
+    headless: bool
+    browser_args: tuple[str, ...]
+    attach_existing_cdp: bool
+
+
+@dataclass(frozen=True)
+class CSDNRunnerConfig:
+    playwright_version: str
+    playwright_home: Path
+    profile_dir: Path
+    browser_profile: str | None
+    extension_dir: Path
+    node_bin: Path
+    wechatsync_cli: Path
+    env_file: Path
+    cdp_host: str
+    cdp_port: int
+    bridge_host: str
+    bridge_port: int
+    extension_id: str
     headless: bool
     browser_args: tuple[str, ...]
     attach_existing_cdp: bool
@@ -239,10 +276,42 @@ def _load_csdn_table(path: str | Path) -> dict[str, Any]:
     return table
 
 
+def _browser_profile_name(table: dict[str, Any]) -> str | None:
+    value = table.get("browser_profile")
+    if value is None:
+        value = table.get("chatbrowser_profile")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise TypeError("csdn.browser_profile must be a non-empty string")
+    return value
+
+
+def _profile_dir_from_browser_layer(table: dict[str, Any]) -> tuple[Path, str | None]:
+    browser_profile = _browser_profile_name(table)
+    explicit_value = table.get("profile_dir")
+    if browser_profile is None:
+        return _path(table, "profile_dir"), None
+    try:
+        resolved = chatbrowser_profile_path(browser_profile).expanduser().resolve()
+    except ChatBrowserRegistryError as exc:
+        raise ValueError(f"ChatBrowser profile {browser_profile!r} is not registered") from exc
+    if explicit_value is not None:
+        explicit = _path(table, "profile_dir")
+        if explicit != resolved:
+            raise ValueError(
+                "csdn.profile_dir must match the ChatBrowser profile path when "
+                "csdn.browser_profile is set"
+            )
+    return resolved, browser_profile
+
+
 def _browser_fields(table: dict[str, Any]) -> dict[str, Any]:
     cdp_host = _required(table, "cdp_host", str)
     if cdp_host not in _LOOPBACK_HOSTS:
         raise ValueError("CDP host must be the 127.0.0.1 loopback address")
+
+    profile_dir, browser_profile = _profile_dir_from_browser_layer(table)
 
     browser_args_value = table.get("browser_args", [])
     if not isinstance(browser_args_value, list) or not all(
@@ -263,7 +332,8 @@ def _browser_fields(table: dict[str, Any]) -> dict[str, Any]:
     return {
         "playwright_version": _required(table, "playwright_version", str),
         "playwright_home": _path(table, "playwright_home"),
-        "profile_dir": _path(table, "profile_dir"),
+        "profile_dir": profile_dir,
+        "browser_profile": browser_profile,
         "cdp_host": cdp_host,
         "cdp_port": _port(table, "cdp_port"),
         "headless": headless,
@@ -278,6 +348,42 @@ def load_browser_config(path: str | Path) -> CSDNBrowserConfig:
     return CSDNBrowserConfig(**_browser_fields(_load_csdn_table(path)))
 
 
+def load_runner_config(path: str | Path) -> CSDNRunnerConfig:
+    """Load the CSDN publishing runner config for the Wechatsync draft layer."""
+
+    table = _load_csdn_table(path)
+    cdp_host = _required(table, "cdp_host", str)
+    bridge_host = _required(table, "bridge_host", str)
+    if cdp_host not in _LOOPBACK_HOSTS or bridge_host not in _LOOPBACK_HOSTS:
+        raise ValueError("CDP and bridge hosts must both be the 127.0.0.1 loopback address")
+    cdp_port = _port(table, "cdp_port")
+    bridge_port = _port(table, "bridge_port")
+    if cdp_port == bridge_port:
+        raise ValueError("CDP and bridge ports must differ")
+    extension_id = _required(table, "extension_id", str)
+    if not _EXTENSION_ID.fullmatch(extension_id):
+        raise ValueError("csdn.extension_id must be an exact Chrome extension ID")
+    browser = _browser_fields(table)
+    return CSDNRunnerConfig(
+        playwright_version=browser["playwright_version"],
+        playwright_home=browser["playwright_home"],
+        profile_dir=browser["profile_dir"],
+        browser_profile=browser["browser_profile"],
+        extension_dir=_path(table, "extension_dir"),
+        node_bin=_path(table, "node_bin"),
+        wechatsync_cli=_path(table, "wechatsync_cli"),
+        env_file=_path(table, "env_file"),
+        cdp_host=cdp_host,
+        cdp_port=browser["cdp_port"],
+        bridge_host=bridge_host,
+        bridge_port=bridge_port,
+        extension_id=extension_id,
+        headless=browser["headless"],
+        browser_args=browser["browser_args"],
+        attach_existing_cdp=browser["attach_existing_cdp"],
+    )
+
+
 @contextmanager
 def browser_login_session(
     config: CSDNBrowserConfig,
@@ -286,6 +392,232 @@ def browser_login_session(
 
     with _browser_login_session(config) as session:
         yield session
+
+
+def _adapter_command(
+    config: CSDNRunnerConfig,
+    source: Path | None,
+    mode: str,
+) -> list[str]:
+    """Build the Wechatsync CLI command for dry-run/auth compatibility only."""
+
+    command = [str(config.node_bin), str(config.wechatsync_cli)]
+    if mode == "auth":
+        return [*command, "auth", "csdn", "--refresh"]
+    if source is None:
+        raise ValueError(f"Source is required for {mode}")
+    command.extend(["sync", str(source), "--platforms", "csdn"])
+    if mode == "dry-run":
+        command.append("--dry-run")
+    return command
+
+
+def _run_extension_mcp_adapter(
+    config: CSDNRunnerConfig,
+    source: Path | None,
+    mode: str,
+    endpoint: _CdpEndpoint,
+) -> subprocess.CompletedProcess[str]:
+    """Use Wechatsync's extension MCP bridge for CSDN auth/create."""
+
+    environment, redactions = _adapter_environment(config)
+    try:
+        if mode == "auth":
+            result = _extension_mcp_request(
+                config,
+                environment,
+                endpoint,
+                "checkAuth",
+                {"platform": "csdn"},
+                timeout=60,
+            )
+            if isinstance(result, dict) and result.get("isAuthenticated"):
+                return subprocess.CompletedProcess(["extension-mcp", "checkAuth"], 0, "csdn auth ready", "")
+            error = result.get("error") if isinstance(result, dict) else None
+            return subprocess.CompletedProcess(
+                ["extension-mcp", "checkAuth"],
+                1,
+                "",
+                _redact(str(error or "CSDN auth check failed"), redactions),
+            )
+
+        if mode != "create" or source is None:
+            raise ValueError(f"Unsupported extension MCP adapter mode: {mode}")
+        article = _source_article_payload(source)
+        result = _extension_mcp_request(
+            config,
+            environment,
+            endpoint,
+            "syncArticle",
+            {"platforms": ["csdn"], "article": article},
+            timeout=360,
+        )
+    except Exception as error:
+        if mode == "create":
+            raise ResultUnknownError(
+                f"Wechatsync extension MCP request failed: {error}; do not retry automatically",
+                receipt={
+                    "status": RESULT_UNKNOWN,
+                    "result_unknown_reason": "mcp_request_failed",
+                    "adapter_cleanup_status": "CLOSED",
+                    "adapter_output_tail": _adapter_output_tail(str(error)),
+                },
+            ) from error
+        raise RuntimeError(f"Wechatsync extension MCP request failed: {error}") from error
+
+    results = result.get("results") if isinstance(result, dict) else None
+    csdn_result = None
+    if isinstance(results, list):
+        csdn_result = next(
+            (item for item in results if isinstance(item, dict) and item.get("platform") == "csdn"),
+            results[0] if results and isinstance(results[0], dict) else None,
+        )
+    if isinstance(csdn_result, dict) and csdn_result.get("success"):
+        review_url = str(csdn_result.get("postUrl") or "")
+        draft_id = str(csdn_result.get("postId") or "")
+        if csdn_result.get("draftOnly") is True and _CSDN_DRAFT_URL.search(review_url):
+            stdout = "\n".join(part for part in (review_url, draft_id) if part)
+            return subprocess.CompletedProcess(
+                ["extension-mcp", "syncArticle"],
+                0,
+                _redact(stdout, redactions),
+                "",
+            )
+        return subprocess.CompletedProcess(
+            ["extension-mcp", "syncArticle"],
+            1,
+            "",
+            "CSDN Wechatsync result was not a draft receipt",
+        )
+    error = "CSDN draft create failed"
+    if isinstance(csdn_result, dict) and csdn_result.get("error"):
+        error = str(csdn_result["error"])
+    return subprocess.CompletedProcess(
+        ["extension-mcp", "syncArticle"],
+        1,
+        "",
+        _redact(error, redactions),
+    )
+
+
+def _run_adapter(
+    config: CSDNRunnerConfig,
+    source: Path | None,
+    mode: str,
+    endpoint: _CdpEndpoint | None = None,
+) -> subprocess.CompletedProcess[str]:
+    environment, redactions = _adapter_environment(config)
+    command = _adapter_command(config, source, mode)
+    if mode == "dry-run":
+        result = subprocess.run(
+            command,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        return subprocess.CompletedProcess(
+            result.args,
+            result.returncode,
+            _redact(result.stdout, redactions),
+            _redact(result.stderr, redactions),
+        )
+    if endpoint is None:
+        raise ValueError("An owned browser CDP endpoint is required")
+    return _run_extension_mcp_adapter(config, source, mode, endpoint)
+
+
+def _source_sha256(source: Path) -> str:
+    digest = hashlib.sha256()
+    with source.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def execute_task(
+    config: CSDNRunnerConfig,
+    source: str | Path | None,
+    *,
+    mode: str,
+    adapter_runner: Callable[
+        [CSDNRunnerConfig, Path | None, str, _CdpEndpoint | None],
+        subprocess.CompletedProcess[str],
+    ] = _run_adapter,
+    browser_session_factory: Callable[[CSDNRunnerConfig], Any] = _wechatsync_browser_session,
+) -> dict[str, Any]:
+    """Execute one CSDN Wechatsync task; create is exactly-once and draft-only."""
+
+    if mode not in {"dry-run", "auth", "create"}:
+        raise ValueError(f"Unsupported CSDN task mode: {mode}")
+    source_path = Path(source).expanduser().resolve() if source is not None else None
+    if mode != "auth" and (source_path is None or not source_path.is_file()):
+        raise ValueError(f"Source file does not exist: {source_path}")
+    source_sha256 = _source_sha256(source_path) if mode != "auth" and source_path is not None else None
+
+    if mode == "dry-run":
+        result = adapter_runner(config, source_path, mode, None)
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or result.stdout).strip() or "Dry-run failed")
+        preview = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
+        return {
+            "status": "DRY_RUN_OK",
+            "source_sha256": source_sha256,
+            "preview": preview[:8000],
+        }
+
+    try:
+        with browser_session_factory(config) as session:
+            browser, endpoint = session
+            result = adapter_runner(config, source_path, mode, endpoint)
+    except ResultUnknownError as error:
+        if mode == "create" and source_sha256 is not None:
+            error.receipt.setdefault("result_unknown_reason", "adapter_result_unknown")
+            error.receipt["source_sha256"] = source_sha256
+        raise
+
+    output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+    if result.returncode != 0:
+        if mode == "create":
+            if source_sha256 is None:
+                raise RuntimeError("Create source digest was not established")
+            raise ResultUnknownError(
+                "Wechatsync create did not return a definitive CSDN draft success; do not retry automatically",
+                receipt=_result_unknown_receipt(
+                    source_sha256,
+                    browser,
+                    reason="adapter_nonzero_exit",
+                    adapter_exit_code=result.returncode,
+                    adapter_output=output,
+                ),
+            )
+        raise RuntimeError(output.strip() or "CSDN auth check failed")
+    if mode == "auth":
+        return {"status": "READY", **browser}
+    if source_sha256 is None:
+        raise RuntimeError("Create source digest was not established")
+    match = _CSDN_DRAFT_URL.search(output)
+    if match is None:
+        raise ResultUnknownError(
+            "Wechatsync exited successfully without a CSDN draft URL; do not retry automatically",
+            receipt=_result_unknown_receipt(
+                source_sha256,
+                browser,
+                reason="missing_review_url",
+                adapter_exit_code=result.returncode,
+                adapter_output=output,
+            ),
+        )
+    return {
+        "status": "DRAFT_CREATED",
+        "draft_id": match.group("id"),
+        "review_url": match.group(0),
+        "source_sha256": source_sha256,
+        "adapter_cleanup_status": "CLOSED",
+        **browser,
+    }
 
 
 def _status_from_visible_state(value: Any) -> dict[str, Any]:
@@ -888,8 +1220,11 @@ def browser_logout(
 
 __all__ = [
     "CSDNBrowserConfig",
+    "CSDNRunnerConfig",
     "browser_login",
     "browser_logout",
     "browser_status",
+    "execute_task",
     "load_browser_config",
+    "load_runner_config",
 ]

@@ -42,13 +42,105 @@ def _json_lines(result):
     return [json.loads(line) for line in result.output.splitlines() if line.strip()]
 
 
-def test_csdn_cli_registers_login_only_surface_without_draft():
+def test_csdn_cli_registers_login_and_wechatsync_draft_surface():
     csdn = main.commands["csdn"]
 
-    assert set(csdn.commands) == {"profiles", "login", "status", "logout"}
+    assert set(csdn.commands) == {"profiles", "login", "status", "logout", "draft"}
     assert all(command.hidden is False for command in csdn.commands.values())
-    assert "draft" not in csdn.commands
     assert "account" not in csdn.commands
+
+
+def test_csdn_draft_dry_run_uses_runner_registry_and_wechatsync_task(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    source = tmp_path / "article.md"
+    source.write_text("# CSDN draft\n\nbody\n", encoding="utf-8")
+    sentinel = object()
+    calls = []
+    monkeypatch.setattr(command, "load_csdn_runner_config", lambda _path: sentinel)
+    monkeypatch.setattr(
+        command,
+        "csdn_execute_task",
+        lambda config, task_source, *, mode: calls.append((config, Path(task_source), mode))
+        or {
+            "status": "DRY_RUN_OK",
+            "source_sha256": "abc123",
+            "preview": "CSDN preview",
+        },
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "csdn",
+            "draft",
+            "test",
+            str(source),
+            "--registry",
+            str(registry),
+            "--dry-run",
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+    payload = _json(result)
+
+    assert calls == [(sentinel, source, "dry-run")]
+    assert payload == {
+        "target": "csdn@test",
+        "profile": "test",
+        "platform": "csdn",
+        "status": "DRY_RUN_OK",
+        "source_sha256": "abc123",
+        "preview": "CSDN preview",
+    }
+
+
+def test_csdn_draft_create_requires_receipt_and_writes_one_shot_result(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    source = tmp_path / "article.md"
+    source.write_text("# CSDN draft\n\nbody\n", encoding="utf-8")
+    receipt = tmp_path / "receipt.json"
+    sentinel = object()
+    calls = []
+    monkeypatch.setattr(command, "load_csdn_runner_config", lambda _path: sentinel)
+    monkeypatch.setattr(
+        command,
+        "csdn_execute_task",
+        lambda config, task_source, *, mode: calls.append((config, Path(task_source), mode))
+        or {
+            "status": "DRAFT_CREATED",
+            "draft_id": "163",
+            "review_url": "https://editor.csdn.net/md?articleId=163",
+            "source_sha256": "abc123",
+            "adapter_cleanup_status": "CLOSED",
+        },
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "csdn",
+            "draft",
+            "csdn-test",
+            str(source),
+            "--registry",
+            str(registry),
+            "--receipt",
+            str(receipt),
+            "--output",
+            "json",
+            "-I",
+        ],
+    )
+    payload = _json(result)
+
+    assert calls == [(sentinel, source, "create")]
+    assert payload["status"] == "DRAFT_CREATED"
+    assert payload["target"] == "csdn@csdn-test"
+    assert payload["review_url"] == "https://editor.csdn.net/md?articleId=163"
+    assert json.loads(receipt.read_text(encoding="utf-8")) == payload
+    assert receipt.stat().st_mode & 0o777 == 0o600
 
 
 def test_csdn_status_accepts_logical_profile_name_without_platform_alias(monkeypatch, tmp_path):

@@ -19,7 +19,9 @@ from chatpost.csdn import (
     browser_login as csdn_browser_login,
     browser_logout as csdn_browser_logout,
     browser_status as csdn_browser_status,
+    execute_task as csdn_execute_task,
     load_browser_config as load_csdn_browser_config,
+    load_runner_config as load_csdn_runner_config,
 )
 from chatpost.xhs import (
     browser_login as xhs_browser_login,
@@ -58,11 +60,12 @@ _CLI_TREE_LINES = (
     "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the creator login page's own QR handoff and write the QR artifact.",
     "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check XHS web login state from page-visible browser state only.",
     "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear XHS browser state after browser-level status.",
-    "└── csdn  # CSDN browser login system",
+    "└── csdn  # CSDN browser login and Wechatsync draft capabilities",
     "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured CSDN browser Profiles.",
     "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the CSDN login page's own QR handoff and write the QR artifact.",
     "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check CSDN web login state from page-visible browser state only.",
-    "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear CSDN browser state after browser-level status.",
+    "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear CSDN browser state after browser-level status.",
+    "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one CSDN draft through Wechatsync; never final-publish.",
 )
 _CLI_TREE_COMMAND_PATHS = (
     ("platforms",),
@@ -83,6 +86,7 @@ _CLI_TREE_COMMAND_PATHS = (
     ("csdn", "login"),
     ("csdn", "status"),
     ("csdn", "logout"),
+    ("csdn", "draft"),
 )
 
 
@@ -233,6 +237,7 @@ def _platforms_payload() -> dict[str, Any]:
                 "login_command": "chatpost csdn login PROFILE",
                 "status_command": "chatpost csdn status PROFILE",
                 "logout_command": "chatpost csdn logout PROFILE",
+                "draft_command": "chatpost csdn draft PROFILE SOURCE",
             },
         ],
     }
@@ -678,7 +683,7 @@ def xiaohongshu_logout_command(
 
 @main.group("csdn")
 def csdn_group() -> None:
-    """Run CSDN browser login/status/logout operations."""
+    """Run CSDN browser login/status/logout and Wechatsync draft operations."""
 
 
 @csdn_group.command("profiles")
@@ -786,6 +791,62 @@ def csdn_logout_command(
     except (OSError, RuntimeError, TypeError, ValueError) as error:
         raise click.ClickException(str(error)) from error
     _emit(_with_target(account, payload), output)
+
+
+@csdn_group.command("draft")
+@click.argument("profile")
+@click.argument("source", type=click.Path(path_type=Path))
+@click.option("--registry", type=click.Path(path_type=Path), default=None)
+@click.option("--dry-run", is_flag=True, help="Validate the source through Wechatsync without starting a browser or writing.")
+@click.option("--receipt", type=click.Path(path_type=Path), default=None, help="Receipt path for a real draft create. Required unless --dry-run is used.")
+@click.option("--output", type=_OUTPUT, default="text", show_default=True)
+@click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
+def csdn_draft_command(
+    profile: str,
+    source: Path,
+    registry: Path | None,
+    dry_run: bool,
+    receipt: Path | None,
+    output: str,
+    no_interactive: bool,
+) -> None:
+    """Dry-run or create one CSDN draft through Wechatsync; never final-publish."""
+
+    del no_interactive
+    if dry_run and receipt is not None:
+        raise click.ClickException("--receipt is only valid when creating a draft; omit it with --dry-run")
+    if not dry_run and receipt is None:
+        raise click.ClickException("--receipt is required when creating a draft; pass --dry-run for validation")
+    account = _csdn_account_or_click_error(registry, profile)
+    config = load_csdn_runner_config(account.runner_config)
+    mode = "dry-run" if dry_run else "create"
+    try:
+        payload = csdn_execute_task(config, source, mode=mode)
+    except ResultUnknownError as error:
+        result = _with_target(account, dict(error.receipt))
+        if receipt is None:
+            raise click.ClickException(str(error)) from error
+        try:
+            _write_receipt(receipt, result)
+        except (OSError, TypeError, ValueError) as receipt_error:
+            _emit(result, output)
+            raise click.ClickException(
+                f"{RESULT_UNKNOWN}: {error}. Receipt could not be written; do not retry automatically."
+            ) from receipt_error
+        raise click.ClickException(str(error)) from error
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    result = _with_target(account, payload)
+    if not dry_run and receipt is not None:
+        try:
+            _write_receipt(receipt, result)
+        except (OSError, TypeError, ValueError) as receipt_error:
+            _emit(result, output)
+            raise click.ClickException(
+                "DRAFT_CREATED result was obtained, but the receipt could not be written; "
+                "do not retry automatically."
+            ) from receipt_error
+    _emit(result, output)
 
 
 if __name__ == "__main__":
