@@ -42,113 +42,13 @@ def _json_lines(result):
     return [json.loads(line) for line in result.output.splitlines() if line.strip()]
 
 
-def test_csdn_cli_registers_login_and_draft_surface():
+def test_csdn_cli_registers_login_only_surface_without_draft():
     csdn = main.commands["csdn"]
 
-    assert set(csdn.commands) == {"profiles", "login", "status", "logout", "draft"}
+    assert set(csdn.commands) == {"profiles", "login", "status", "logout"}
     assert all(command.hidden is False for command in csdn.commands.values())
+    assert "draft" not in csdn.commands
     assert "account" not in csdn.commands
-
-
-def test_csdn_draft_dry_run_validates_source_without_browser(monkeypatch, tmp_path):
-    registry = _registry(tmp_path)
-    source = tmp_path / "article.md"
-    source.write_text("# Hello CSDN\n\nBody\n", encoding="utf-8")
-    sentinel = object()
-    calls = []
-    monkeypatch.setattr(command, "load_csdn_browser_config", lambda _path: sentinel)
-    monkeypatch.setattr(
-        command,
-        "csdn_create_draft",
-        lambda config, source_path, dry_run=False: calls.append((config, source_path, dry_run))
-        or {"status": "DRY_RUN_OK", "source_sha256": "abc123", "preview": "Hello CSDN"},
-    )
-
-    result = CliRunner().invoke(
-        main,
-        [
-            "csdn",
-            "draft",
-            "test",
-            str(source),
-            "--registry",
-            str(registry),
-            "--dry-run",
-            "--output",
-            "json",
-            "-I",
-        ],
-    )
-    payload = _json(result)
-
-    assert calls == [(sentinel, source, True)]
-    assert payload == {
-        "target": "csdn@test",
-        "profile": "test",
-        "platform": "csdn",
-        "status": "DRY_RUN_OK",
-        "source_sha256": "abc123",
-        "preview": "Hello CSDN",
-    }
-
-
-def test_csdn_draft_requires_receipt_for_real_create(tmp_path):
-    registry = _registry(tmp_path)
-    source = tmp_path / "article.md"
-    source.write_text("# Hello CSDN\n\nBody\n", encoding="utf-8")
-
-    result = CliRunner().invoke(
-        main,
-        ["csdn", "draft", "test", str(source), "--registry", str(registry), "--output", "json", "-I"],
-    )
-
-    assert result.exit_code != 0
-    assert "--receipt is required" in result.output
-
-
-def test_csdn_draft_create_writes_receipt(monkeypatch, tmp_path):
-    registry = _registry(tmp_path)
-    source = tmp_path / "article.md"
-    source.write_text("# Hello CSDN\n\nBody\n", encoding="utf-8")
-    receipt = tmp_path / "receipts" / "csdn.json"
-    sentinel = object()
-    calls = []
-    monkeypatch.setattr(command, "load_csdn_browser_config", lambda _path: sentinel)
-    monkeypatch.setattr(
-        command,
-        "csdn_create_draft",
-        lambda config, source_path, dry_run=False: calls.append((config, source_path, dry_run))
-        or {
-            "status": "DRAFT_CREATED",
-            "draft_id": "12345",
-            "source_sha256": "abc123",
-            "browser_attachment": "OWNED_BROWSER",
-        },
-    )
-
-    result = CliRunner().invoke(
-        main,
-        [
-            "csdn",
-            "draft",
-            "test",
-            str(source),
-            "--registry",
-            str(registry),
-            "--receipt",
-            str(receipt),
-            "--output",
-            "json",
-            "-I",
-        ],
-    )
-    payload = _json(result)
-
-    assert calls == [(sentinel, source, False)]
-    assert payload["status"] == "DRAFT_CREATED"
-    assert payload["draft_id"] == "12345"
-    assert json.loads(receipt.read_text(encoding="utf-8")) == payload
-    assert receipt.stat().st_mode & 0o777 == 0o600
 
 
 def test_csdn_status_accepts_logical_profile_name_without_platform_alias(monkeypatch, tmp_path):

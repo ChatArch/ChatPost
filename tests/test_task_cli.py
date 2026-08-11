@@ -76,7 +76,7 @@ def test_task_cli_exposes_login_and_draft_platform_surfaces():
     assert all(command.hidden is False for command in xhs.commands.values())
 
     csdn = main.commands["csdn"]
-    assert set(csdn.commands) == {"profiles", "login", "logout", "status", "draft"}
+    assert set(csdn.commands) == {"profiles", "login", "logout", "status"}
     assert all(command.hidden is False for command in csdn.commands.values())
 
 
@@ -98,12 +98,11 @@ def test_top_level_tree_prints_complete_login_only_registered_cli_tree():
     assert "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the creator login page's own QR handoff and write the QR artifact." in result.output
     assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check XHS web login state from page-visible browser state only." in result.output
     assert "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear XHS browser state after browser-level status." in result.output
-    assert "└── csdn  # CSDN browser login and draft system" in result.output
+    assert "└── csdn  # CSDN browser login system" in result.output
     assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured CSDN browser Profiles." in result.output
     assert "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the CSDN login page's own QR handoff and write the QR artifact." in result.output
     assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check CSDN web login state from page-visible browser state only." in result.output
-    assert "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear CSDN browser state after browser-level status." in result.output
-    assert "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or save one CSDN browser editor draft; never final-publish." in result.output
+    assert "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear CSDN browser state after browser-level status." in result.output
     forbidden = [
         "account",
         "qr-artifact",
@@ -162,7 +161,6 @@ def test_platforms_lists_supported_login_platforms():
                 "login_command": "chatpost csdn login PROFILE",
                 "status_command": "chatpost csdn status PROFILE",
                 "logout_command": "chatpost csdn logout PROFILE",
-                "draft_command": "chatpost csdn draft PROFILE SOURCE",
             }
         ],
     }
