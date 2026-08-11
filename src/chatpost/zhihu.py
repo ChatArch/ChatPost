@@ -1364,18 +1364,38 @@ def _source_article_payload(source: Path) -> dict[str, str]:
             heading_match = re.search(r"<h1[^>]*>([^<]+)</h1>", text, re.IGNORECASE)
             if heading_match:
                 title = heading_match.group(1).strip()
-        return {"title": title or source.stem, "content": text, "html": text}
+        payload = {"title": title or source.stem, "content": text, "html": text}
+        cover_match = re.search(
+            r"<meta\s[^>]*property=[\"']og:image[\"'][^>]*content=[\"']([^\"']+)[\"'][^>]*>",
+            text,
+            re.IGNORECASE,
+        ) or re.search(
+            r"<meta\s[^>]*content=[\"']([^\"']+)[\"'][^>]*property=[\"']og:image[\"'][^>]*>",
+            text,
+            re.IGNORECASE,
+        )
+        if cover_match:
+            payload["cover"] = cover_match.group(1).strip()
+        return payload
 
     title = None
+    cover = None
     body = text
     frontmatter = re.match(r"^---\s*\n([\s\S]*?)\n---\s*\n", text)
     if frontmatter:
+        metadata = frontmatter.group(1)
         title_match = re.search(
             r"(?m)^title:\s*[\"']?(.+?)[\"']?\s*$",
-            frontmatter.group(1),
+            metadata,
         )
         if title_match:
             title = title_match.group(1).strip()
+        cover_match = re.search(
+            r"(?m)^cover:\s*[\"']?(.+?)[\"']?\s*$",
+            metadata,
+        )
+        if cover_match:
+            cover = cover_match.group(1).strip()
         body = text[frontmatter.end() :]
     if not title:
         heading = re.search(r"(?m)^#\s+(.+?)\s*$", body)
@@ -1383,7 +1403,10 @@ def _source_article_payload(source: Path) -> dict[str, str]:
             title = heading.group(1).strip()
             body = body[: heading.start()] + body[heading.end() :]
     markdown = body.strip() or text.strip()
-    return {"title": title or source.stem, "markdown": markdown}
+    payload = {"title": title or source.stem, "markdown": markdown}
+    if cover:
+        payload["cover"] = cover
+    return payload
 
 
 def _extension_mcp_request(

@@ -14,7 +14,7 @@ This page separates the real current `ChatPost 0.1.x` user entrypoints, the pure
 | Browser-only runner config | Implemented | The login foundation needs only `playwright_version`, `playwright_home`, `profile_dir`, `cdp_host`, `cdp_port`, `headless`, `browser_args`, and `attach_existing_cdp`; it may reference a ChatBrowser Profile with `browser_profile`. |
 | ChatArch state root | Implemented | The default local state root is `~/.chatarch/chatpost/`; the default registry is `~/.chatarch/chatpost/accounts.toml`, with explicit overrides via `CHATPOST_HOME`, `CHATPOST_ACCOUNT_REGISTRY`, or `--registry PATH`. |
 | Zhihu draft / Wechatsync adapter | Implemented | `chatpost zhihu draft PROFILE SOURCE --dry-run` calls the Wechatsync CLI parser for an adapter preview without starting a browser or writing a draft; `--receipt PATH` starts controlled Chromium + the Wechatsync extension, serves one bounded extension MCP bridge request, creates exactly one Zhihu draft, writes a mode `0600` receipt, and returns `DRAFT_CREATED`, `draft_id`, and the `/edit` review URL. It never final-publishes and does not perform same-ID updates. |
-| CSDN draft / Wechatsync adapter | Implemented | `chatpost csdn draft PROFILE SOURCE --dry-run` and real create both use the Wechatsync adapter. CSDN create accepts only a Wechatsync `draftOnly=true` result, writes a mode `0600` receipt, and returns `DRAFT_CREATED`, `draft_id`, and the CSDN editor review URL. It does not hand-write CSDN editor DOM/CDP automation and never final-publishes. |
+| CSDN draft / Wechatsync adapter | Implemented | `chatpost csdn draft PROFILE SOURCE --dry-run` and real create both use the Wechatsync adapter. CSDN create accepts only a Wechatsync `draftOnly=true` result, writes a mode `0600` receipt, and returns `DRAFT_CREATED`, `draft_id`, and the CSDN editor review URL. Markdown sources may provide a CSDN cover image through frontmatter `cover`; Markdown body images are uploaded through Wechatsync `image_upload` and saved as CSDN image URLs. It does not hand-write CSDN editor DOM/CDP automation and never final-publishes. |
 | Secret redaction / state boundary | Implemented | Output contains only non-secret page-visible state such as account name/home URL. Diagnostics continue to redact WebSocket endpoints, loopback connection details, ownership markers, and private assignments. |
 
 ## Verified Facts
@@ -24,7 +24,7 @@ This page separates the real current `ChatPost 0.1.x` user entrypoints, the pure
 - Unit tests lock that the browser-only Chrome launch does not include `--load-extension` / `--disable-extensions-except`.
 - Unit tests lock that `status/login/logout` use browser-level APIs, not publishing-adapter auth; XHS/CSDN login emits a QR artifact rather than exposing the internal confirmation link/token as the user interface.
 - Unit tests lock that Zhihu/CSDN `draft` uses `load_runner_config` / `execute_task`, requires an explicit `--receipt` before create, and writes mode `0600` receipts.
-- The current Wechatsync CSDN adapter capability is draft-only: its request uses `pubStatus="draft"`, returns `draftOnly=true`, and ChatPost currently has no CSDN public `post/publish` command.
+- The current Wechatsync CSDN adapter capability is draft-only: its request uses `pubStatus="draft"`, returns `draftOnly=true`; rich draft smoke has read back the title, marker, body image URL, and `cover_images`; ChatPost currently has no CSDN public `post/publish` command.
 
 ## Ownership
 

@@ -194,7 +194,18 @@ chatpost zhihu draft "$PROFILE" "$ARTICLE" \
 
 Expected successful statuses are `DRY_RUN_OK` for dry-run and `DRAFT_CREATED` for create. Create writes a mode `0600` receipt with the draft id, `/edit` review URL, source digest, and cleanup statuses. If the create path returns `RESULT_UNKNOWN`, do not retry automatically; inspect the receipt and the browser before deciding next steps.
 
-CSDN uses the same Wechatsync draft contract, but with platform parameter `csdn`. The current Wechatsync CSDN adapter saves a draft: its request uses `pubStatus="draft"` and returns `draftOnly=true`; ChatPost currently has no CSDN public `post/publish` command.
+CSDN uses the same Wechatsync draft contract, but with platform parameter `csdn`. The current Wechatsync CSDN adapter saves a draft: its request uses `pubStatus="draft"` and returns `draftOnly=true`; ChatPost currently has no CSDN public `post/publish` command. Markdown sources may provide a cover image with frontmatter `cover`, and body images use standard Markdown image syntax; create uploads them through CSDN `image_upload` and saves CSDN image URLs plus `cover_images`.
+
+```markdown
+---
+title: CSDN rich draft demo
+cover: data:image/png;base64,...
+---
+
+## Body image
+
+![body image alt](data:image/png;base64,...)
+```
 
 ```bash
 ARTICLE=/absolute/path/to/article.md

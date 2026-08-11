@@ -113,6 +113,94 @@ def test_csdn_extension_mcp_create_uses_csdn_platform_and_accepts_draft_only(mon
     assert calls[0][4]["article"]["title"] == "Title"
 
 
+def test_csdn_extension_mcp_create_passes_html_og_image_as_cover(monkeypatch, tmp_path):
+    path = _runner_config(tmp_path)
+    source = tmp_path / "article.html"
+    source.write_text(
+        """<!doctype html>
+<html>
+  <head>
+    <title>Rich CSDN article</title>
+    <meta property="og:image" content="https://img.example.test/cover.png">
+  </head>
+  <body>
+    <h1>Rich CSDN article</h1>
+    <p>body</p>
+  </body>
+</html>
+""",
+        encoding="utf-8",
+    )
+    config = csdn.load_runner_config(path)
+    calls = []
+
+    def fake_request(config_arg, environment, endpoint, method, payload, *, timeout):
+        calls.append(payload)
+        return {
+            "results": [
+                {
+                    "platform": "csdn",
+                    "success": True,
+                    "postId": "164",
+                    "postUrl": "https://editor.csdn.net/md?articleId=164",
+                    "draftOnly": True,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(csdn, "_extension_mcp_request", fake_request)
+
+    result = csdn._run_adapter(config, source, "create", object())
+
+    assert result.returncode == 0
+    assert calls[0]["article"]["title"] == "Rich CSDN article"
+    assert calls[0]["article"]["cover"] == "https://img.example.test/cover.png"
+
+
+def test_csdn_extension_mcp_create_passes_markdown_frontmatter_cover(monkeypatch, tmp_path):
+    path = _runner_config(tmp_path)
+    source = tmp_path / "article.md"
+    source.write_text(
+        """---
+title: Rich Markdown CSDN article
+cover: https://img.example.test/cover.png
+---
+
+正文里还有图片：
+
+![body image](https://img.example.test/body.png)
+""",
+        encoding="utf-8",
+    )
+    config = csdn.load_runner_config(path)
+    calls = []
+
+    def fake_request(config_arg, environment, endpoint, method, payload, *, timeout):
+        calls.append(payload)
+        return {
+            "results": [
+                {
+                    "platform": "csdn",
+                    "success": True,
+                    "postId": "165",
+                    "postUrl": "https://editor.csdn.net/md?articleId=165",
+                    "draftOnly": True,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(csdn, "_extension_mcp_request", fake_request)
+
+    result = csdn._run_adapter(config, source, "create", object())
+
+    assert result.returncode == 0
+    assert calls[0]["article"] == {
+        "title": "Rich Markdown CSDN article",
+        "markdown": "正文里还有图片：\n\n![body image](https://img.example.test/body.png)",
+        "cover": "https://img.example.test/cover.png",
+    }
+
+
 def test_csdn_execute_task_parses_csdn_draft_receipt(tmp_path):
     path = _runner_config(tmp_path)
     source = tmp_path / "article.md"

@@ -192,7 +192,18 @@ chatpost zhihu draft "$PROFILE" "$ARTICLE" \
 
 期望状态：dry-run 返回 `DRY_RUN_OK`；真实 create 返回 `DRAFT_CREATED` 并写 mode `0600` receipt。若返回 `RESULT_UNKNOWN`，不要自动重试，先读 receipt 和浏览器状态。
 
-CSDN 使用同样的 Wechatsync draft 合同，但平台参数是 `csdn`。当前 Wechatsync CSDN adapter 保存的是草稿：请求使用 `pubStatus="draft"`，返回 `draftOnly=true`；ChatPost 当前不提供 CSDN 公开 `post/publish` 命令。
+CSDN 使用同样的 Wechatsync draft 合同，但平台参数是 `csdn`。当前 Wechatsync CSDN adapter 保存的是草稿：请求使用 `pubStatus="draft"`，返回 `draftOnly=true`；ChatPost 当前不提供 CSDN 公开 `post/publish` 命令。Markdown source 可以用 frontmatter `cover` 提供封面图，正文图片使用标准 Markdown 图片语法；创建草稿时会通过 CSDN `image_upload` 写入 CSDN 图床 URL 和 `cover_images`。
+
+```markdown
+---
+title: CSDN rich draft demo
+cover: data:image/png;base64,...
+---
+
+## 正文图片
+
+![正文图片说明](data:image/png;base64,...)
+```
 
 ```bash
 ARTICLE=/absolute/path/to/article.md

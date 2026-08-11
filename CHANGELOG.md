@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 - 2026-08-12
+
+### Added
+
+- Support rich CSDN Wechatsync drafts with Markdown frontmatter `cover` and Markdown body images: ChatPost passes `cover` through the extension MCP payload, while the CSDN adapter uploads the cover into `cover_images` and body images through `image_upload`; the flow remains draft-only and does not expose CSDN public `post/publish`.
+
 ## 0.1.0 - 2026-08-09
 
 ### Added
