@@ -34,6 +34,8 @@ from threading import Thread
 from typing import Any
 
 import websocket
+from chatbrowser.registry import RegistryError as ChatBrowserRegistryError
+from chatbrowser.registry import profile_path as chatbrowser_profile_path
 from chatup.playwright import PlaywrightBrowserInstallation, resolve
 
 from chatpost.qr import generate_qr_code_image
@@ -131,6 +133,7 @@ class ZhihuBrowserConfig:
     playwright_version: str
     playwright_home: Path
     profile_dir: Path
+    browser_profile: str | None
     cdp_host: str
     cdp_port: int
     headless: bool
@@ -143,6 +146,7 @@ class ZhihuRunnerConfig:
     playwright_version: str
     playwright_home: Path
     profile_dir: Path
+    browser_profile: str | None
     extension_dir: Path
     node_bin: Path
     wechatsync_cli: Path
@@ -186,6 +190,38 @@ def _path(table: dict[str, Any], key: str) -> Path:
     return Path(value).expanduser().resolve()
 
 
+def _browser_profile_name(table: dict[str, Any]) -> str | None:
+    value = table.get("browser_profile")
+    if value is None:
+        value = table.get("chatbrowser_profile")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise TypeError("zhihu.browser_profile must be a non-empty string")
+    return value
+
+
+def _profile_dir_from_browser_layer(table: dict[str, Any]) -> tuple[Path, str | None]:
+    browser_profile = _browser_profile_name(table)
+    explicit_value = table.get("profile_dir")
+    if browser_profile is None:
+        return _path(table, "profile_dir"), None
+    try:
+        resolved = chatbrowser_profile_path(browser_profile).expanduser().resolve()
+    except ChatBrowserRegistryError as exc:
+        raise ValueError(
+            f"ChatBrowser profile {browser_profile!r} is not registered"
+        ) from exc
+    if explicit_value is not None:
+        explicit = _path(table, "profile_dir")
+        if explicit != resolved:
+            raise ValueError(
+                "zhihu.profile_dir must match the ChatBrowser profile path when "
+                "zhihu.browser_profile is set"
+            )
+    return resolved, browser_profile
+
+
 def _port(table: dict[str, Any], key: str) -> int:
     value = _required(table, key, int)
     if isinstance(value, bool) or not 1 <= value <= 65535:
@@ -208,6 +244,8 @@ def _browser_fields(table: dict[str, Any]) -> dict[str, Any]:
     if cdp_host not in _LOOPBACK_HOSTS:
         raise ValueError("CDP host must be the 127.0.0.1 loopback address")
 
+    profile_dir, browser_profile = _profile_dir_from_browser_layer(table)
+
     browser_args_value = table.get("browser_args", [])
     if not isinstance(browser_args_value, list) or not all(
         isinstance(item, str) and item for item in browser_args_value
@@ -227,7 +265,8 @@ def _browser_fields(table: dict[str, Any]) -> dict[str, Any]:
     return {
         "playwright_version": _required(table, "playwright_version", str),
         "playwright_home": _path(table, "playwright_home"),
-        "profile_dir": _path(table, "profile_dir"),
+        "profile_dir": profile_dir,
+        "browser_profile": browser_profile,
         "cdp_host": cdp_host,
         "cdp_port": _port(table, "cdp_port"),
         "headless": headless,
@@ -275,6 +314,7 @@ def load_runner_config(path: str | Path) -> ZhihuRunnerConfig:
         playwright_version=browser["playwright_version"],
         playwright_home=browser["playwright_home"],
         profile_dir=browser["profile_dir"],
+        browser_profile=browser["browser_profile"],
         extension_dir=_path(table, "extension_dir"),
         node_bin=_path(table, "node_bin"),
         wechatsync_cli=_path(table, "wechatsync_cli"),
@@ -827,36 +867,22 @@ def _wake_extension(
         session_id = attached.get("sessionId")
         if not isinstance(session_id, str):
             raise TypeError("Extension CDP attach returned no session identity")
-        token_saved = _cdp_evaluate(
+        bridge_config_saved = _cdp_evaluate(
             debug_socket,
             3,
             "new Promise((resolve) => {"
             "chrome.storage.local.set("
-            + json.dumps({"mcpToken": token}, ensure_ascii=False)
-            + ", () => resolve({ok: !chrome.runtime.lastError}));"
-            "})",
-            session_id=session_id,
-        )
-        set_server = _cdp_evaluate(
-            debug_socket,
-            4,
-            "new Promise((resolve) => {"
-            "chrome.runtime.sendMessage("
             + json.dumps(
-                {
-                    "type": "MCP_SET_SERVER_URL",
-                    "payload": {"url": server_url},
-                },
+                {"mcpToken": token, "mcpServerUrl": server_url},
                 ensure_ascii=False,
             )
-            + ", (response) => resolve({ok: !chrome.runtime.lastError && "
-            "response?.success !== false && response?.ok !== false}));"
+            + ", () => resolve({ok: !chrome.runtime.lastError}));"
             "})",
             session_id=session_id,
         )
         enabled = _cdp_evaluate(
             debug_socket,
-            5,
+            4,
             "new Promise((resolve) => {"
             "chrome.runtime.sendMessage({type: 'MCP_ENABLE'}, "
             "(response) => resolve({ok: !chrome.runtime.lastError && "
@@ -866,7 +892,7 @@ def _wake_extension(
         )
         watched = _cdp_evaluate(
             debug_socket,
-            6,
+            5,
             "new Promise((resolve) => {"
             "chrome.runtime.sendMessage({type: 'MCP_WATCH_START'}, "
             "(response) => resolve({ok: !chrome.runtime.lastError && "
@@ -874,13 +900,15 @@ def _wake_extension(
             "})",
             session_id=session_id,
         )
-    token_ready = bool(isinstance(token_saved, dict) and token_saved.get("ok"))
+    bridge_config_ready = bool(
+        isinstance(bridge_config_saved, dict) and bridge_config_saved.get("ok")
+    )
     watch_ready = bool(isinstance(watched, dict) and watched.get("ok"))
     result = {
-        "server": bool(isinstance(set_server, dict) and set_server.get("ok")),
+        "server": bridge_config_ready,
         "enabled": bool(isinstance(enabled, dict) and enabled.get("ok")),
     }
-    if not token_ready or not watch_ready or not all(result.values()):
+    if not bridge_config_ready or not watch_ready or not all(result.values()):
         raise RuntimeError("Extension rejected the loopback bridge configuration")
     return result
 

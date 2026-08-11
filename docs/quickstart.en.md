@@ -2,7 +2,32 @@
 
 This page covers ChatPost's recommended daily path: use logical Profiles (`test` by default, optionally `product`) to discover configuration, check Zhihu web login state, open a login handoff, and log out / clear browser state; then use the separate `chatpost zhihu draft` entrypoint to dry-run or create one Zhihu draft. `login/status/logout` do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens. XHS keeps the same `profiles/login/status/logout` shape, but it is not the current acceptance path.
 
-## 0. Set Variables
+## 0. Install Chain And Responsibility Boundary
+
+Installing ChatPost pulls in the Python-layer dependencies `chatup` and `chatbrowser`, but the three packages own different layers:
+
+```text
+ChatUp       = install / setup: Node, Playwright package, Chromium/Chrome artifacts
+ChatBrowser  = browser runtime: backend, Profile metadata, loopback CDP session registry
+ChatPost     = post orchestration: logical Profile -> platform -> login state -> draft/create receipt
+```
+
+```bash
+python -m pip install ChatPost
+chatpost --version
+chatup playwright install 1.61.1 --browser chromium --output json -I
+chatbrowser profile create zhihu-test \
+  --path "$HOME/.chatarch/chatpost/profiles/test/zhihu" \
+  --backend chatup-playwright \
+  --label owner=chatpost \
+  --label platform=zhihu \
+  --label logical_profile=test \
+  --output json
+```
+
+`pip install ChatPost` installs Python package dependencies. Browser binaries are still prepared by `chatup playwright install ...`. Browser Profile paths and non-sensitive metadata are registered by `chatbrowser profile create ...`. A ChatPost runner may reference that browser layer with `browser_profile = "zhihu-test"`, while Wechatsync extension, bridge, receipt, and adapter fields stay in the ChatPost/adapter layer.
+
+## 0b. Set Variables
 
 ```bash
 CHATPOST=chatpost

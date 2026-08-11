@@ -118,6 +118,30 @@ def _endpoint(target_id: str | None = "extension-owned-target") -> zhihu._CdpEnd
     )
 
 
+def test_runner_config_resolves_profile_dir_from_chatbrowser_profile(monkeypatch, tmp_path):
+    path = _config(tmp_path)
+    chatbrowser_profile = tmp_path / "chatbrowser-profile"
+    chatbrowser_profile.mkdir()
+    chatbrowser_profile.chmod(0o700)
+    text = path.read_text(encoding="utf-8")
+    text = text.replace("profile_dir = " + json.dumps(str(tmp_path / "profile")) + "\n", "")
+    text = text.replace("[zhihu]\n", "[zhihu]\nbrowser_profile = \"zhihu-test\"\n")
+    path.write_text(text, encoding="utf-8")
+    calls = []
+
+    def fake_profile_path(name):
+        calls.append(name)
+        return chatbrowser_profile
+
+    monkeypatch.setattr(zhihu, "chatbrowser_profile_path", fake_profile_path)
+
+    config = load_runner_config(path)
+
+    assert calls == ["zhihu-test"]
+    assert config.browser_profile == "zhihu-test"
+    assert config.profile_dir == chatbrowser_profile.resolve()
+
+
 def test_runner_config_rejects_non_loopback_bind(tmp_path):
     path = _config(tmp_path, bridge_host="0.0.0.0")
 
@@ -377,6 +401,50 @@ def test_default_create_uses_extension_mcp_directly(monkeypatch, tmp_path):
     assert params["platforms"] == ["zhihu"]
     assert params["article"]["title"] == "Infra title"
     assert "CHATPOST-PLAYWRIGHT-INFRA-V1" in params["article"]["markdown"]
+
+
+def test_wake_extension_stores_token_and_server_url_before_enable(monkeypatch, tmp_path):
+    config = load_runner_config(_config(tmp_path))
+    endpoint = _endpoint()
+    expressions: list[str] = []
+
+    class FakeSocket:
+        pass
+
+    @contextmanager
+    def fake_owned_socket(_endpoint):
+        yield FakeSocket()
+
+    def fake_cdp_command(_socket, _identifier, method, params=None, *, session_id=None):
+        if method == "Target.getTargets":
+            return {
+                "targetInfos": [
+                    {
+                        "type": "page",
+                        "targetId": endpoint.extension_target_id,
+                        "url": f"chrome-extension://{config.extension_id}/src/popup/index.html",
+                    }
+                ]
+            }
+        if method == "Target.attachToTarget":
+            return {"sessionId": "extension-session"}
+        raise AssertionError(f"unexpected CDP method: {method}")
+
+    def fake_evaluate(_socket, _identifier, expression, *, session_id):
+        expressions.append(expression)
+        return {"ok": True}
+
+    monkeypatch.setattr(zhihu, "_owned_browser_socket", fake_owned_socket)
+    monkeypatch.setattr(zhihu, "_cdp_command", fake_cdp_command)
+    monkeypatch.setattr(zhihu, "_cdp_evaluate", fake_evaluate)
+
+    zhihu._wake_extension(config, {"WECHATSYNC_TOKEN": "secret-value"}, endpoint)
+
+    assert "mcpToken" in expressions[0]
+    assert "mcpServerUrl" in expressions[0]
+    assert "MCP_ENABLE" in expressions[1]
+    assert "MCP_WATCH_START" in expressions[2]
+    assert "MCP_SET_SERVER_URL" not in "\n".join(expressions)
 
 
 def test_default_auth_uses_extension_mcp_directly(monkeypatch, tmp_path):
@@ -1831,7 +1899,6 @@ def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, t
         "Runtime.evaluate",
         "Runtime.evaluate",
         "Runtime.evaluate",
-        "Runtime.evaluate",
     ]
     assert commands[1]["params"] == {
         "targetId": "owned-extension-target",
@@ -1840,19 +1907,17 @@ def test_extension_wake_uses_exact_target_and_never_returns_token(monkeypatch, t
     assert commands[2]["sessionId"] == "owned-extension-session"
     assert commands[3]["sessionId"] == "owned-extension-session"
     assert commands[4]["sessionId"] == "owned-extension-session"
-    assert commands[5]["sessionId"] == "owned-extension-session"
-    expressions = [command["params"]["expression"] for command in commands[2:6]]
+    expressions = [command["params"]["expression"] for command in commands[2:5]]
     assert "chrome.storage.local.set" in expressions[0]
     assert "mcpToken" in expressions[0]
+    assert "mcpServerUrl" in expressions[0]
     assert "top-secret" in expressions[0]
-    assert "MCP_SET_SERVER_URL" in expressions[1]
-    assert "payload" in expressions[1]
-    assert "ws://127.0.0.1:9527" in expressions[1]
-    assert "MCP_ENABLE" in expressions[2]
-    assert "MCP_WATCH_START" in expressions[3]
+    assert "ws://127.0.0.1:9527" in expressions[0]
+    assert "MCP_ENABLE" in expressions[1]
+    assert "MCP_WATCH_START" in expressions[2]
+    assert "MCP_SET_SERVER_URL" not in "\n".join(expressions)
     assert "top-secret" not in expressions[1]
     assert "top-secret" not in expressions[2]
-    assert "top-secret" not in expressions[3]
     assert "top-secret" not in json.dumps(result)
 
 

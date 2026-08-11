@@ -2,7 +2,32 @@
 
 本页覆盖 ChatPost 的推荐日常路径：用逻辑 Profile（默认 `test`，可另建 `product`）发现配置、检查知乎网页登录态、打开登录 handoff、登出/清理；再通过独立 `chatpost zhihu draft` 入口 dry-run 或创建一个知乎草稿。`login/status/logout` 不创建草稿、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。小红书保留同形 `profiles/login/status/logout` 接口，但当前不作为验收主线。
 
-## 0. 设定变量
+## 0. 安装链路与职责边界
+
+安装 ChatPost 会带上 Python 层依赖 `chatup` 和 `chatbrowser`，但三者职责不同：
+
+```text
+ChatUp       = 安装 / setup：Node、Playwright package、Chromium/Chrome 制品
+ChatBrowser  = 浏览器运行态：backend、Profile metadata、loopback CDP session registry
+ChatPost     = post 编排：逻辑 Profile -> 平台 -> 登录态 -> draft/create receipt
+```
+
+```bash
+python -m pip install ChatPost
+chatpost --version
+chatup playwright install 1.61.1 --browser chromium --output json -I
+chatbrowser profile create zhihu-test \
+  --path "$HOME/.chatarch/chatpost/profiles/test/zhihu" \
+  --backend chatup-playwright \
+  --label owner=chatpost \
+  --label platform=zhihu \
+  --label logical_profile=test \
+  --output json
+```
+
+`pip install ChatPost` 负责安装 Python 包依赖；浏览器二进制仍由 `chatup playwright install ...` 准备；浏览器 Profile 路径和非敏感 metadata 由 `chatbrowser profile create ...` 登记。ChatPost 的 runner 可以通过 `browser_profile = "zhihu-test"` 引用 ChatBrowser Profile，并继续把 Wechatsync extension、bridge、receipt 等发布适配器字段留在 ChatPost/adapter 层。
+
+## 0b. 设定变量
 
 ```bash
 CHATPOST=chatpost

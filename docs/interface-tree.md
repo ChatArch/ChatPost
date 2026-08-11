@@ -12,14 +12,14 @@ chatpost.accounts
 └── resolve_account(target, accounts)
 
 chatpost.zhihu
-├── ZhihuBrowserConfig            # 纯浏览器登录配置
+├── ZhihuBrowserConfig            # 纯浏览器登录配置；可记录 browser_profile
 ├── load_browser_config(path)     # 不读取 adapter/env/extension 字段
 ├── browser_preflight(config)
 ├── browser_status(config)
 ├── browser_login(config, timeout=..., event_callback=...)
 ├── browser_logout(config)
 ├── browser_login_session(config)
-├── ZhihuRunnerConfig             # draft/Wechatsync runner 配置边界
+├── ZhihuRunnerConfig             # draft/Wechatsync runner 配置边界；可引用 browser_profile
 ├── load_runner_config(path)      # draft runner 专用；不得被 login/status/logout 默认调用
 ├── execute_task(config, source, mode="dry-run"|"create")
 └── ResultUnknownError            # create 结果不确定时禁止自动重试
@@ -29,10 +29,10 @@ chatpost.zhihu
 
 ```python
 from chatup.playwright import resolve
-import chatbrowser
+from chatbrowser.registry import profile_path
 ```
 
-ChatPost 只解析已存在的 exact Playwright browser installation，不隐式安装或升级。ChatBrowser 负责浏览器 runtime、Profile metadata 和 CDP session metadata 的安全边界；ChatPost 不保存 Cookie、LocalStorage、IndexedDB、session、token 或 QR payload。
+ChatPost 只解析已存在的 exact Playwright browser installation，不隐式安装或升级。ChatBrowser 负责浏览器 runtime、Profile metadata 和 CDP session metadata 的安全边界；ChatPost 不保存 Cookie、LocalStorage、IndexedDB、session、token 或 QR payload。配置文件可写 `browser_profile = "zhihu-test"`，`load_browser_config()` / `load_runner_config()` 会通过 `chatbrowser.registry.profile_path()` 解析 Profile 路径；若同时写 `profile_dir`，它必须与 ChatBrowser registry 记录一致。
 
 ## 示例：默认 ChatArch state root 读取 Profile registry
 

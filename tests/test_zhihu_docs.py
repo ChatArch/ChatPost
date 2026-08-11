@@ -67,6 +67,13 @@ def test_quickstart_covers_login_and_draft_while_preserving_login_boundary():
         assert "qrcode_path" in text
         assert "--dry-run" in text
         assert "--receipt" in text
+        assert "pip install ChatPost" in text
+        assert "ChatUp" in text
+        assert "ChatBrowser" in text
+        assert "ChatPost" in text
+        assert "chatup playwright install" in text
+        assert "chatbrowser profile create" in text
+        assert "browser_profile" in text
         assert "browser_opened" in text
         assert "LOGGED_IN" in text
         assert "LOGGED_OUT" in text
@@ -127,6 +134,8 @@ def test_interface_tree_documents_default_state_root_and_browser_api():
         assert "default_registry_path()" in text
         assert "~/.chatarch/chatpost" in text
         assert "load_browser_config(path)" in text
+        assert "browser_profile" in text
+        assert "chatbrowser.registry.profile_path" in text
         assert "browser_status(config)" in text
         assert "browser_login(config" in text
         assert "browser_logout(config)" in text

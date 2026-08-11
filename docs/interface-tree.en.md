@@ -12,14 +12,14 @@ chatpost.accounts
 └── resolve_account(target, accounts)
 
 chatpost.zhihu
-├── ZhihuBrowserConfig            # pure browser-login config
+├── ZhihuBrowserConfig            # pure browser-login config; may record browser_profile
 ├── load_browser_config(path)     # ignores adapter/env/extension fields
 ├── browser_preflight(config)
 ├── browser_status(config)
 ├── browser_login(config, timeout=..., event_callback=...)
 ├── browser_logout(config)
 ├── browser_login_session(config)
-├── ZhihuRunnerConfig             # draft / Wechatsync runner boundary
+├── ZhihuRunnerConfig             # draft / Wechatsync runner boundary; may reference browser_profile
 ├── load_runner_config(path)      # draft-runner only; not the default login/status/logout path
 ├── execute_task(config, source, mode="dry-run"|"create")
 └── ResultUnknownError            # forbids automatic retry after ambiguous create results
@@ -29,10 +29,10 @@ chatpost.zhihu
 
 ```python
 from chatup.playwright import resolve
-import chatbrowser
+from chatbrowser.registry import profile_path
 ```
 
-ChatPost resolves an existing exact Playwright browser installation. It never installs or upgrades one implicitly. ChatBrowser owns the browser runtime, Profile metadata, and CDP session metadata safety boundary; ChatPost does not store cookies, local storage, IndexedDB, sessions, tokens, or QR payloads.
+ChatPost resolves an existing exact Playwright browser installation. It never installs or upgrades one implicitly. ChatBrowser owns the browser runtime, Profile metadata, and CDP session metadata safety boundary; ChatPost does not store cookies, local storage, IndexedDB, sessions, tokens, or QR payloads. Config files may set `browser_profile = "zhihu-test"`; `load_browser_config()` / `load_runner_config()` resolve the Profile path through `chatbrowser.registry.profile_path()`. If `profile_dir` is also present, it must match the ChatBrowser registry record.
 
 ## Example: Read Profiles From The Default ChatArch State Root
 
