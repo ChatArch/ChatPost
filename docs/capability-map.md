@@ -14,7 +14,7 @@
 | Browser-only runner config | 已实现 | 登录基础层只需要 `playwright_version`、`playwright_home`、`profile_dir`、`cdp_host`、`cdp_port`、`headless`、`browser_args`、`attach_existing_cdp`；可用 `browser_profile` 引用 ChatBrowser Profile。 |
 | ChatArch state root | 已实现 | 默认本地状态根目录是 `~/.chatarch/chatpost/`；默认 registry 是 `~/.chatarch/chatpost/accounts.toml`，可用 `CHATPOST_HOME` / `CHATPOST_ACCOUNT_REGISTRY` / `--registry PATH` 显式覆盖。 |
 | 知乎 draft / Wechatsync adapter | 已实现 | `chatpost zhihu draft PROFILE SOURCE --dry-run` 调用 Wechatsync CLI parser 做 adapter preview，不启动浏览器也不写草稿；`--receipt PATH` 启动受控 Chromium + Wechatsync extension，并通过 extension MCP direct bridge 创建一个知乎草稿，写 mode `0600` receipt，返回 `DRAFT_CREATED`、`draft_id` 和 `/edit` review URL；不最终发布，不做 same-ID 更新。 |
-| CSDN draft / Wechatsync adapter | 已实现 | `chatpost csdn draft PROFILE SOURCE --dry-run` 与真实 create 都走 Wechatsync adapter；CSDN create 只接受 Wechatsync 返回的 `draftOnly=true` 草稿结果，写 mode `0600` receipt，返回 `DRAFT_CREATED`、`draft_id` 和 CSDN editor review URL；不手写 CSDN editor DOM/CDP 自动化，也不最终公开发布。 |
+| CSDN draft / Wechatsync adapter | 已实现 | `chatpost csdn draft PROFILE SOURCE --dry-run` 与真实 create 都走 Wechatsync adapter；CSDN create 只接受 Wechatsync 返回的 `draftOnly=true` 草稿结果，写 mode `0600` receipt，返回 `DRAFT_CREATED`、`draft_id` 和 CSDN editor review URL。Markdown source 可用 frontmatter `cover` 提供 CSDN 封面图，正文 Markdown 图片经 Wechatsync `image_upload` 写入 CSDN 图床 URL；不手写 CSDN editor DOM/CDP 自动化，也不最终公开发布。 |
 | Secret redaction / state boundary | 已实现 | 输出只包含页面可见账号名/主页 URL 等非 secret 状态；诊断继续遮蔽 WebSocket、loopback、ownership marker 和私密赋值。 |
 
 ## 已验证事实
@@ -24,7 +24,7 @@
 - 单元测试锁定 browser-only Chrome 启动命令不带 `--load-extension` / `--disable-extensions-except`。
 - 单元测试锁定 `status/login/logout` 走 browser-level API，而不是发布适配器 auth；XHS/CSDN login 输出二维码 artifact，不把内部确认链接/token 作为用户接口。
 - 单元测试锁定 Zhihu/CSDN `draft` 走 `load_runner_config` / `execute_task`，create 前必须显式传 `--receipt`，receipt 写入 mode `0600`。
-- CSDN Wechatsync adapter 的当前能力是草稿：请求使用 `pubStatus="draft"`，返回 `draftOnly=true`；ChatPost 当前没有 CSDN 公开 `post/publish` 命令。
+- CSDN Wechatsync adapter 的当前能力是草稿：请求使用 `pubStatus="draft"`，返回 `draftOnly=true`；rich draft smoke 已回读标题、正文 marker、正文图床 URL 和 `cover_images`；ChatPost 当前没有 CSDN 公开 `post/publish` 命令。
 
 ## 责任边界
 
