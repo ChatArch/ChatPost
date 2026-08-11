@@ -1,6 +1,6 @@
-# Quickstart：逻辑 Profile、知乎登录与草稿
+# Quickstart：逻辑 Profile、知乎/CSDN 登录与草稿
 
-本页覆盖 ChatPost 的推荐日常路径：用逻辑 Profile（默认 `test`，可另建 `product`）发现配置、检查知乎网页登录态、打开登录 handoff、登出/清理；再通过独立 `chatpost zhihu draft` 入口 dry-run 或创建一个知乎草稿。`login/status/logout` 不创建草稿、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。小红书保留同形 `profiles/login/status/logout` 接口，但当前不作为验收主线。
+本页覆盖 ChatPost 的推荐日常路径：用逻辑 Profile（默认 `test`，可另建 `product`）发现配置、检查知乎/CSDN 网页登录态、打开登录 handoff、登出/清理；再通过独立 `chatpost zhihu draft` / `chatpost csdn draft` 入口 dry-run 或创建一个草稿。`login/status/logout` 不创建草稿、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。小红书保留同形 `profiles/login/status/logout` 接口，但当前不作为草稿验收主线。
 
 ## 0. 安装链路与职责边界
 
@@ -47,12 +47,14 @@ profiles/
   test/
     zhihu/
     xhs/
+    csdn/
   product/
     zhihu/
     xhs/
+    csdn/
 ```
 
-日常命令优先使用逻辑名，例如 `chatpost zhihu status test`。registry 内部可以保留平台别名（如 `zhihu-test`、`xhs-test`）作为兼容层，但用户不需要记这些别名。
+日常命令优先使用逻辑名，例如 `chatpost zhihu status test` 或 `chatpost csdn status test`。registry 内部可以保留平台别名（如 `zhihu-test`、`xhs-test`、`csdn-test`）作为兼容层，但用户不需要记这些别名。
 
 ## 1. 确认可见 CLI 和 Profile
 
@@ -65,14 +67,18 @@ profiles/
 
 "$CHATPOST" profiles   --platform xhs   --registry "$REGISTRY"   --output json   -I
 
+"$CHATPOST" profiles   --platform csdn   --registry "$REGISTRY"   --output json   -I
+
 "$CHATPOST" zhihu profiles   --registry "$REGISTRY"   --output json   -I
 
 "$CHATPOST" xhs profiles   --registry "$REGISTRY"   --output json   -I
+
+"$CHATPOST" csdn profiles   --registry "$REGISTRY"   --output json   -I
 ```
 
-这些发现命令只读 registry，不启动浏览器，不读取登录态。等价真实命令名是 `chatpost platforms`、`chatpost profiles`、`chatpost zhihu profiles` 和 `chatpost xhs profiles`。
+这些发现命令只读 registry，不启动浏览器，不读取登录态。等价真实命令名是 `chatpost platforms`、`chatpost profiles`、`chatpost zhihu profiles`、`chatpost xhs profiles` 和 `chatpost csdn profiles`。
 
-登录基础层的真实命令名是 `chatpost zhihu status`、`chatpost zhihu login`、`chatpost zhihu logout`、`chatpost xhs status`、`chatpost xhs login` 和 `chatpost xhs logout`。
+登录基础层的真实命令名是 `chatpost zhihu status`、`chatpost zhihu login`、`chatpost zhihu logout`、`chatpost xhs status`、`chatpost xhs login`、`chatpost xhs logout`、`chatpost csdn status`、`chatpost csdn login` 和 `chatpost csdn logout`。
 
 ## 2. 检查当前网页登录态
 
@@ -133,6 +139,20 @@ XHS_QR="$CHATPOST_HOME/xhs-login-qrcode.png"
 
 当二维码成功生成时，首个 JSON Lines 事件形态为 `event=login_handoff`、`status=LOGIN_REQUIRED`、`handoff_kind=qrcode_image`、`qrcode_path=/path/to/png`。如果页面没有暴露真实可解码二维码，返回 `LOGIN_HANDOFF_UNAVAILABLE` / `reason=qrcode_not_found`；如果小红书把当前网络判为风险，返回 `LOGIN_BLOCKED` / `block_reason=network_risk`。这些失败都不能伪装成可扫码二维码。
 
+## 5c. CSDN 登录与状态
+
+CSDN 保留与知乎同形的平台入口：`profiles/status/login/logout`。未登录时，CSDN 登录只输出二维码图片 artifact，不输出私有确认链接、二维码 token、Cookie 或 session。密码/SMS/人机验证属于人工浏览器流程；ChatPost 不绕过、不自动打码、不保存验证码内容。
+
+```bash
+CSDN_PROFILE="$PROFILE"
+CSDN_QR="$CHATPOST_HOME/csdn-login-qrcode.png"
+"$CHATPOST" csdn status "$CSDN_PROFILE"   --registry "$REGISTRY"   --output json   -I
+"$CHATPOST" csdn login "$CSDN_PROFILE"   --registry "$REGISTRY"   --timeout 900   --qrcode "$CSDN_QR"   --output json   -I
+"$CHATPOST" csdn status "$CSDN_PROFILE"   --registry "$REGISTRY"   --output json   -I
+```
+
+CSDN `status` 的验收依据必须来自同一受控 Profile 的页面可见状态或浏览器内用户接口结果；不能只看 URL/title，也不能从 Cookie/LocalStorage/IndexedDB/session/token 反推登录态。
+
 ## 常见停点
 
 | 停点 | 处理 |
@@ -143,11 +163,12 @@ XHS_QR="$CHATPOST_HOME/xhs-login-qrcode.png"
 | `zhihu login` 输出 `browser_opened` 但没有 page-owned `login_url` | 浏览器已打开等待人工登录；不要用截图或私有 artifact 冒充登录链接。 |
 | 登录页需要滑块或验证码 | 停在人工浏览器流程，不把验证码写进 CLI 参数或日志。 |
 | `login` 返回 `LOGIN_BLOCKED` / `block_reason=network_risk` | 当前出口被平台拒绝，不能生成可扫码二维码；换可靠网络或本机浏览器 profile 后再试。 |
+| `csdn login` 遇到安全验证 | 停在人工浏览器流程；不绕过、不自动打码、不把验证码写进 CLI 参数、日志或文档。 |
 | `status` 返回 `UNKNOWN` | 只报告未知；不要 fallback 到发布适配器或读取 Cookie/token。 |
 
-## 6. 知乎草稿 dry-run 与 create
+## 6. 知乎/CSDN 草稿 dry-run 与 create
 
-`chatpost zhihu draft` 与浏览器级登录命令刻意分离。它复用同一个逻辑 Profile，但只有 draft 流程会加载 Wechatsync、扩展、bridge 和私有 env 文件；`login/status/logout` 必须保持 browser-only。
+`chatpost zhihu draft` 与 `chatpost csdn draft` 都与浏览器级登录命令刻意分离。它们复用同一个逻辑 Profile，但只有 draft 流程会加载 Wechatsync、扩展、bridge 和私有 env 文件；`login/status/logout` 必须保持 browser-only。
 
 ```bash
 ARTICLE=/absolute/path/to/article.md
@@ -170,3 +191,21 @@ chatpost zhihu draft "$PROFILE" "$ARTICLE" \
 ```
 
 期望状态：dry-run 返回 `DRY_RUN_OK`；真实 create 返回 `DRAFT_CREATED` 并写 mode `0600` receipt。若返回 `RESULT_UNKNOWN`，不要自动重试，先读 receipt 和浏览器状态。
+
+CSDN 使用同样的 Wechatsync draft 合同，但平台参数是 `csdn`。当前 Wechatsync CSDN adapter 保存的是草稿：请求使用 `pubStatus="draft"`，返回 `draftOnly=true`；ChatPost 当前不提供 CSDN 公开 `post/publish` 命令。
+
+```bash
+ARTICLE=/absolute/path/to/article.md
+chatpost csdn draft "$PROFILE" "$ARTICLE" \
+  --registry "$REGISTRY" \
+  --dry-run \
+  --output json \
+  -I
+
+RECEIPT="$CHATPOST_HOME/runners/csdn-test/run/csdn-draft-receipt.json"
+chatpost csdn draft "$PROFILE" "$ARTICLE" \
+  --registry "$REGISTRY" \
+  --receipt "$RECEIPT" \
+  --output json \
+  -I
+```

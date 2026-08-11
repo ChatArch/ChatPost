@@ -16,6 +16,11 @@ LOGIN_COMMANDS = (
     "chatpost xhs login",
     "chatpost xhs status",
     "chatpost xhs logout",
+    "chatpost csdn profiles",
+    "chatpost csdn login",
+    "chatpost csdn status",
+    "chatpost csdn logout",
+    "chatpost csdn draft",
 )
 
 FORBIDDEN_LOGIN_SURFACE = (
@@ -23,6 +28,8 @@ FORBIDDEN_LOGIN_SURFACE = (
     "chatpost qr",
     "chatpost zhihu account",
     "chatpost xhs draft",
+    "chatpost csdn post",
+    "chatpost csdn publish",
     "qr-artifact",
     "WECHATSYNC_TOKEN",
     "auth zhihu",
@@ -94,14 +101,17 @@ def test_home_readme_and_mkdocs_route_to_login_quickstart():
     en_home = (ROOT / "docs/index.en.md").read_text(encoding="utf-8")
     zh_readme = (ROOT / "README.md").read_text(encoding="utf-8")
     en_readme = (ROOT / "README.en.md").read_text(encoding="utf-8")
-    assert "Quickstart：逻辑 Profile、知乎登录与草稿" in zh_home
-    assert "Quickstart: Logical Profiles, Zhihu Login, and Drafts" in en_home
-    assert "Quickstart：逻辑 Profile、知乎登录与草稿" in zh_readme
-    assert "Quickstart: Logical Profiles, Zhihu Login, and Drafts" in en_readme
+    assert "Quickstart：逻辑 Profile、知乎/CSDN 登录与草稿" in zh_home
+    assert "Quickstart: Logical Profiles, Zhihu/CSDN Login, and Drafts" in en_home
+    assert "Quickstart：逻辑 Profile、知乎/CSDN 登录与草稿" in zh_readme
+    assert "Quickstart: Logical Profiles, Zhihu/CSDN Login, and Drafts" in en_readme
     for text in (zh_home, en_home, zh_readme, en_readme):
         assert "chatpost zhihu login" in text or "login/status/logout" in text
         assert "chatpost zhihu draft" in text
+        assert "chatpost csdn draft" in text
         assert "chatpost xhs draft" not in text
+        assert "chatpost csdn post" not in text
+        assert "chatpost csdn publish" not in text
         assert "qrcode_path" in text
         assert "WECHATSYNC_TOKEN" not in text
     for text in (zh_home, en_home):
@@ -118,13 +128,14 @@ def test_quickstart_uses_logical_profiles_without_live_identity_or_login_urls():
         "scan/login",
         "zhihu-personal",
         "xhs-personal",
+        "csdn-personal",
         "zhihu-practice-quickstart",
     ):
         assert forbidden not in text
     assert "PROFILE=test" in text
     assert "profiles/" in text
     assert "product/" in text
-    assert "当前不作为验收主线" in text
+    assert "当前不作为草稿验收主线" in text
 
 
 def test_interface_tree_documents_default_state_root_and_browser_api():
@@ -141,6 +152,7 @@ def test_interface_tree_documents_default_state_root_and_browser_api():
         assert "browser_logout(config)" in text
         assert "load_runner_config(path)" in text
         assert "Wechatsync" in text
+        assert "CSDNRunnerConfig" in text
 
 
 def test_configuration_documents_default_state_root_and_current_registry_shape():
@@ -150,6 +162,7 @@ def test_configuration_documents_default_state_root_and_current_registry_shape()
         assert "CHATPOST_HOME" in text
         assert "CHATPOST_ACCOUNT_REGISTRY" in text
         assert "runner_config = \"runners/zhihu-personal/runner.toml\"" in text
+        assert "runner_config = \"runners/csdn-personal/runner.toml\"" in text
         assert "LocalStorage" in text or "local storage" in text
         assert "IndexedDB" in text
 
@@ -159,6 +172,7 @@ def test_capability_map_says_browser_login_does_not_touch_adapter():
     en_text = (ROOT / "docs/capability-map.en.md").read_text(encoding="utf-8")
     assert "知乎纯浏览器登录/状态/登出" in zh_text
     assert "小红书二维码登录/状态/登出" in zh_text
+    assert "CSDN 二维码登录/状态/登出" in zh_text
     assert "不调用发布适配器" in zh_text
     assert "不加载发布扩展" in zh_text
     assert "不要求发布 token" in zh_text
@@ -172,6 +186,8 @@ def test_capability_map_says_browser_login_does_not_touch_adapter():
         assert "ChatArch state root" in text or "ChatArch state root" in en_text
         assert "load_browser_config" in text
         assert "chatpost zhihu draft" in text
+        assert "chatpost csdn draft" in text
         assert "chatpost xhs draft/create" in text
         assert "qrcode_path" in text
         assert "Wechatsync" in text
+        assert "draftOnly" in text

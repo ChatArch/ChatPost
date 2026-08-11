@@ -1,9 +1,9 @@
 # Browser Runners and Account Isolation
 
 !!! warning "Status: partially implemented, partially proposed"
-    `ChatPost 0.1.x` implements the task-specific Zhihu Runner lifecycle, non-sensitive Profile-registry reads, and `chatpost zhihu login/status/logout/draft` entrypoints. Generic `runner` management, multi-account scheduling, and remote models remain proposals.
+    `ChatPost 0.1.x` implements the task-specific Zhihu/CSDN Runner lifecycle, non-sensitive Profile-registry reads, and `chatpost zhihu login/status/logout/draft` plus `chatpost csdn login/status/logout/draft` entrypoints. Generic `runner` management, multi-account scheduling, and remote models remain proposals.
 
-See [Overall Architecture](architecture.md) for the resource model, [Configuration, Environment, and State](configuration.md) for persistence, and [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md) for the concrete task.
+See [Overall Architecture](architecture.md) for the resource model, [Configuration, Environment, and State](configuration.md) for persistence, and [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md) for the older Zhihu acceptance record. CSDN reuses the same Wechatsync draft contract, but its current adapter saves drafts only and does not final-publish.
 
 ## Direct Answers
 

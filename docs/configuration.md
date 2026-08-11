@@ -1,7 +1,7 @@
 # 配置、环境与状态设计
 
 !!! warning "状态：设计提案"
-    `ChatPost 0.1.0` 已读取 task-specific `[zhihu]` Runner TOML 和权限 `0600` 的 bridge env 文件；本页其余通用 Runner/Account/ledger schema 仍是提案。
+    `ChatPost 0.1.x` 已读取 task-specific `[zhihu]` / `[csdn]` Runner TOML 和权限 `0600` 的 bridge env 文件；本页其余通用 Runner/Account/ledger schema 仍是提案。
 
 ## 设计结论
 
@@ -73,9 +73,13 @@ ChatBrowser 管 browser backend、Profile metadata 与 CDP session registry。Ch
 [zhihu]
 browser_profile = "zhihu-test"
 profile_dir = "/home/zhihong/.chatarch/chatpost/profiles/test/zhihu"
+
+[csdn]
+browser_profile = "csdn-test"
+profile_dir = "/home/zhihong/.chatarch/chatpost/profiles/test/csdn"
 ```
 
-`browser_profile` 通过 `chatbrowser.registry.profile_path()` 解析；如果同时保留 `profile_dir`，必须和 ChatBrowser registry 中的路径一致。ChatPost 仍拥有知乎账号 alias、platform/profile 映射、Wechatsync extension/bridge/env/receipt 字段；ChatBrowser 不判断“登录了哪个知乎账号”，也不创建草稿。
+`browser_profile` 通过 `chatbrowser.registry.profile_path()` 解析；如果同时保留 `profile_dir`，必须和 ChatBrowser registry 中的路径一致。ChatPost 仍拥有平台账号 alias、platform/profile 映射、Wechatsync extension/bridge/env/receipt 字段；ChatBrowser 不判断“登录了哪个平台账号”，也不创建草稿。
 
 ```bash
 chatbrowser profile create zhihu-test \
@@ -86,6 +90,14 @@ chatbrowser profile create zhihu-test \
   --label logical_profile=test \
   --output json
 chatbrowser profile show zhihu-test --output json
+chatbrowser profile create csdn-test \
+  --path "$HOME/.chatarch/chatpost/profiles/test/csdn" \
+  --backend chatup-playwright \
+  --label owner=chatpost \
+  --label platform=csdn \
+  --label logical_profile=test \
+  --output json
+chatbrowser profile show csdn-test --output json
 ```
 
 ## 非秘密配置示例
@@ -238,6 +250,13 @@ platform = "xhs"
 runner_config = "runners/xhs-personal/runner.toml"
 profile = "xhs-personal"
 label = "Personal XHS browser Profile"
+login_methods = ["qr"]
+
+[accounts."csdn-personal"]
+platform = "csdn"
+runner_config = "runners/csdn-personal/runner.toml"
+profile = "csdn-personal"
+label = "Personal CSDN browser Profile"
 login_methods = ["qr"]
 ```
 
