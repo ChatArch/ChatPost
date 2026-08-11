@@ -15,7 +15,7 @@ def _registry(tmp_path: Path) -> Path:
         '[accounts."xhs-test"]\n'
         'platform = "xhs"\n'
         f'runner_config = {json.dumps(str(runner))}\n'
-        'profile = "xhs-test"\n',
+        'profile = "test"\n',
         encoding="utf-8",
     )
     return registry
@@ -41,6 +41,37 @@ def test_xhs_cli_registers_short_platform_surface_without_draft_or_long_alias():
     assert "account" not in xhs.commands
     assert "qr" not in main.commands
     assert "xhs-login" not in main.commands
+
+
+def test_xhs_status_accepts_logical_profile_name_without_platform_alias(monkeypatch, tmp_path):
+    registry = _registry(tmp_path)
+    sentinel = object()
+    calls = []
+    monkeypatch.setattr(command, "load_xhs_browser_config", lambda _path: sentinel)
+    monkeypatch.setattr(
+        command,
+        "xhs_browser_status",
+        lambda config: calls.append(config)
+        or {
+            "status": "LOGGED_OUT",
+            "check_method": "browser_page",
+        },
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["xhs", "status", "test", "--registry", str(registry), "--output", "json", "-I"],
+    )
+    payload = _json(result)
+
+    assert calls == [sentinel]
+    assert payload == {
+        "target": "xhs@test",
+        "profile": "test",
+        "platform": "xhs",
+        "status": "LOGGED_OUT",
+        "check_method": "browser_page",
+    }
 
 
 def test_xhs_status_dispatches_browser_level_status_without_adapter(monkeypatch, tmp_path):

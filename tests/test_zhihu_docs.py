@@ -87,10 +87,10 @@ def test_home_readme_and_mkdocs_route_to_login_quickstart():
     en_home = (ROOT / "docs/index.en.md").read_text(encoding="utf-8")
     zh_readme = (ROOT / "README.md").read_text(encoding="utf-8")
     en_readme = (ROOT / "README.en.md").read_text(encoding="utf-8")
-    assert "Quickstart：浏览器登录、知乎草稿与小红书二维码登录" in zh_home
-    assert "Quickstart: Browser Login, Zhihu Drafts, and XHS QR Login" in en_home
-    assert "Quickstart：浏览器登录、知乎草稿与小红书二维码登录" in zh_readme
-    assert "Quickstart: Browser Login, Zhihu Drafts, and XHS QR Login" in en_readme
+    assert "Quickstart：逻辑 Profile、知乎登录与草稿" in zh_home
+    assert "Quickstart: Logical Profiles, Zhihu Login, and Drafts" in en_home
+    assert "Quickstart：逻辑 Profile、知乎登录与草稿" in zh_readme
+    assert "Quickstart: Logical Profiles, Zhihu Login, and Drafts" in en_readme
     for text in (zh_home, en_home, zh_readme, en_readme):
         assert "chatpost zhihu login" in text or "login/status/logout" in text
         assert "chatpost zhihu draft" in text
@@ -101,7 +101,7 @@ def test_home_readme_and_mkdocs_route_to_login_quickstart():
         assert "~/.chatarch/chatpost/accounts.toml" in text
 
 
-def test_quickstart_public_transcript_redacts_live_identity_and_login_urls():
+def test_quickstart_uses_logical_profiles_without_live_identity_or_login_urls():
     text = (ROOT / "docs/quickstart.md").read_text(encoding="utf-8")
     for forbidden in (
         "致宏",
@@ -109,11 +109,15 @@ def test_quickstart_public_transcript_redacts_live_identity_and_login_urls():
         "people/40qok4",
         "people/rexwzh",
         "scan/login",
+        "zhihu-personal",
+        "xhs-personal",
+        "zhihu-practice-quickstart",
     ):
         assert forbidden not in text
-    assert "[REDACTED]" in text
-    assert "[URL_REDACTED]" in text
-    assert "[LIVE_LOGIN_URL_OMITTED_FROM_PUBLIC_DOC]" in text
+    assert "PROFILE=test" in text
+    assert "profiles/" in text
+    assert "product/" in text
+    assert "当前不作为验收主线" in text
 
 
 def test_interface_tree_documents_default_state_root_and_browser_api():

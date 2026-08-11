@@ -23,7 +23,7 @@ ChatArch browser-level platform login foundation and draft entrypoint.
 
 | 场景 | 文档 |
 | --- | --- |
-| 立即跑登录与知乎草稿路径 | [Quickstart：浏览器登录、知乎草稿与小红书二维码登录](docs/quickstart.md) |
+| 立即跑知乎登录与草稿路径 | [Quickstart：逻辑 Profile、知乎登录与草稿](docs/quickstart.md) |
 | 查看当前真实命令 | [CLI 树](docs/cli-tree.md) |
 | 校对当前能力和边界 | [能力地图](docs/capability-map.md) |
 | Review Chrome/Profile 状态边界 | [配置、环境与状态](docs/configuration.md) |

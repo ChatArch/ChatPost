@@ -4,7 +4,7 @@ ChatPost's current user-visible focus is the **pure browser login foundation plu
 
 | Scenario | Document |
 | --- | --- |
-| Run login and Zhihu draft flows now | [Quickstart: Browser Login, Zhihu Drafts, and XHS QR Login](quickstart.md) |
+| Run Zhihu login and draft flows now | [Quickstart: Logical Profiles, Zhihu Login, and Drafts](quickstart.md) |
 | Inspect the real CLI tree | [CLI Tree](cli-tree.md) |
 | Check implemented capabilities and boundaries | [Capability Map](capability-map.md) |
 | Understand overall resources and flow | [Overall Architecture](architecture.md) |

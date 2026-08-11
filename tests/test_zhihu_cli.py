@@ -231,6 +231,46 @@ def test_draft_result_unknown_writes_receipt_with_recovery_reason(monkeypatch, t
     assert "do not retry automatically" in result.output
 
 
+def test_status_accepts_logical_profile_name_without_platform_alias(monkeypatch, tmp_path):
+    runner = tmp_path / "runner.toml"
+    runner.write_text("[zhihu]\n", encoding="utf-8")
+    registry = tmp_path / "accounts.toml"
+    registry.write_text(
+        '[accounts."zhihu-test"]\n'
+        'platform = "zhihu"\n'
+        f'runner_config = {json.dumps(str(runner))}\n'
+        'profile = "test"\n',
+        encoding="utf-8",
+    )
+    sentinel = object()
+    calls = []
+    monkeypatch.setattr(command, "load_browser_config", lambda _path: sentinel)
+    monkeypatch.setattr(
+        command,
+        "browser_status",
+        lambda config: calls.append(config)
+        or {
+            "status": "LOGGED_OUT",
+            "check_method": "browser_page",
+        },
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["zhihu", "status", "test", "--registry", str(registry), "--output", "json", "-I"],
+    )
+    payload = _json(result)
+
+    assert calls == [sentinel]
+    assert payload == {
+        "target": "zhihu@test",
+        "profile": "test",
+        "platform": "zhihu",
+        "status": "LOGGED_OUT",
+        "check_method": "browser_page",
+    }
+
+
 def test_status_dispatches_browser_level_status_without_adapter_auth(monkeypatch, tmp_path):
     registry = _registry(tmp_path)
     sentinel = object()

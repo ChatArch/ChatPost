@@ -4,7 +4,7 @@ ChatPost 当前用户可见重点是 **纯浏览器登录基础层 + 独立知�
 
 | 场景 | 文档 |
 | --- | --- |
-| 立即跑登录与知乎草稿路径 | [Quickstart：浏览器登录、知乎草稿与小红书二维码登录](quickstart.md) |
+| 立即跑知乎登录与草稿路径 | [Quickstart：逻辑 Profile、知乎登录与草稿](quickstart.md) |
 | 查看真实 CLI 树 | [CLI 树](cli-tree.md) |
 | 校对当前包有哪些一等能力和边界 | [能力地图](capability-map.md) |
 | 理解总体资源和数据流 | [总体架构](architecture.md) |

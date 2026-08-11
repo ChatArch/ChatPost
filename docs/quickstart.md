@@ -1,6 +1,6 @@
-# Quickstart：浏览器登录、知乎草稿与小红书二维码登录
+# Quickstart：逻辑 Profile、知乎登录与草稿
 
-本页覆盖 ChatPost 的日常路径：先用纯浏览器登录基础层发现 Profile、检查知乎/小红书网页登录态、打开登录 handoff、登出/清理；再通过独立 `chatpost zhihu draft` 入口 dry-run 或创建一个知乎草稿。`login/status/logout` 不创建草稿、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。小红书当前只提供 `profiles/login/status/logout`，登录用户侧只支持二维码图片 handoff。
+本页覆盖 ChatPost 的推荐日常路径：用逻辑 Profile（默认 `test`，可另建 `product`）发现配置、检查知乎网页登录态、打开登录 handoff、登出/清理；再通过独立 `chatpost zhihu draft` 入口 dry-run 或创建一个知乎草稿。`login/status/logout` 不创建草稿、不调用发布适配器，也不会读取或导出 Cookie、LocalStorage、IndexedDB、session 或 token 原值。小红书保留同形 `profiles/login/status/logout` 接口，但当前不作为验收主线。
 
 ## 0. 设定变量
 
@@ -8,12 +8,26 @@
 CHATPOST=chatpost
 CHATPOST_HOME="${CHATPOST_HOME:-$HOME/.chatarch/chatpost}"
 REGISTRY="${CHATPOST_ACCOUNT_REGISTRY:-$CHATPOST_HOME/accounts.toml}"
-PROFILE=zhihu-personal
+PROFILE=test
 ```
 
 ChatPost 默认把本地状态放在 ChatArch 内部目录 `~/.chatarch/chatpost/`：默认 registry 是 `~/.chatarch/chatpost/accounts.toml`，runner/Profile/receipt 等后续状态也应放在这个 state root 下。`--registry` 只用于显式覆盖或任务级实验；不要把默认 `accounts.toml` 放到仓库根目录、当前工作目录或临时 project 目录。
 
 `accounts.toml` 只保存非敏感 Profile metadata，例如 alias、platform、runner_config、profile 和 label。不要把 Cookie、LocalStorage、二维码 payload、验证码、手机号、密码、token 或 WebSocket UUID 写入 registry、config、日志或文档。相对 `runner_config` 路径按 registry 所在目录解析，因此默认情况下也会落在 `~/.chatarch/chatpost/` 内部。
+
+推荐只维护两个逻辑 Profile：
+
+```text
+profiles/
+  test/
+    zhihu/
+    xhs/
+  product/
+    zhihu/
+    xhs/
+```
+
+日常命令优先使用逻辑名，例如 `chatpost zhihu status test`。registry 内部可以保留平台别名（如 `zhihu-test`、`xhs-test`）作为兼容层，但用户不需要记这些别名。
 
 ## 1. 确认可见 CLI 和 Profile
 
@@ -80,16 +94,16 @@ JSON 输出是 JSON Lines：先输出可交互 handoff 事件，最后输出登�
 
 `logout` 先做 browser-level status：未登录时返回 `ALREADY_LOGGED_OUT`；已登录时才清理知乎 origins 登录态。清理是浏览器命令，不读取任何 session 原值。
 
-## 5b. 小红书二维码图片 handoff
+## 5b. 小红书接口保留（当前不作为验收主线）
 
-小红书与知乎保持同形平台入口，但 handoff 形态不同：小红书用户侧只支持二维码图片。`login` 会打开小红书创作者中心登录页，切到二维码登录，并把页面自己的短期二维码 payload 写成 PNG artifact。用户可见输出只包含 `qrcode_path`，不会输出 `login_url`、`loginconfirm`、raw data URL、base64 或二维码 token。二维码必须绑定仍然活着、正在轮询的同一个浏览器登录页；如果登录命令 timeout、被终止或浏览器关闭，已生成的二维码立即作废。
+小红书保留与知乎同形的平台入口：`profiles/status/login/logout`。当前默认推荐仍只验收知乎；小红书二维码来源需要后续单独修正普通站点登录页后再恢复验收。日常不要把小红书调试二维码当作可用登录结果。
 
 ```bash
-XHS_PROFILE=xhs-personal
+XHS_PROFILE="$PROFILE"
 XHS_QR="$CHATPOST_HOME/xhs-login-qrcode.png"
 "$CHATPOST" xhs status "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
-"$CHATPOST" xhs login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --qrcode "$XHS_QR"   --output json   -I
-"$CHATPOST" xhs logout "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
+# 后续恢复 XHS 验收时再执行：
+# "$CHATPOST" xhs login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --qrcode "$XHS_QR"   --output json   -I
 ```
 
 当二维码成功生成时，首个 JSON Lines 事件形态为 `event=login_handoff`、`status=LOGIN_REQUIRED`、`handoff_kind=qrcode_image`、`qrcode_path=/path/to/png`。如果页面没有暴露真实可解码二维码，返回 `LOGIN_HANDOFF_UNAVAILABLE` / `reason=qrcode_not_found`；如果小红书把当前网络判为风险，返回 `LOGIN_BLOCKED` / `block_reason=network_risk`。这些失败都不能伪装成可扫码二维码。
@@ -106,299 +120,28 @@ XHS_QR="$CHATPOST_HOME/xhs-login-qrcode.png"
 | `login` 返回 `LOGIN_BLOCKED` / `block_reason=network_risk` | 当前出口被平台拒绝，不能生成可扫码二维码；换可靠网络或本机浏览器 profile 后再试。 |
 | `status` 返回 `UNKNOWN` | 只报告未知；不要 fallback 到发布适配器或读取 Cookie/token。 |
 
-## 附录：真实 CLI 运行记录（2026-08-08）
+## 6. 知乎草稿 dry-run 与 create
 
-以下 transcript 来自 `/home/zhihong/Playground/core/ChatPost`，环境为 `PATH=/home/zhihong/.chatarch/venv/bin:$PATH` 与 `PYTHONPATH=src`。`logout` 未运行；其余当前登录基础层接口均实际执行。
-
-旧 registry：`/home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/accounts.toml`。
-
-Practice registry：`/home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml`。
-
-说明：以下 transcript 基于真实 CLI 运行；一次性 live `login_url`、账号展示名和账号主页 URL 在公开文档中脱敏或省略，其他字段保留真实命令结果。
-
-### root_help
-
-```bash
-$ chatpost --help
-exit: 0
-stdout:
-Usage: chatpost [OPTIONS] [COMMAND] [ARGS]...
-
-  ChatPost browser login and draft command line interface.
-
-Options:
-  --version  Show the version and exit.
-  --tree     Print the registered CLI tree.
-  --help     Show this message and exit.
-
-Commands:
-  platforms  List supported platforms.
-  profiles   List configured browser Profiles without reading login state.
-  zhihu      Run Zhihu browser login/status/logout and draft operations.
-```
-
-### root_version
-
-```bash
-$ chatpost --version
-exit: 0
-stdout:
-chatpost, version 0.1.0
-```
-
-### root_tree
-
-```bash
-$ chatpost --tree
-exit: 0
-stdout:
-chatpost  # browser-level platform login and draft manager
-├── --help  # Show help for the current command.
-├── --version  # Show package version.
-├── --tree  # Print the registered CLI tree with command purpose and IO shape.
-├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.
-├── profiles [--platform zhihu] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.
-└── zhihu  # Zhihu browser login and WeChat sync draft capabilities
-    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.
-    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.
-    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only.
-    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.
-    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.
-```
-
-### platforms
-
-```bash
-$ chatpost platforms --output json -I
-exit: 0
-stdout:
-{
-  "platforms": [
-    {
-      "login_command": "chatpost zhihu login PROFILE",
-      "logout_command": "chatpost zhihu logout PROFILE",
-      "name": "zhihu",
-      "profiles_command": "chatpost zhihu profiles",
-      "status_command": "chatpost zhihu status PROFILE"
-    }
-  ],
-  "status": "READY"
-}
-```
-
-### profiles_old
-
-```bash
-$ chatpost profiles --platform zhihu --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/accounts.toml --output json -I
-exit: 0
-stdout:
-{
-  "platform": "zhihu",
-  "profiles": [
-    {
-      "alias": "zhihu-test",
-      "label": "Logged-in Zhihu profile; keep this existing session",
-      "platform": "zhihu",
-      "profile": "zhihu-test",
-      "runner_config": "/home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/runner-attach-existing.toml"
-    },
-    {
-      "alias": "zhihu-qr-login",
-      "label": "Zhihu QR authorization login checkpoint for adding a new account",
-      "login_methods": [
-        "qr"
-      ],
-      "platform": "zhihu",
-      "profile": "zhihu-qr-login",
-      "runner_config": "/home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/runner-qr-login.toml"
-    }
-  ],
-  "status": "READY"
-}
-```
-
-### zhihu_profiles_old
-
-```bash
-$ chatpost zhihu profiles --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/accounts.toml --output json -I
-exit: 0
-stdout:
-{
-  "platform": "zhihu",
-  "profiles": [
-    {
-      "alias": "zhihu-test",
-      "label": "Logged-in Zhihu profile; keep this existing session",
-      "platform": "zhihu",
-      "profile": "zhihu-test",
-      "runner_config": "/home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/runner-attach-existing.toml"
-    },
-    {
-      "alias": "zhihu-qr-login",
-      "label": "Zhihu QR authorization login checkpoint for adding a new account",
-      "login_methods": [
-        "qr"
-      ],
-      "platform": "zhihu",
-      "profile": "zhihu-qr-login",
-      "runner_config": "/home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/runner-qr-login.toml"
-    }
-  ],
-  "status": "READY"
-}
-```
-
-### zhihu_test_status
-
-```bash
-$ chatpost zhihu status zhihu-test --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/accounts.toml --output json -I
-exit: 0
-stdout:
-{
-  "account_name": "[REDACTED]",
-  "account_url": "[URL_REDACTED]",
-  "browser_attachment": "EXISTING_CDP",
-  "browser_cdp_product": "Chrome/145.0.7632.6",
-  "browser_revision": "existing-cdp",
-  "browser_version": "145.0.7632.6",
-  "check_method": "browser_page",
-  "platform": "zhihu",
-  "playwright_version": "1.61.1",
-  "profile": "zhihu-test",
-  "status": "LOGGED_IN",
-  "target": "zhihu@zhihu-test"
-}
-```
-
-### zhihu_test_login
-
-```bash
-$ chatpost zhihu login zhihu-test --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/accounts.toml --timeout 5 --output json -I
-exit: 0
-stdout:
-{"account_name": "[REDACTED]", "account_url": "[URL_REDACTED]", "browser_attachment": "EXISTING_CDP", "browser_cdp_product": "Chrome/145.0.7632.6", "browser_revision": "existing-cdp", "browser_version": "145.0.7632.6", "check_method": "browser_page", "event": "already_logged_in", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-test", "status": "LOGGED_IN", "target": "zhihu@zhihu-test"}
-```
-
-### zhihu_qr_login_status
-
-```bash
-$ chatpost zhihu status zhihu-qr-login --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/accounts.toml --output json -I
-exit: 0
-stdout:
-{
-  "account_name": "[REDACTED]",
-  "account_url": "[URL_REDACTED]",
-  "browser_attachment": "OWNED_BROWSER",
-  "browser_revision": "1228",
-  "browser_version": "149.0.7827.55",
-  "check_method": "browser_page",
-  "platform": "zhihu",
-  "playwright_version": "1.61.1",
-  "profile": "zhihu-qr-login",
-  "status": "LOGGED_IN",
-  "target": "zhihu@zhihu-qr-login"
-}
-```
-
-### zhihu_qr_login_login
-
-```bash
-$ chatpost zhihu login zhihu-qr-login --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/accounts.toml --timeout 5 --output json -I
-exit: 0
-stdout:
-{"account_name": "[REDACTED]", "account_url": "[URL_REDACTED]", "browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "already_logged_in", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-qr-login", "status": "LOGGED_IN", "target": "zhihu@zhihu-qr-login"}
-```
-
-### practice_status
-
-```bash
-$ chatpost zhihu status zhihu-practice-quickstart --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml --output json -I
-exit: 0
-stdout:
-{
-  "browser_attachment": "OWNED_BROWSER",
-  "browser_revision": "1228",
-  "browser_version": "149.0.7827.55",
-  "check_method": "browser_page",
-  "platform": "zhihu",
-  "playwright_version": "1.61.1",
-  "profile": "zhihu-practice-quickstart",
-  "status": "LOGGED_OUT",
-  "target": "zhihu@zhihu-practice-quickstart"
-}
-```
-
-### practice_login_timeout_smoke
-
-This short timeout smoke proves the command emits the page-owned login handoff immediately even when the user does not finish authorization inside the short test window.
-
-```bash
-$ chatpost zhihu login zhihu-practice-quickstart --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml --timeout 5 --output json -I
-exit: 0
-stdout:
-{"browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "login_url", "handoff_kind": "page_owned_login_url", "login_url": "[LIVE_LOGIN_URL_OMITTED_FROM_PUBLIC_DOC]", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGIN_REQUIRED", "target": "zhihu@zhihu-practice-quickstart"}
-{"browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "login_timeout", "handoff_kind": "page_owned_login_url", "login_url": "[LIVE_LOGIN_URL_OMITTED_FROM_PUBLIC_DOC]", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGIN_TIMEOUT", "target": "zhihu@zhihu-practice-quickstart"}
-```
-
-### practice_login_authorized_end_to_end
-
-This run keeps the same CLI command alive while the user authorizes the page-owned Zhihu login URL. The live tokenized `login_url` and page-visible account identity fields are omitted from the public documentation; the remaining CLI output below is the real command result.
-
-When this login URL is delivered through Feishu/Lark, do not treat a URL button click as observable completion. A URL button only navigates. Pair it with explicit callback buttons such as `I opened the link / authorization done` and `Cancel`, then verify completion by running `chatpost zhihu status PROFILE` or by waiting for this long-running `login` command to emit `LOGGED_IN`.
-
-```bash
-$ chatpost zhihu login zhihu-practice-quickstart --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml --timeout 900 --output json -I
-exit: 0
-stdout:
-{"browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "login_url", "handoff_kind": "page_owned_login_url", "login_url": "[LIVE_LOGIN_URL_OMITTED_FROM_PUBLIC_DOC]", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGIN_REQUIRED", "target": "zhihu@zhihu-practice-quickstart"}
-{"account_name": "[REDACTED]", "account_url": "[URL_REDACTED]", "browser_attachment": "OWNED_BROWSER", "browser_revision": "1228", "browser_version": "149.0.7827.55", "check_method": "browser_page", "event": "logged_in", "platform": "zhihu", "playwright_version": "1.61.1", "profile": "zhihu-practice-quickstart", "status": "LOGGED_IN", "target": "zhihu@zhihu-practice-quickstart"}
-```
-
-### practice_status_after_authorization
-
-```bash
-$ chatpost zhihu status zhihu-practice-quickstart --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml --output json -I
-exit: 0
-stdout:
-{
-  "account_name": "[REDACTED]",
-  "account_url": "[URL_REDACTED]",
-  "browser_attachment": "OWNED_BROWSER",
-  "browser_revision": "1228",
-  "browser_version": "149.0.7827.55",
-  "check_method": "browser_page",
-  "platform": "zhihu",
-  "playwright_version": "1.61.1",
-  "profile": "zhihu-practice-quickstart",
-  "status": "LOGGED_IN",
-  "target": "zhihu@zhihu-practice-quickstart"
-}
-```
-
-## 6. Draft dry-run and create through Wechatsync
-
-`chatpost zhihu draft` is intentionally separate from the browser-level login commands. It reuses the same registry alias and runner config, but it loads the full runner fields for Wechatsync, extension, bridge, and private env file only inside the draft flow. `login/status/logout` must continue to use `load_browser_config` and must not require adapter readiness.
-
-Dry-run validates the source without starting a browser or writing a draft:
+`chatpost zhihu draft` 与浏览器级登录命令刻意分离。它复用同一个逻辑 Profile，但只有 draft 流程会加载 Wechatsync、扩展、bridge 和私有 env 文件；`login/status/logout` 必须保持 browser-only。
 
 ```bash
 ARTICLE=/absolute/path/to/article.md
-chatpost zhihu draft zhihu-practice-quickstart "$ARTICLE" \
-  --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml \
+chatpost zhihu draft "$PROFILE" "$ARTICLE" \
+  --registry "$REGISTRY" \
   --dry-run \
   --output json \
   -I
 ```
 
-A real create requires an explicit receipt path and creates exactly one Zhihu draft. It does not final-publish:
+真实 create 需要显式 receipt，并且只创建一个知乎草稿，不最终发布：
 
 ```bash
-RECEIPT=~/.chatarch/chatpost/runners/zhihu-practice-quickstart/run/zhihu-draft-receipt.json
-chatpost zhihu draft zhihu-practice-quickstart "$ARTICLE" \
-  --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml \
+RECEIPT="$CHATPOST_HOME/runners/zhihu-test/run/zhihu-draft-receipt.json"
+chatpost zhihu draft "$PROFILE" "$ARTICLE" \
+  --registry "$REGISTRY" \
   --receipt "$RECEIPT" \
   --output json \
   -I
 ```
 
-Expected successful statuses are `DRY_RUN_OK` for dry-run and `DRAFT_CREATED` for create. Create writes a mode `0600` receipt with the draft id, `/edit` review URL, source digest, and cleanup statuses. If the create path returns `RESULT_UNKNOWN`, do not retry automatically; inspect the receipt and the browser before deciding next steps.
+期望状态：dry-run 返回 `DRY_RUN_OK`；真实 create 返回 `DRAFT_CREATED` 并写 mode `0600` receipt。若返回 `RESULT_UNKNOWN`，不要自动重试，先读 receipt 和浏览器状态。

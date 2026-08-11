@@ -1,6 +1,6 @@
-# Quickstart: Browser Login, Zhihu Drafts, and XHS QR Login
+# Quickstart: Logical Profiles, Zhihu Login, and Drafts
 
-This page covers ChatPost's daily path: use the pure browser login foundation to discover Profiles, check Zhihu/XHS web login state, open a login handoff, and log out / clear browser state; then use the separate `chatpost zhihu draft` entrypoint to dry-run or create one Zhihu draft. `login/status/logout` do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens. XHS currently exposes only `profiles/login/status/logout`, and its user-facing login handoff is QR-image-only.
+This page covers ChatPost's recommended daily path: use logical Profiles (`test` by default, optionally `product`) to discover configuration, check Zhihu web login state, open a login handoff, and log out / clear browser state; then use the separate `chatpost zhihu draft` entrypoint to dry-run or create one Zhihu draft. `login/status/logout` do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens. XHS keeps the same `profiles/login/status/logout` shape, but it is not the current acceptance path.
 
 ## 0. Set Variables
 
@@ -8,12 +8,26 @@ This page covers ChatPost's daily path: use the pure browser login foundation to
 CHATPOST=chatpost
 CHATPOST_HOME="${CHATPOST_HOME:-$HOME/.chatarch/chatpost}"
 REGISTRY="${CHATPOST_ACCOUNT_REGISTRY:-$CHATPOST_HOME/accounts.toml}"
-PROFILE=zhihu-personal
+PROFILE=test
 ```
 
 ChatPost stores local state under the ChatArch-owned state root `~/.chatarch/chatpost/` by default: the default registry is `~/.chatarch/chatpost/accounts.toml`, and later runner/Profile/receipt state should live under the same root. Use `--registry` only for an explicit override or task-local experiment; do not place the default `accounts.toml` in the repository root, current working directory, or a temporary project directory.
 
 `accounts.toml` stores only non-sensitive Profile metadata such as alias, platform, runner_config, profile, and label. Never write cookies, local storage, QR payloads, verification codes, phone numbers, passwords, tokens, or WebSocket UUIDs into the registry, config, logs, or docs. Relative `runner_config` paths resolve from the registry directory, so the default layout keeps them inside `~/.chatarch/chatpost/` too.
+
+Recommended layout: keep only two logical Profiles:
+
+```text
+profiles/
+  test/
+    zhihu/
+    xhs/
+  product/
+    zhihu/
+    xhs/
+```
+
+Daily commands should use the logical name, for example `chatpost zhihu status test`. The registry may keep platform-qualified aliases such as `zhihu-test` and `xhs-test` as a compatibility layer, but users do not need to remember them.
 
 ## 1. Confirm CLI and Profile
 
@@ -80,16 +94,16 @@ After a real login practice, this should return `LOGGED_IN`, ideally with page-v
 
 `logout` first runs browser-level status. It returns `ALREADY_LOGGED_OUT` when already logged out, and clears Zhihu origins only after a logged-in precheck. Clearing state is a browser command; it does not read session values.
 
-## 5b. XHS QR Image Handoff
+## 5b. XHS Interface Kept, Not Current Acceptance Path
 
-XHS keeps the same platform shape as Zhihu, but the handoff shape is different: the user-facing XHS login path is QR-image-only. `login` opens the XHS creator login page, switches to QR login, and writes the page-owned short-lived QR payload as a PNG artifact. User-visible output contains only `qrcode_path`; it never prints `login_url`, `loginconfirm`, raw data URLs, base64, or QR tokens. The QR is valid only while the same browser login page stays alive and polling; if the login command times out, is terminated, or the browser closes, the generated QR is invalid.
+XHS keeps the same platform entry shape: `profiles/status/login/logout`. The current recommended acceptance path is Zhihu only; XHS QR source validation needs a later fix against the ordinary site login page before QR login is accepted again. Do not treat a debugging QR as a usable login result.
 
 ```bash
-XHS_PROFILE=xhs-personal
+XHS_PROFILE="$PROFILE"
 XHS_QR="$CHATPOST_HOME/xhs-login-qrcode.png"
 "$CHATPOST" xhs status "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
-"$CHATPOST" xhs login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --qrcode "$XHS_QR"   --output json   -I
-"$CHATPOST" xhs logout "$XHS_PROFILE"   --registry "$REGISTRY"   --output json   -I
+# Run this only after XHS acceptance is restored:
+# "$CHATPOST" xhs login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --qrcode "$XHS_QR"   --output json   -I
 ```
 
 When QR generation succeeds, the first JSON Lines event has `event=login_handoff`, `status=LOGIN_REQUIRED`, `handoff_kind=qrcode_image`, and `qrcode_path=/path/to/png`. If the page does not expose a real decodable QR, ChatPost returns `LOGIN_HANDOFF_UNAVAILABLE` / `reason=qrcode_not_found`; if XHS marks the current network as risky, it returns `LOGIN_BLOCKED` / `block_reason=network_risk`. These failures must not be disguised as a scannable QR.
@@ -114,8 +128,8 @@ Dry-run validates the source without starting a browser or writing a draft:
 
 ```bash
 ARTICLE=/absolute/path/to/article.md
-chatpost zhihu draft zhihu-practice-quickstart "$ARTICLE" \
-  --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml \
+chatpost zhihu draft "$PROFILE" "$ARTICLE" \
+  --registry "$REGISTRY" \
   --dry-run \
   --output json \
   -I
@@ -124,9 +138,9 @@ chatpost zhihu draft zhihu-practice-quickstart "$ARTICLE" \
 A real create requires an explicit receipt path and creates exactly one Zhihu draft. It does not final-publish:
 
 ```bash
-RECEIPT=~/.chatarch/chatpost/runners/zhihu-practice-quickstart/run/zhihu-draft-receipt.json
-chatpost zhihu draft zhihu-practice-quickstart "$ARTICLE" \
-  --registry /home/zhihong/Playground/projects/chatarch/08-05-chatpost-login-cli-practice/playground/quickstart-practice-20260807-182534/accounts.toml \
+RECEIPT="$CHATPOST_HOME/runners/zhihu-test/run/zhihu-draft-receipt.json"
+chatpost zhihu draft "$PROFILE" "$ARTICLE" \
+  --registry "$REGISTRY" \
   --receipt "$RECEIPT" \
   --output json \
   -I

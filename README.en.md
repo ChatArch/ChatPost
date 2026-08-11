@@ -23,7 +23,7 @@ Docs: <https://arch.gh.wzhecnu.cn/ChatPost/>
 
 | Scenario | Document |
 | --- | --- |
-| Run login and Zhihu draft flows now | [Quickstart: Browser Login, Zhihu Drafts, and XHS QR Login](docs/quickstart.en.md) |
+| Run Zhihu login and draft flows now | [Quickstart: Logical Profiles, Zhihu Login, and Drafts](docs/quickstart.en.md) |
 | Inspect the real CLI tree | [CLI Tree](docs/cli-tree.en.md) |
 | Check current capabilities and boundaries | [Capability Map](docs/capability-map.md) |
 | Review Chrome/Profile state boundaries | [Configuration, Environment, and State](docs/configuration.en.md) |

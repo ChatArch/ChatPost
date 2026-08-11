@@ -13,7 +13,7 @@ from typing import Any
 import click
 
 from chatpost import __version__
-from chatpost.accounts import AccountRegistryError, load_accounts, resolve_account
+from chatpost.accounts import Account, AccountRegistryError, load_accounts, resolve_account
 from chatpost.qr import generate_qr_code_image
 from chatpost.xhs import (
     browser_login as xhs_browser_login,
@@ -235,18 +235,48 @@ def _account_or_click_error(registry: Path | None, target: str):
         raise click.ClickException(str(error)) from error
 
 
-def _zhihu_account_or_click_error(registry: Path | None, target: str):
-    account = _account_or_click_error(registry, target)
-    if account.platform != "zhihu":
+def _platform_account_or_click_error(registry: Path | None, target: str, platform: str):
+    accounts = _accounts_or_click_error(registry)
+    requested_platform: str | None = None
+    lookup = target
+    if "@" in target:
+        requested_platform, lookup = target.split("@", 1)
+        if requested_platform != platform:
+            raise click.ClickException(
+                f"target platform {requested_platform!r} does not match command platform {platform!r}"
+            )
+    try:
+        account = resolve_account(target, accounts)
+    except AccountRegistryError as alias_error:
+        matches = [
+            account
+            for account in accounts.values()
+            if account.platform == platform and account.profile == lookup
+        ]
+        if not matches:
+            raise click.ClickException(str(alias_error)) from alias_error
+        if len(matches) > 1:
+            raise click.ClickException(f"ambiguous {platform} profile: {lookup}")
+        account = matches[0]
+        return Account(
+            alias=lookup,
+            platform=account.platform,
+            runner_config=account.runner_config,
+            profile=account.profile,
+            label=account.label,
+            login_methods=account.login_methods,
+        )
+    if account.platform != platform:
         raise click.ClickException(f"unsupported account platform: {account.platform}")
     return account
+
+
+def _zhihu_account_or_click_error(registry: Path | None, target: str):
+    return _platform_account_or_click_error(registry, target, "zhihu")
 
 
 def _xiaohongshu_account_or_click_error(registry: Path | None, target: str):
-    account = _account_or_click_error(registry, target)
-    if account.platform != "xhs":
-        raise click.ClickException(f"unsupported account platform: {account.platform}")
-    return account
+    return _platform_account_or_click_error(registry, target, "xhs")
 
 
 def _load_zhihu_browser_config(account):
