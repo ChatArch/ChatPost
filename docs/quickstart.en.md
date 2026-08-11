@@ -1,6 +1,6 @@
-# Quickstart: Logical Profiles, Zhihu Login, and Drafts
+# Quickstart: Logical Profiles, Zhihu/CSDN Login, and Drafts
 
-This page covers ChatPost's recommended daily path: use logical Profiles (`test` by default, optionally `product`) to discover configuration, check Zhihu web login state, open a login handoff, and log out / clear browser state; then use the separate `chatpost zhihu draft` entrypoint to dry-run or create one Zhihu draft. `login/status/logout` do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens. XHS keeps the same `profiles/login/status/logout` shape, but it is not the current acceptance path.
+This page covers ChatPost's recommended daily path: use logical Profiles (`test` by default, optionally `product`) to discover configuration, check Zhihu/CSDN web login state, open a login handoff, and log out / clear browser state; then use the separate `chatpost zhihu draft` / `chatpost csdn draft` entrypoints to dry-run or create one draft. `login/status/logout` do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens. XHS keeps the same `profiles/login/status/logout` shape, but it is not the current draft acceptance path.
 
 ## 0. Install Chain And Responsibility Boundary
 
@@ -47,12 +47,14 @@ profiles/
   test/
     zhihu/
     xhs/
+    csdn/
   product/
     zhihu/
     xhs/
+    csdn/
 ```
 
-Daily commands should use the logical name, for example `chatpost zhihu status test`. The registry may keep platform-qualified aliases such as `zhihu-test` and `xhs-test` as a compatibility layer, but users do not need to remember them.
+Daily commands should use the logical name, for example `chatpost zhihu status test` or `chatpost csdn status test`. The registry may keep platform-qualified aliases such as `zhihu-test`, `xhs-test`, and `csdn-test` as a compatibility layer, but users do not need to remember them.
 
 ## 1. Confirm CLI and Profile
 
@@ -65,14 +67,18 @@ Daily commands should use the logical name, for example `chatpost zhihu status t
 
 "$CHATPOST" profiles   --platform xhs   --registry "$REGISTRY"   --output json   -I
 
+"$CHATPOST" profiles   --platform csdn   --registry "$REGISTRY"   --output json   -I
+
 "$CHATPOST" zhihu profiles   --registry "$REGISTRY"   --output json   -I
 
 "$CHATPOST" xhs profiles   --registry "$REGISTRY"   --output json   -I
+
+"$CHATPOST" csdn profiles   --registry "$REGISTRY"   --output json   -I
 ```
 
-Discovery commands read only the registry. They do not start a browser or inspect login state. The equivalent real command names are `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, and `chatpost xhs profiles`.
+Discovery commands read only the registry. They do not start a browser or inspect login state. The equivalent real command names are `chatpost platforms`, `chatpost profiles`, `chatpost zhihu profiles`, `chatpost xhs profiles`, and `chatpost csdn profiles`.
 
-The real login-foundation command names are `chatpost zhihu status`, `chatpost zhihu login`, `chatpost zhihu logout`, `chatpost xhs status`, `chatpost xhs login`, and `chatpost xhs logout`.
+The real login-foundation command names are `chatpost zhihu status`, `chatpost zhihu login`, `chatpost zhihu logout`, `chatpost xhs status`, `chatpost xhs login`, `chatpost xhs logout`, `chatpost csdn status`, `chatpost csdn login`, and `chatpost csdn logout`.
 
 ## 2. Check Current Web Login State
 
@@ -133,6 +139,20 @@ XHS_QR="$CHATPOST_HOME/xhs-login-qrcode.png"
 
 When QR generation succeeds, the first JSON Lines event has `event=login_handoff`, `status=LOGIN_REQUIRED`, `handoff_kind=qrcode_image`, and `qrcode_path=/path/to/png`. If the page does not expose a real decodable QR, ChatPost returns `LOGIN_HANDOFF_UNAVAILABLE` / `reason=qrcode_not_found`; if XHS marks the current network as risky, it returns `LOGIN_BLOCKED` / `block_reason=network_risk`. These failures must not be disguised as a scannable QR.
 
+## 5c. CSDN Login And Status
+
+CSDN keeps the same platform entry shape as Zhihu: `profiles/status/login/logout`. When logged out, CSDN login emits only a QR-image artifact, not a private confirmation link, QR token, cookie, or session. Password/SMS/CAPTCHA checkpoints remain human browser-flow inputs; ChatPost does not bypass them, solve them, or store verification contents.
+
+```bash
+CSDN_PROFILE="$PROFILE"
+CSDN_QR="$CHATPOST_HOME/csdn-login-qrcode.png"
+"$CHATPOST" csdn status "$CSDN_PROFILE"   --registry "$REGISTRY"   --output json   -I
+"$CHATPOST" csdn login "$CSDN_PROFILE"   --registry "$REGISTRY"   --timeout 900   --qrcode "$CSDN_QR"   --output json   -I
+"$CHATPOST" csdn status "$CSDN_PROFILE"   --registry "$REGISTRY"   --output json   -I
+```
+
+CSDN `status` acceptance must come from the same controlled Profile's page-visible state or browser-internal user-info response. Do not accept URL/title-only checks, and do not infer login by reading cookies/local storage/IndexedDB/session/token contents.
+
 ## Common Stops
 
 | Stop | Handling |
@@ -143,11 +163,12 @@ When QR generation succeeds, the first JSON Lines event has `event=login_handoff
 | `zhihu login` emits `browser_opened` but no page-owned `login_url` | The browser is open for human login; do not use screenshots or private artifacts as login links. |
 | The login page asks for a slider or verification code | Stay in the human browser flow; do not put codes into CLI args or logs. |
 | `login` returns `LOGIN_BLOCKED` / `block_reason=network_risk` | The current egress was rejected by the platform, so no scannable QR can be generated; retry from a trusted network or local browser Profile. |
+| `csdn login` hits a security challenge | Stay in the human browser flow; do not bypass it, solve it automatically, or put verification contents into CLI args, logs, or docs. |
 | `status` returns `UNKNOWN` | Report unknown only; do not fall back to an adapter or read cookies/tokens. |
 
-## 6. Draft dry-run and create through Wechatsync
+## 6. Zhihu/CSDN Draft dry-run and create through Wechatsync
 
-`chatpost zhihu draft` is intentionally separate from the browser-level login commands. It reuses the same registry alias and runner config, but it loads the full runner fields for Wechatsync, extension, bridge, and private env file only inside the draft flow. `login/status/logout` must continue to use `load_browser_config` and must not require adapter readiness.
+`chatpost zhihu draft` and `chatpost csdn draft` are intentionally separate from the browser-level login commands. They reuse the same registry alias and runner config, but they load the full runner fields for Wechatsync, extension, bridge, and private env file only inside the draft flow. `login/status/logout` must continue to use `load_browser_config` and must not require adapter readiness.
 
 Dry-run validates the source without starting a browser or writing a draft:
 
@@ -172,3 +193,21 @@ chatpost zhihu draft "$PROFILE" "$ARTICLE" \
 ```
 
 Expected successful statuses are `DRY_RUN_OK` for dry-run and `DRAFT_CREATED` for create. Create writes a mode `0600` receipt with the draft id, `/edit` review URL, source digest, and cleanup statuses. If the create path returns `RESULT_UNKNOWN`, do not retry automatically; inspect the receipt and the browser before deciding next steps.
+
+CSDN uses the same Wechatsync draft contract, but with platform parameter `csdn`. The current Wechatsync CSDN adapter saves a draft: its request uses `pubStatus="draft"` and returns `draftOnly=true`; ChatPost currently has no CSDN public `post/publish` command.
+
+```bash
+ARTICLE=/absolute/path/to/article.md
+chatpost csdn draft "$PROFILE" "$ARTICLE" \
+  --registry "$REGISTRY" \
+  --dry-run \
+  --output json \
+  -I
+
+RECEIPT="$CHATPOST_HOME/runners/csdn-test/run/csdn-draft-receipt.json"
+chatpost csdn draft "$PROFILE" "$ARTICLE" \
+  --registry "$REGISTRY" \
+  --receipt "$RECEIPT" \
+  --output json \
+  -I
+```

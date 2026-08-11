@@ -26,7 +26,7 @@ _SENSITIVE_KEY_MARKERS = (
 )
 _ALLOWED_ACCOUNT_KEYS = {"platform", "runner_config", "profile", "label", "login_methods"}
 _SUPPORTED_LOGIN_METHODS = {"qr", "code"}
-_SUPPORTED_PLATFORMS = {"zhihu", "xhs"}
+_SUPPORTED_PLATFORMS = {"zhihu", "xhs", "csdn"}
 
 
 def default_chatpost_home() -> Path:
