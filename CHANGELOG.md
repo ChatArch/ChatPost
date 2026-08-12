@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.2 - 2026-08-12
+
+### Added
+
+- Generate `chatpost --tree` from the real Click command registry instead of maintaining a parallel hard-coded tree table.
+- Add regression coverage that forbids stale private CLI tree table constants.
+
+### Changed
+
+- Bump the package release version to `0.1.2` for the CLI tree/workflow/docs hardening patch.
+- Align Preview Docs with the ChatArch public docs domain from `mkdocs.yml` and fetch `gh-pages` before `mike deploy`.
+- Harden the tag publish workflow with a default-branch ancestor guard that does not fetch tags over an annotated-tag checkout.
+- Enable the MkDocs Material emoji renderer baseline so generated/live docs cannot leak unrendered Material icon shorthand.
+
 ## 0.1.1 - 2026-08-12
 
 ### Added
