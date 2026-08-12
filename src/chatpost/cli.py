@@ -42,52 +42,98 @@ from chatpost.zhihu import (
 
 _OUTPUT = click.Choice(["text", "json"])
 
-_CLI_TREE_LINES = (
-    "chatpost  # browser-level platform login and draft manager",
-    "├── --help  # Show help for the current command.",
-    "├── --version  # Show package version.",
-    "├── --tree  # Print the registered CLI tree with command purpose and IO shape.",
-    "├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.",
-    "├── profiles [--platform zhihu|xhs|csdn] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.",
-    "├── zhihu  # Zhihu browser login and Wechatsync draft capabilities",
-    "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.",
-    "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.",
-    "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only.",
-    "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.",
-    "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.",
-    "├── xhs  # XHS browser login system",
-    "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured XHS browser Profiles.",
-    "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the creator login page's own QR handoff and write the QR artifact.",
-    "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check XHS web login state from page-visible browser state only.",
-    "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear XHS browser state after browser-level status.",
-    "└── csdn  # CSDN browser login and Wechatsync draft capabilities",
-    "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured CSDN browser Profiles.",
-    "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the CSDN login page's own QR handoff and write the QR artifact.",
-    "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check CSDN web login state from page-visible browser state only.",
-    "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear CSDN browser state after browser-level status.",
-    "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one CSDN draft through Wechatsync; never final-publish.",
-)
-_CLI_TREE_COMMAND_PATHS = (
-    ("platforms",),
-    ("profiles",),
-    ("zhihu",),
-    ("zhihu", "profiles"),
-    ("zhihu", "login"),
-    ("zhihu", "status"),
-    ("zhihu", "logout"),
-    ("zhihu", "draft"),
-    ("xhs",),
-    ("xhs", "profiles"),
-    ("xhs", "login"),
-    ("xhs", "status"),
-    ("xhs", "logout"),
-    ("csdn",),
-    ("csdn", "profiles"),
-    ("csdn", "login"),
-    ("csdn", "status"),
-    ("csdn", "logout"),
-    ("csdn", "draft"),
-)
+
+_TREE_PARAM_PURPOSES = {
+    "help": "Show help for the current command",
+    "version": "Show package version",
+    "show_tree": "Print the registered CLI tree with command purpose and IO shape",
+}
+
+
+def _purpose(command: click.Command) -> str:
+    """Return a compact one-line purpose for a Click command."""
+
+    help_text = command.help or command.short_help or ""
+    return " ".join(help_text.strip().split()).rstrip(".") or "Run this command"
+
+
+def _option_token(option: click.Option) -> str:
+    long_name = next((opt for opt in option.opts if opt.startswith("--")), option.opts[-1])
+    if option.secondary_opts:
+        choices = [long_name, *option.secondary_opts]
+        return "[" + "/".join(choices) + "]"
+    if option.is_bool_flag or option.is_flag:
+        if option.opts and option.opts[0].startswith("-") and not option.opts[0].startswith("--"):
+            label = f"{option.opts[0]}/{long_name}"
+        else:
+            label = long_name
+        return label if option.required else f"[{label}]"
+    if isinstance(option.type, click.Choice):
+        metavar = "|".join(str(choice) for choice in option.type.choices)
+    else:
+        metavar = (option.metavar or option.name or "VALUE").upper().replace("_", "-")
+    token = f"{long_name} {metavar}"
+    return token if option.required else f"[{token}]"
+
+
+def _argument_token(argument: click.Argument) -> str:
+    name = argument.name.upper().replace("_", "-")
+    if argument.nargs == -1:
+        name = f"{name}..."
+    return name if argument.required else f"[{name}]"
+
+
+def _command_signature(command: click.Command) -> str:
+    tokens: list[str] = []
+    for param in command.params:
+        if isinstance(param, click.Argument):
+            tokens.append(_argument_token(param))
+        elif isinstance(param, click.Option):
+            if param.name == "help":
+                continue
+            tokens.append(_option_token(param))
+    return " ".join(tokens)
+
+
+def _tree_lines(command: click.Command, prefix: str = "") -> list[str]:
+    if not isinstance(command, click.Group):
+        return []
+    visible_commands = [(key, cmd) for key, cmd in command.commands.items() if not cmd.hidden]
+    lines: list[str] = []
+    for index, (child_name, child) in enumerate(visible_commands):
+        last = index == len(visible_commands) - 1
+        connector = "└── " if last else "├── "
+        child_prefix = "    " if last else "│   "
+        signature = _command_signature(child)
+        label = f"{child_name} {signature}".rstrip()
+        lines.append(f"{prefix}{connector}{label}  # {_purpose(child)}.")
+        lines.extend(_tree_lines(child, prefix + child_prefix))
+    return lines
+
+
+def _root_option_lines(command: click.Command) -> list[str]:
+    lines: list[str] = []
+    for param in command.params:
+        if not isinstance(param, click.Option):
+            continue
+        if param.name == "help":
+            continue
+        name = "--tree" if param.name == "show_tree" else next(
+            (opt for opt in param.opts if opt.startswith("--")), param.opts[-1]
+        )
+        purpose = _TREE_PARAM_PURPOSES.get(param.name, "Show option")
+        lines.append(f"├── {name}  # {purpose}.")
+    lines.insert(0, "├── --help  # Show help for the current command.")
+    return lines
+
+
+def render_command_tree(command: click.Command, prog_name: str = "chatpost") -> str:
+    """Render the public command tree from the registered Click surface."""
+
+    lines = [f"{prog_name}  # {_purpose(command)}."]
+    lines.extend(_root_option_lines(command))
+    lines.extend(_tree_lines(command))
+    return "\n".join(lines)
 
 
 def _emit(payload: dict[str, Any], output: str) -> None:
@@ -359,20 +405,6 @@ def _with_target(account, payload: dict[str, Any]) -> dict[str, Any]:
     return {**_target_context(account), **payload}
 
 
-def _ensure_cli_tree_matches_registered(root: click.Group) -> None:
-    for path in _CLI_TREE_COMMAND_PATHS:
-        current: click.Command = root
-        for part in path:
-            if not isinstance(current, click.Group):
-                raise click.ClickException(f"CLI tree path is not registered: {' '.join(path)}")
-            current = current.commands.get(part)  # type: ignore[assignment]
-            if current is None:
-                raise click.ClickException(f"CLI tree path is not registered: {' '.join(path)}")
-
-
-def _render_cli_tree(root: click.Group) -> str:
-    _ensure_cli_tree_matches_registered(root)
-    return "\n".join(_CLI_TREE_LINES)
 
 
 @click.group(invoke_without_command=True)
@@ -380,10 +412,10 @@ def _render_cli_tree(root: click.Group) -> str:
 @click.option("--tree", "show_tree", is_flag=True, is_eager=True, help="Print the registered CLI tree.")
 @click.pass_context
 def main(ctx: click.Context, show_tree: bool) -> None:
-    """ChatPost browser login and draft command line interface."""
+    """Browser-level platform login and draft manager."""
 
     if show_tree:
-        click.echo(_render_cli_tree(ctx.command))
+        click.echo(render_command_tree(ctx.command, "chatpost"))
         ctx.exit()
 
 
@@ -391,7 +423,7 @@ def main(ctx: click.Context, show_tree: bool) -> None:
 @click.option("--output", type=_OUTPUT, default="text", show_default=True)
 @click.option("-I", "--no-interactive", is_flag=True, help="Fail instead of prompting.")
 def platforms_command(output: str, no_interactive: bool) -> None:
-    """List supported platforms."""
+    """List supported platforms without starting a browser."""
 
     del no_interactive
     _emit(_platforms_payload(), output)
@@ -408,7 +440,7 @@ def profiles_command(
     output: str,
     no_interactive: bool,
 ) -> None:
-    """List configured browser Profiles without reading login state."""
+    """List configured browser Profiles without checking login state."""
 
     del no_interactive
     _emit(_profiles_payload(registry, platform=platform), output)
@@ -416,7 +448,7 @@ def profiles_command(
 
 @main.group("zhihu")
 def zhihu_group() -> None:
-    """Run Zhihu browser login/status/logout and draft operations."""
+    """Zhihu browser login and Wechatsync draft capabilities."""
 
 
 @zhihu_group.command("profiles")
@@ -571,7 +603,7 @@ def zhihu_draft_command(
 
 @main.group("xhs")
 def xiaohongshu_group() -> None:
-    """Run XHS browser login/status/logout operations."""
+    """XHS browser login system."""
 
 
 @xiaohongshu_group.command("profiles")
@@ -683,7 +715,7 @@ def xiaohongshu_logout_command(
 
 @main.group("csdn")
 def csdn_group() -> None:
-    """Run CSDN browser login/status/logout and Wechatsync draft operations."""
+    """CSDN browser login and Wechatsync draft capabilities."""
 
 
 @csdn_group.command("profiles")

@@ -84,26 +84,18 @@ def test_top_level_tree_prints_complete_login_only_registered_cli_tree():
     result = CliRunner().invoke(main, ["--tree"])
 
     assert result.exit_code == 0, result.output
-    assert "chatpost  # browser-level platform login and draft manager" in result.output
+    assert "chatpost  # Browser-level platform login and draft manager." in result.output
+    assert "├── --tree  # Print the registered CLI tree with command purpose and IO shape." in result.output
     assert "├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser." in result.output
-    assert "├── profiles [--platform zhihu|xhs|csdn] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state." in result.output
-    assert "├── zhihu  # Zhihu browser login and Wechatsync draft capabilities" in result.output
-    assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles." in result.output
-    assert "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed." in result.output
-    assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only." in result.output
-    assert "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status." in result.output
-    assert "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish." in result.output
-    assert "├── xhs  # XHS browser login system" in result.output
-    assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured XHS browser Profiles." in result.output
-    assert "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the creator login page's own QR handoff and write the QR artifact." in result.output
-    assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check XHS web login state from page-visible browser state only." in result.output
-    assert "    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear XHS browser state after browser-level status." in result.output
-    assert "└── csdn  # CSDN browser login and Wechatsync draft capabilities" in result.output
-    assert "    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured CSDN browser Profiles." in result.output
-    assert "    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the CSDN login page's own QR handoff and write the QR artifact." in result.output
-    assert "    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check CSDN web login state from page-visible browser state only." in result.output
-    assert "    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear CSDN browser state after browser-level status." in result.output
-    assert "    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one CSDN draft through Wechatsync; never final-publish." in result.output
+    assert "├── profiles [--platform zhihu|xhs|csdn] [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state." in result.output
+    assert "├── zhihu  # Zhihu browser login and Wechatsync draft capabilities." in result.output
+    assert "│   ├── profiles [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles." in result.output
+    assert "│   ├── login PROFILE [--registry REGISTRY] [--timeout TIMEOUT] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff." in result.output
+    assert "│   └── draft PROFILE SOURCE [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish." in result.output
+    assert "├── xhs  # XHS browser login system." in result.output
+    assert "│   ├── login PROFILE [--registry REGISTRY] [--timeout TIMEOUT] [--qrcode QRCODE-PATH] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff." in result.output
+    assert "└── csdn  # CSDN browser login and Wechatsync draft capabilities." in result.output
+    assert "    └── draft PROFILE SOURCE [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output text|json] [-I/--no-interactive]  # Dry-run or create one CSDN draft through Wechatsync; never final-publish." in result.output
     forbidden = [
         "account",
         "qr-artifact",
@@ -115,6 +107,17 @@ def test_top_level_tree_prints_complete_login_only_registered_cli_tree():
     ]
     for text in forbidden:
         assert text not in result.output
+
+
+def test_cli_tree_is_generated_from_click_registry():
+    source = (Path(__file__).resolve().parents[1] / "src/chatpost/cli.py").read_text(encoding="utf-8")
+
+    stale_lines_name = "_CLI" + "_TREE" + "_LINES"
+    stale_paths_name = "_CLI" + "_TREE" + "_COMMAND" + "_PATHS"
+
+    assert stale_lines_name not in source
+    assert stale_paths_name not in source
+    assert 'render_command_tree(ctx.command, "chatpost")' in source
 
 
 def test_top_level_help_shows_discovery_and_platform_groups_only():

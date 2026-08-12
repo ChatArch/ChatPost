@@ -13,29 +13,29 @@ Here `PROFILE` is a registry alias / browser user-data directory / login-state c
 `chatpost --tree` prints the real registered CLI tree:
 
 ```text
-chatpost  # browser-level platform login and draft manager
+chatpost  # Browser-level platform login and draft manager.
 ├── --help  # Show help for the current command.
 ├── --version  # Show package version.
 ├── --tree  # Print the registered CLI tree with command purpose and IO shape.
 ├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.
-├── profiles [--platform zhihu|xhs|csdn] [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.
-├── zhihu  # Zhihu browser login and Wechatsync draft capabilities
-    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.
-    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session; emit page-owned login_url if needed.
-    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check Zhihu web login state from page-visible browser state only.
-    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear Zhihu browser state after browser-level status.
-    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.
-├── xhs  # XHS browser login system
-    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured XHS browser Profiles.
-    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the creator login page's own QR handoff and write the QR artifact.
-    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check XHS web login state from page-visible browser state only.
-    └── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear XHS browser state after browser-level status.
-└── csdn  # CSDN browser login and Wechatsync draft capabilities
-    ├── profiles [--registry PATH] [--output text|json] [-I/--no-interactive]  # List configured CSDN browser Profiles.
-    ├── login PROFILE [--registry PATH] [--timeout INTEGER] [--qrcode PATH] [--output text|json] [-I/--no-interactive]  # Wait for the CSDN login page's own QR handoff and write the QR artifact.
-    ├── status PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Check CSDN web login state from page-visible browser state only.
-    ├── logout PROFILE [--registry PATH] [--output text|json] [-I/--no-interactive]  # Log out or clear CSDN browser state after browser-level status.
-    └── draft PROFILE SOURCE [--registry PATH] [--dry-run] [--receipt PATH] [--output text|json] [-I/--no-interactive]  # Dry-run or create one CSDN draft through Wechatsync; never final-publish.
+├── profiles [--platform zhihu|xhs|csdn] [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.
+├── zhihu  # Zhihu browser login and Wechatsync draft capabilities.
+│   ├── profiles [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.
+│   ├── status PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Check PROFILE's Zhihu web login state from browser-visible page state.
+│   ├── login PROFILE [--registry REGISTRY] [--timeout TIMEOUT] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff.
+│   ├── logout PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Log out or clear PROFILE's Zhihu browser state after browser-level status.
+│   └── draft PROFILE SOURCE [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.
+├── xhs  # XHS browser login system.
+│   ├── profiles [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured XHS browser Profiles.
+│   ├── status PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Check PROFILE's XHS web login state from browser-visible page state.
+│   ├── login PROFILE [--registry REGISTRY] [--timeout TIMEOUT] [--qrcode QRCODE-PATH] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff.
+│   └── logout PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Log out or clear PROFILE's XHS browser state after browser-level status.
+└── csdn  # CSDN browser login and Wechatsync draft capabilities.
+    ├── profiles [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured CSDN browser Profiles.
+    ├── status PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Check PROFILE's CSDN web login state from browser-visible page state.
+    ├── login PROFILE [--registry REGISTRY] [--timeout TIMEOUT] [--qrcode QRCODE-PATH] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff.
+    ├── logout PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Log out or clear PROFILE's CSDN browser state after browser-level status.
+    └── draft PROFILE SOURCE [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output text|json] [-I/--no-interactive]  # Dry-run or create one CSDN draft through Wechatsync; never final-publish.
 ```
 
 Inspect real help:
