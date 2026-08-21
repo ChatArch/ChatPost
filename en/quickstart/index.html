@@ -1,0 +1,1170 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://arch.gh.wzhecnu.cn/ChatPost/en/quickstart/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../architecture/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.23">
+    
+    
+      
+        <title>Quickstart - ChatPost Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.84d31ad4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#quickstart-logical-profiles-zhihucsdn-login-and-drafts" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../" title="ChatPost Documentation" class="md-header__button md-logo" aria-label="ChatPost Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ChatPost Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Quickstart
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../quickstart/" hreflang="zh" class="md-select__link">
+              中文
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ChatArch/ChatPost" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChatArch/ChatPost
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Quickstart
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../architecture/" class="md-tabs__link">
+          
+  
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cli-tree/" class="md-tabs__link">
+          
+  
+  
+  Commands and APIs
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="ChatPost Documentation" class="md-nav__button md-logo" aria-label="ChatPost Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ChatPost Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ChatArch/ChatPost" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChatArch/ChatPost
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Quickstart
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quickstart
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-install-chain-and-responsibility-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      0. Install Chain And Responsibility Boundary
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0b-set-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      0b. Set Variables
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-confirm-cli-and-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Confirm CLI and Profile
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-check-current-web-login-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Check Current Web Login State
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-log-in-or-reuse-an-authenticated-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Log In or Reuse an Authenticated Profile
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-read-back-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Read Back Status
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-log-out-clear-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Log Out / Clear State
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5b-xhs-interface-kept-not-current-acceptance-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      5b. XHS Interface Kept, Not Current Acceptance Path
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5c-csdn-login-and-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      5c. CSDN Login And Status
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-stops" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Stops
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-zhihucsdn-draft-dry-run-and-create-through-wechatsync" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Zhihu/CSDN Draft dry-run and create through Wechatsync
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Design
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Design
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overall Architecture
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration, Environment, and State
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../browser-runners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Browser Runners and Account Isolation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Commands and APIs
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Commands and APIs
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-tree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CLI Tree
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capability-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Capability Map
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface-tree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Python Interface Tree
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-install-chain-and-responsibility-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      0. Install Chain And Responsibility Boundary
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0b-set-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      0b. Set Variables
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-confirm-cli-and-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Confirm CLI and Profile
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-check-current-web-login-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Check Current Web Login State
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-log-in-or-reuse-an-authenticated-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Log In or Reuse an Authenticated Profile
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-read-back-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Read Back Status
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-log-out-clear-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Log Out / Clear State
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5b-xhs-interface-kept-not-current-acceptance-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      5b. XHS Interface Kept, Not Current Acceptance Path
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5c-csdn-login-and-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      5c. CSDN Login And Status
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-stops" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Stops
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-zhihucsdn-draft-dry-run-and-create-through-wechatsync" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Zhihu/CSDN Draft dry-run and create through Wechatsync
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/ChatArch/ChatPost/edit/main/docs/quickstart.en.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="quickstart-logical-profiles-zhihucsdn-login-and-drafts">Quickstart: Logical Profiles, Zhihu/CSDN Login, and Drafts<a class="headerlink" href="#quickstart-logical-profiles-zhihucsdn-login-and-drafts" title="Permanent link">&para;</a></h1>
+<p>This page covers ChatPost's recommended daily path: use logical Profiles (<code>test</code> by default, optionally <code>product</code>) to discover configuration, check Zhihu/CSDN web login state, open a login handoff, and log out / clear browser state; then use the separate <code>chatpost zhihu draft</code> / <code>chatpost csdn draft</code> entrypoints to dry-run or create one draft. <code>login/status/logout</code> do not create drafts, call a publishing adapter, or read/export raw cookies, local storage, IndexedDB, sessions, or tokens. XHS keeps the same <code>profiles/login/status/logout</code> shape, but it is not the current draft acceptance path.</p>
+<h2 id="0-install-chain-and-responsibility-boundary">0. Install Chain And Responsibility Boundary<a class="headerlink" href="#0-install-chain-and-responsibility-boundary" title="Permanent link">&para;</a></h2>
+<p>Installing ChatPost pulls in the Python-layer dependencies <code>chatup</code> and <code>chatbrowser</code>, but the three packages own different layers:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ChatUp       = install / setup: Node, Playwright package, Chromium/Chrome artifacts
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>ChatBrowser  = browser runtime: backend, Profile metadata, loopback CDP session registry
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>ChatPost     = post orchestration: logical Profile -&gt; platform -&gt; login state -&gt; draft/create receipt
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>ChatPost
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>chatpost<span class="w"> </span>--version
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>chatpost<span class="w"> </span>--tree
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>chatpost<span class="w"> </span>--tree-brief
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>chatup<span class="w"> </span>playwright<span class="w"> </span>install<span class="w"> </span><span class="m">1</span>.61.1<span class="w"> </span>--browser<span class="w"> </span>chromium<span class="w"> </span>--output<span class="w"> </span>json<span class="w"> </span>-I
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>chatbrowser<span class="w"> </span>profile<span class="w"> </span>create<span class="w"> </span>zhihu-test<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span>--path<span class="w"> </span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.chatarch/chatpost/profiles/test/zhihu"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span>--backend<span class="w"> </span>chatup-playwright<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span>--label<span class="w"> </span><span class="nv">owner</span><span class="o">=</span>chatpost<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span>--label<span class="w"> </span><span class="nv">platform</span><span class="o">=</span>zhihu<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span>--label<span class="w"> </span><span class="nv">logical_profile</span><span class="o">=</span><span class="nb">test</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span>--output<span class="w"> </span>json
+</code></pre></div>
+<p><code>pip install ChatPost</code> installs Python package dependencies. Browser binaries are still prepared by <code>chatup playwright install ...</code>. Browser Profile paths and non-sensitive metadata are registered by <code>chatbrowser profile create ...</code>. A ChatPost runner may reference that browser layer with <code>browser_profile = "zhihu-test"</code>, while Wechatsync extension, bridge, receipt, and adapter fields stay in the ChatPost/adapter layer.</p>
+<h2 id="0b-set-variables">0b. Set Variables<a class="headerlink" href="#0b-set-variables" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">CHATPOST</span><span class="o">=</span>chatpost
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nv">CHATPOST_HOME</span><span class="o">=</span><span class="s2">"</span><span class="si">${</span><span class="nv">CHATPOST_HOME</span><span class="k">:-</span><span class="nv">$HOME</span><span class="p">/.chatarch/chatpost</span><span class="si">}</span><span class="s2">"</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nv">REGISTRY</span><span class="o">=</span><span class="s2">"</span><span class="si">${</span><span class="nv">CHATPOST_ACCOUNT_REGISTRY</span><span class="k">:-</span><span class="nv">$CHATPOST_HOME</span><span class="p">/accounts.toml</span><span class="si">}</span><span class="s2">"</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nv">PROFILE</span><span class="o">=</span><span class="nb">test</span>
+</code></pre></div>
+<p>ChatPost stores local state under the ChatArch-owned state root <code>~/.chatarch/chatpost/</code> by default: the default registry is <code>~/.chatarch/chatpost/accounts.toml</code>, and later runner/Profile/receipt state should live under the same root. Use <code>--registry</code> only for an explicit override or task-local experiment; do not place the default <code>accounts.toml</code> in the repository root, current working directory, or a temporary project directory.</p>
+<p><code>accounts.toml</code> stores only non-sensitive Profile metadata such as alias, platform, runner_config, profile, and label. Never write cookies, local storage, QR payloads, verification codes, phone numbers, passwords, tokens, or WebSocket UUIDs into the registry, config, logs, or docs. Relative <code>runner_config</code> paths resolve from the registry directory, so the default layout keeps them inside <code>~/.chatarch/chatpost/</code> too.</p>
+<p>Recommended layout: keep only two logical Profiles:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>profiles/
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  test/
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    zhihu/
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    xhs/
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    csdn/
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  product/
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    zhihu/
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    xhs/
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    csdn/
+</code></pre></div>
+<p>Daily commands should use the logical name, for example <code>chatpost zhihu status test</code> or <code>chatpost csdn status test</code>. The registry may keep platform-qualified aliases such as <code>zhihu-test</code>, <code>xhs-test</code>, and <code>csdn-test</code> as a compatibility layer, but users do not need to remember them.</p>
+<h2 id="1-confirm-cli-and-profile">1. Confirm CLI and Profile<a class="headerlink" href="#1-confirm-cli-and-profile" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>--tree
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>platforms<span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>profiles<span class="w">   </span>--platform<span class="w"> </span>zhihu<span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>profiles<span class="w">   </span>--platform<span class="w"> </span>xhs<span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>profiles<span class="w">   </span>--platform<span class="w"> </span>csdn<span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>zhihu<span class="w"> </span>profiles<span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>xhs<span class="w"> </span>profiles<span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>csdn<span class="w"> </span>profiles<span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+</code></pre></div>
+<p>Discovery commands read only the registry. They do not start a browser or inspect login state. The equivalent real command names are <code>chatpost platforms</code>, <code>chatpost profiles</code>, <code>chatpost zhihu profiles</code>, <code>chatpost xhs profiles</code>, and <code>chatpost csdn profiles</code>.</p>
+<p>The real login-foundation command names are <code>chatpost zhihu status</code>, <code>chatpost zhihu login</code>, <code>chatpost zhihu logout</code>, <code>chatpost xhs status</code>, <code>chatpost xhs login</code>, <code>chatpost xhs logout</code>, <code>chatpost csdn status</code>, <code>chatpost csdn login</code>, and <code>chatpost csdn logout</code>.</p>
+<h2 id="2-check-current-web-login-state">2. Check Current Web Login State<a class="headerlink" href="#2-check-current-web-login-state" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>zhihu<span class="w"> </span>status<span class="w"> </span><span class="s2">"</span><span class="nv">$PROFILE</span><span class="s2">"</span><span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+</code></pre></div>
+<p><code>status</code> is browser-level only: it opens/connects a controlled Chromium Profile and infers state from Zhihu page URL, DOM, and visible account entrypoints. Status values are:</p>
+<ul>
+<li><code>LOGGED_IN</code>: page-visible state confirms login, optionally with <code>account_name</code> / <code>account_url</code>;</li>
+<li><code>LOGGED_OUT</code>: page-visible state shows logged out;</li>
+<li><code>UNKNOWN</code>: the page cannot be judged reliably, and ChatPost does not fall back to a publishing adapter.</li>
+</ul>
+<h2 id="3-log-in-or-reuse-an-authenticated-profile">3. Log In or Reuse an Authenticated Profile<a class="headerlink" href="#3-log-in-or-reuse-an-authenticated-profile" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>zhihu<span class="w"> </span>login<span class="w"> </span><span class="s2">"</span><span class="nv">$PROFILE</span><span class="s2">"</span><span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--timeout<span class="w"> </span><span class="m">900</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+</code></pre></div>
+<p>Contract:</p>
+<ul>
+<li>Already logged in: browser-page status runs first and returns <code>LOGGED_IN</code>; no QR or login link is emitted.</li>
+<li>Logged out: ChatPost opens Zhihu's login page in the same Profile, quickly emits a page-owned <code>login_url</code> or <code>browser_opened</code> handoff, then keeps the browser alive while a human completes login.</li>
+<li>No cookies, local storage, IndexedDB, sessions, or tokens are read/exported.</li>
+<li>No publishing adapter, adapter env, or publishing token is required.</li>
+<li>Screenshots are not login handoff and must not masquerade as final output.</li>
+<li>Sliders, phone numbers, and verification codes are human browser-flow inputs; the CLI has no <code>--phone</code>, <code>--code</code>, <code>--otp</code>, or <code>--sms-code</code> options.</li>
+</ul>
+<p>JSON output is JSON Lines: one interactive handoff event first, then a final login-completed or timeout event.</p>
+<h2 id="4-read-back-status">4. Read Back Status<a class="headerlink" href="#4-read-back-status" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>zhihu<span class="w"> </span>status<span class="w"> </span><span class="s2">"</span><span class="nv">$PROFILE</span><span class="s2">"</span><span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+</code></pre></div>
+<p>After a real login practice, this should return <code>LOGGED_IN</code>, ideally with page-visible <code>account_name</code> or <code>account_url</code>.</p>
+<h2 id="5-log-out-clear-state">5. Log Out / Clear State<a class="headerlink" href="#5-log-out-clear-state" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>zhihu<span class="w"> </span><span class="nb">logout</span><span class="w"> </span><span class="s2">"</span><span class="nv">$PROFILE</span><span class="s2">"</span><span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+</code></pre></div>
+<p><code>logout</code> first runs browser-level status. It returns <code>ALREADY_LOGGED_OUT</code> when already logged out, and clears Zhihu origins only after a logged-in precheck. Clearing state is a browser command; it does not read session values.</p>
+<h2 id="5b-xhs-interface-kept-not-current-acceptance-path">5b. XHS Interface Kept, Not Current Acceptance Path<a class="headerlink" href="#5b-xhs-interface-kept-not-current-acceptance-path" title="Permanent link">&para;</a></h2>
+<p>XHS keeps the same platform entry shape: <code>profiles/status/login/logout</code>. The current recommended acceptance path is Zhihu only; XHS QR source validation needs a later fix against the ordinary site login page before QR login is accepted again. Do not treat a debugging QR as a usable login result.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nv">XHS_PROFILE</span><span class="o">=</span><span class="s2">"</span><span class="nv">$PROFILE</span><span class="s2">"</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nv">XHS_QR</span><span class="o">=</span><span class="s2">"</span><span class="nv">$CHATPOST_HOME</span><span class="s2">/xhs-login-qrcode.png"</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>xhs<span class="w"> </span>status<span class="w"> </span><span class="s2">"</span><span class="nv">$XHS_PROFILE</span><span class="s2">"</span><span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Run this only after XHS acceptance is restored:</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1"># "$CHATPOST" xhs login "$XHS_PROFILE"   --registry "$REGISTRY"   --timeout 900   --qrcode "$XHS_QR"   --output json   -I</span>
+</code></pre></div>
+<p>When QR generation succeeds, the first JSON Lines event has <code>event=login_handoff</code>, <code>status=LOGIN_REQUIRED</code>, <code>handoff_kind=qrcode_image</code>, and <code>qrcode_path=/path/to/png</code>. If the page does not expose a real decodable QR, ChatPost returns <code>LOGIN_HANDOFF_UNAVAILABLE</code> / <code>reason=qrcode_not_found</code>; if XHS marks the current network as risky, it returns <code>LOGIN_BLOCKED</code> / <code>block_reason=network_risk</code>. These failures must not be disguised as a scannable QR.</p>
+<h2 id="5c-csdn-login-and-status">5c. CSDN Login And Status<a class="headerlink" href="#5c-csdn-login-and-status" title="Permanent link">&para;</a></h2>
+<p>CSDN keeps the same platform entry shape as Zhihu: <code>profiles/status/login/logout</code>. When logged out, CSDN login emits only a QR-image artifact, not a private confirmation link, QR token, cookie, or session. Password/SMS/CAPTCHA checkpoints remain human browser-flow inputs; ChatPost does not bypass them, solve them, or store verification contents.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">CSDN_PROFILE</span><span class="o">=</span><span class="s2">"</span><span class="nv">$PROFILE</span><span class="s2">"</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nv">CSDN_QR</span><span class="o">=</span><span class="s2">"</span><span class="nv">$CHATPOST_HOME</span><span class="s2">/csdn-login-qrcode.png"</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>csdn<span class="w"> </span>status<span class="w"> </span><span class="s2">"</span><span class="nv">$CSDN_PROFILE</span><span class="s2">"</span><span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>csdn<span class="w"> </span>login<span class="w"> </span><span class="s2">"</span><span class="nv">$CSDN_PROFILE</span><span class="s2">"</span><span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--timeout<span class="w"> </span><span class="m">900</span><span class="w">   </span>--qrcode<span class="w"> </span><span class="s2">"</span><span class="nv">$CSDN_QR</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="s2">"</span><span class="nv">$CHATPOST</span><span class="s2">"</span><span class="w"> </span>csdn<span class="w"> </span>status<span class="w"> </span><span class="s2">"</span><span class="nv">$CSDN_PROFILE</span><span class="s2">"</span><span class="w">   </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w">   </span>--output<span class="w"> </span>json<span class="w">   </span>-I
+</code></pre></div>
+<p>CSDN <code>status</code> acceptance must come from the same controlled Profile's page-visible state or browser-internal user-info response. Do not accept URL/title-only checks, and do not infer login by reading cookies/local storage/IndexedDB/session/token contents.</p>
+<h2 id="common-stops">Common Stops<a class="headerlink" href="#common-stops" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Stop</th>
+<th>Handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>login</code> returns <code>LOGGED_IN</code> immediately</td>
+<td>Expected: the Profile is already logged in.</td>
+</tr>
+<tr>
+<td><code>xhs login</code> emits <code>qrcode_path</code></td>
+<td>Expected handoff: send that PNG to the user and keep the same login command/browser page polling.</td>
+</tr>
+<tr>
+<td><code>xhs login</code> returns <code>LOGIN_HANDOFF_UNAVAILABLE</code> / <code>qrcode_not_found</code></td>
+<td>The page did not expose a real decodable QR; do not use screenshots, switch icons, or private artifacts as QR substitutes.</td>
+</tr>
+<tr>
+<td><code>zhihu login</code> emits <code>browser_opened</code> but no page-owned <code>login_url</code></td>
+<td>The browser is open for human login; do not use screenshots or private artifacts as login links.</td>
+</tr>
+<tr>
+<td>The login page asks for a slider or verification code</td>
+<td>Stay in the human browser flow; do not put codes into CLI args or logs.</td>
+</tr>
+<tr>
+<td><code>login</code> returns <code>LOGIN_BLOCKED</code> / <code>block_reason=network_risk</code></td>
+<td>The current egress was rejected by the platform, so no scannable QR can be generated; retry from a trusted network or local browser Profile.</td>
+</tr>
+<tr>
+<td><code>csdn login</code> hits a security challenge</td>
+<td>Stay in the human browser flow; do not bypass it, solve it automatically, or put verification contents into CLI args, logs, or docs.</td>
+</tr>
+<tr>
+<td><code>status</code> returns <code>UNKNOWN</code></td>
+<td>Report unknown only; do not fall back to an adapter or read cookies/tokens.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-zhihucsdn-draft-dry-run-and-create-through-wechatsync">6. Zhihu/CSDN Draft dry-run and create through Wechatsync<a class="headerlink" href="#6-zhihucsdn-draft-dry-run-and-create-through-wechatsync" title="Permanent link">&para;</a></h2>
+<p><code>chatpost zhihu draft</code> and <code>chatpost csdn draft</code> are intentionally separate from the browser-level login commands. They reuse the same registry alias and runner config, but they load the full runner fields for Wechatsync, extension, bridge, and private env file only inside the draft flow. <code>login/status/logout</code> must continue to use <code>load_browser_config</code> and must not require adapter readiness.</p>
+<p>Dry-run validates the source without starting a browser or writing a draft:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nv">ARTICLE</span><span class="o">=</span>/absolute/path/to/article.md
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>chatpost<span class="w"> </span>zhihu<span class="w"> </span>draft<span class="w"> </span><span class="s2">"</span><span class="nv">$PROFILE</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$ARTICLE</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span>--dry-run<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span>--output<span class="w"> </span>json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span>-I
+</code></pre></div>
+<p>A real create requires an explicit receipt path and creates exactly one Zhihu draft. It does not final-publish:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nv">RECEIPT</span><span class="o">=</span><span class="s2">"</span><span class="nv">$CHATPOST_HOME</span><span class="s2">/runners/zhihu-test/run/zhihu-draft-receipt.json"</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>chatpost<span class="w"> </span>zhihu<span class="w"> </span>draft<span class="w"> </span><span class="s2">"</span><span class="nv">$PROFILE</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$ARTICLE</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span>--receipt<span class="w"> </span><span class="s2">"</span><span class="nv">$RECEIPT</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span>--output<span class="w"> </span>json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span>-I
+</code></pre></div>
+<p>Expected successful statuses are <code>DRY_RUN_OK</code> for dry-run and <code>DRAFT_CREATED</code> for create. Create writes a mode <code>0600</code> receipt with the draft id, <code>/edit</code> review URL, source digest, and cleanup statuses. If the create path returns <code>RESULT_UNKNOWN</code>, do not retry automatically; inspect the receipt and the browser before deciding next steps.</p>
+<p>CSDN uses the same Wechatsync draft contract, but with platform parameter <code>csdn</code>. The current Wechatsync CSDN adapter saves a draft: its request uses <code>pubStatus="draft"</code> and returns <code>draftOnly=true</code>; ChatPost currently has no CSDN public <code>post/publish</code> command. Markdown sources may provide a cover image with frontmatter <code>cover</code>, and body images use standard Markdown image syntax; create uploads them through CSDN <code>image_upload</code> and saves CSDN image URLs plus <code>cover_images</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>---
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>title: CSDN rich draft demo
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="gu">cover: data:image/png;base64,...</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="gu">---</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="gu">## Body image</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>![<span class="nt">body image alt</span>](<span class="na">data:image/png;base64,...</span>)
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nv">ARTICLE</span><span class="o">=</span>/absolute/path/to/article.md
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>chatpost<span class="w"> </span>csdn<span class="w"> </span>draft<span class="w"> </span><span class="s2">"</span><span class="nv">$PROFILE</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$ARTICLE</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span>--dry-run<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span>--output<span class="w"> </span>json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span>-I
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="nv">RECEIPT</span><span class="o">=</span><span class="s2">"</span><span class="nv">$CHATPOST_HOME</span><span class="s2">/runners/csdn-test/run/csdn-draft-receipt.json"</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>chatpost<span class="w"> </span>csdn<span class="w"> </span>draft<span class="w"> </span><span class="s2">"</span><span class="nv">$PROFILE</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$ARTICLE</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">  </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REGISTRY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">  </span>--receipt<span class="w"> </span><span class="s2">"</span><span class="nv">$RECEIPT</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">  </span>--output<span class="w"> </span>json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="w">  </span>-I
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "search.share", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+    
+  </body>
+</html>

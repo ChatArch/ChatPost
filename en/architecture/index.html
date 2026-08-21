@@ -1,0 +1,1396 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://arch.gh.wzhecnu.cn/ChatPost/en/architecture/">
+      
+      
+        <link rel="prev" href="../quickstart/">
+      
+      
+        <link rel="next" href="../configuration/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.23">
+    
+    
+      
+        <title>Overall Architecture - ChatPost Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.84d31ad4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#overall-architecture-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../" title="ChatPost Documentation" class="md-header__button md-logo" aria-label="ChatPost Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ChatPost Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Overall Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../architecture/" hreflang="zh" class="md-select__link">
+              中文
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ChatArch/ChatPost" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChatArch/ChatPost
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../quickstart/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Quickstart
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cli-tree/" class="md-tabs__link">
+          
+  
+  
+  Commands and APIs
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="ChatPost Documentation" class="md-nav__button md-logo" aria-label="ChatPost Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ChatPost Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ChatArch/ChatPost" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChatArch/ChatPost
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quickstart
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Design
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Design
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Overall Architecture
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overall Architecture
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#one-sentence-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      One-Sentence Model
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verified-facts-versus-proposal" class="md-nav__link">
+    <span class="md-ellipsis">
+      Verified Facts Versus Proposal
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#core-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Resources
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Resources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chatup-playwright-dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      ChatUp Playwright Dependency
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runner" class="md-nav__link">
+    <span class="md-ellipsis">
+      Runner
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#account" class="md-nav__link">
+    <span class="md-ellipsis">
+      Account
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Publication
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#control-plane-and-execution-plane" class="md-nav__link">
+    <span class="md-ellipsis">
+      Control Plane and Execution Plane
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Control Plane and Execution Plane">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chatpost-control-plane-owns" class="md-nav__link">
+    <span class="md-ellipsis">
+      ChatPost Control Plane Owns
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#browser-runner-execution-plane-owns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Browser Runner Execution Plane Owns
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-connection-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Three Connection Surfaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lifecycle-from-installation-to-draft" class="md-nav__link">
+    <span class="md-ellipsis">
+      Lifecycle From Installation to Draft
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      State Ownership
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-oriented-first-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Task-Oriented First Acceptance
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-functional-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      First Functional Release
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Security Boundary
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration, Environment, and State
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../browser-runners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Browser Runners and Account Isolation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Commands and APIs
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Commands and APIs
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-tree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CLI Tree
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capability-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Capability Map
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface-tree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Python Interface Tree
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#one-sentence-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      One-Sentence Model
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verified-facts-versus-proposal" class="md-nav__link">
+    <span class="md-ellipsis">
+      Verified Facts Versus Proposal
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#core-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Resources
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Resources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chatup-playwright-dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      ChatUp Playwright Dependency
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runner" class="md-nav__link">
+    <span class="md-ellipsis">
+      Runner
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#account" class="md-nav__link">
+    <span class="md-ellipsis">
+      Account
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Publication
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#control-plane-and-execution-plane" class="md-nav__link">
+    <span class="md-ellipsis">
+      Control Plane and Execution Plane
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Control Plane and Execution Plane">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chatpost-control-plane-owns" class="md-nav__link">
+    <span class="md-ellipsis">
+      ChatPost Control Plane Owns
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#browser-runner-execution-plane-owns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Browser Runner Execution Plane Owns
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-connection-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Three Connection Surfaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lifecycle-from-installation-to-draft" class="md-nav__link">
+    <span class="md-ellipsis">
+      Lifecycle From Installation to Draft
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      State Ownership
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-oriented-first-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Task-Oriented First Acceptance
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-functional-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      First Functional Release
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Security Boundary
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/ChatArch/ChatPost/edit/main/docs/architecture.en.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="overall-architecture-design">Overall Architecture Design<a class="headerlink" href="#overall-architecture-design" title="Permanent link">&para;</a></h1>
+<div class="admonition warning">
+<p class="admonition-title">Status: design proposal</p>
+<p><code>ChatPost 0.1.0</code> implements the task-specific <code>zhihu preflight/auth/draft</code> route. The generic Runner, Account, Publication, and update resource models on this page remain proposals.</p>
+</div>
+<h2 id="one-sentence-model">One-Sentence Model<a class="headerlink" href="#one-sentence-model" title="Permanent link">&para;</a></h2>
+<p>ChatPost is the control plane. ChatUp supplies the reusable Playwright package/browser environment. A Browser Runner with a persistent profile is the execution plane. A platform account is a logical destination bound to that runner.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Markdown + local assets
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>        |
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        v
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>ChatPost control plane
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  parse -&gt; plan -&gt; policy -&gt; ledger
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        |
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        | bridge task + receipt
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        v
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>Browser Runner
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  Chrome for Testing
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  + isolated user-data-dir
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  + adapter extension
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        |
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>        v
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>Platform session in browser
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  -&gt; create/update draft
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  -&gt; human review
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  -&gt; human final publish
+</code></pre></div>
+<p>ChatPost never reads platform cookies and does not treat a browser profile as ordinary configuration.</p>
+<h2 id="verified-facts-versus-proposal">Verified Facts Versus Proposal<a class="headerlink" href="#verified-facts-versus-proposal" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Markdown to Zhihu draft</td>
+<td>Verified</td>
+<td>The existing Wechatsync practice created and read back a Zhihu draft without final publish.</td>
+</tr>
+<tr>
+<td>Chrome for Testing host binary</td>
+<td>Verified</td>
+<td>The successful path ran a local binary directly; Docker was not involved.</td>
+</tr>
+<tr>
+<td>Dedicated persistent profile</td>
+<td>Verified</td>
+<td>Zhihu authentication remained in a dedicated user-data-dir; cookies were not exported.</td>
+</tr>
+<tr>
+<td>Zhihu QR-scan login</td>
+<td>Verified</td>
+<td>The visible isolated browser completed QR login and the profile retained the session.</td>
+</tr>
+<tr>
+<td>Zhihu SMS-code login</td>
+<td>Hidden compatibility checkpoint implemented; needs separate acceptance</td>
+<td><code>chatpost zhihu account login code</code> remains callable as a hidden compatibility checkpoint. Phone numbers and verification codes are used only in the later human browser flow, and current evidence must not claim new-account SMS login has passed.</td>
+</tr>
+<tr>
+<td>Loopback bridge and token</td>
+<td>Verified</td>
+<td>The extension and CLI communicated over local WebSocket; the token was not a Zhihu credential.</td>
+</tr>
+<tr>
+<td>ChatUp Playwright environment</td>
+<td>Released dependency</td>
+<td><code>chatup 0.2.4</code> provides <code>chatup playwright</code> and <code>chatup.playwright.resolve</code>; ChatPost does not duplicate downloads.</td>
+</tr>
+<tr>
+<td>ChatPost task-specific Zhihu Runner</td>
+<td>Implemented</td>
+<td><code>preflight/auth/draft</code>, persistent Profile, exact extension, loopback CDP/bridge, and receipts have code and tests.</td>
+</tr>
+<tr>
+<td>Profile-based Zhihu CLI</td>
+<td>Implemented</td>
+<td><code>chatpost platforms/profiles</code> discover platforms and non-sensitive Profile targets; <code>chatpost zhihu login/status/logout PROFILE</code> handles QR login, read-only status, and logout; <code>chatpost zhihu draft PROFILE SOURCE</code> either preflights with <code>--dry-run</code> or creates a review draft in receipt-required create mode.</td>
+</tr>
+<tr>
+<td>Multi-account scheduling and publication ledger</td>
+<td>Proposed</td>
+<td>This page defines the resource and state boundaries for later implementation.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="core-resources">Core Resources<a class="headerlink" href="#core-resources" title="Permanent link">&para;</a></h2>
+<h3 id="chatup-playwright-dependency">ChatUp Playwright Dependency<a class="headerlink" href="#chatup-playwright-dependency" title="Permanent link">&para;</a></h3>
+<p>The Playwright package and its declared browser revision are machine-level ChatUp installations, not ChatPost resources. ChatPost declares compatibility and resolves a read-only descriptor:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ChatUp PlaywrightBrowserInstallation
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── kind = playwright
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── playwright_version
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── browser / browser_revision / browser_version
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├── binary_path
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>├── root_dir = installation root
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>└── package_dir / browsers_dir / node_version
+</code></pre></div>
+<p><code>chatup playwright install &lt;tested-version&gt; --browser chromium</code> installs under <code>~/.chatarch/playwright/</code>. ChatPost calls <code>chatup.playwright.resolve(...)</code> for an existing installation. A missing dependency fails closed with a ChatUp command; ChatPost never downloads, extracts, or modifies system Chrome.</p>
+<p>ChromeDriver is a separate ChatUp backend (<code>chatup chromedriver</code> / <code>chatup.chromedriver</code>). The current ChatPost runner launches Chrome for Testing directly and uses CDP; it does not consume ChromeDriver or assume that the two backends share versions or descriptors.</p>
+<h3 id="runner">Runner<a class="headerlink" href="#runner" title="Permanent link">&para;</a></h3>
+<p>A runner is the execution boundary for one browser persona:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Runner
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── one ChatUp-resolved Chrome descriptor
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>├── one Chrome process
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>├── one isolated user-data-dir
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>├── one CDP endpoint
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>├── one extension/bridge instance
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>├── one bridge secret reference
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>└── one serialized write queue
+</code></pre></div>
+<p>Writes within one runner are serialized. Different runners may run concurrently when their directories, ports, and tokens are independent.</p>
+<h3 id="account">Account<a class="headerlink" href="#account" title="Permanent link">&para;</a></h3>
+<p>An account is a logical destination expressed as <code>platform@alias</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>zhihu@personal -&gt; runner: local-personal
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>zhihu@brand    -&gt; runner: local-brand
+</code></pre></div>
+<p>The alias is not a platform username and should contain no phone number, email, or real name. It stores only the platform, runner binding, and last authentication state.</p>
+<h3 id="publication">Publication<a class="headerlink" href="#publication" title="Permanent link">&para;</a></h3>
+<p>A publication is the durable mapping between one source and one target:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>source identity + source hash
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>        &lt;-&gt;
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>platform account + draft/article ID
+</code></pre></div>
+<p>It enables idempotency, updates, readback, and <code>RESULT_UNKNOWN</code> recovery. Titles must not replace this mapping.</p>
+<h2 id="control-plane-and-execution-plane">Control Plane and Execution Plane<a class="headerlink" href="#control-plane-and-execution-plane" title="Permanent link">&para;</a></h2>
+<h3 id="chatpost-control-plane-owns">ChatPost Control Plane Owns<a class="headerlink" href="#chatpost-control-plane-owns" title="Permanent link">&para;</a></h3>
+<ul>
+<li>parsing Markdown, front matter, and local assets;</li>
+<li>resolving <code>platform@alias</code>, runner, and adapter capabilities;</li>
+<li>producing a plan without remote writes;</li>
+<li>acquiring the runner write lock;</li>
+<li>issuing explicit create or fail-closed update operations;</li>
+<li>recording receipts, source hashes, draft IDs, and states;</li>
+<li>opening the draft in the correct runner for human review.</li>
+</ul>
+<h3 id="browser-runner-execution-plane-owns">Browser Runner Execution Plane Owns<a class="headerlink" href="#browser-runner-execution-plane-owns" title="Permanent link">&para;</a></h3>
+<ul>
+<li>starting a pinned Chrome build;</li>
+<li>holding the browser profile and platform session;</li>
+<li>loading and proving the exact extension identity;</li>
+<li>receiving tasks through the bridge;</li>
+<li>uploading assets and creating/updating drafts with the current browser session;</li>
+<li>returning structured receipts;</li>
+<li>stopping on login, verification, risk-control, or compatibility checkpoints.</li>
+</ul>
+<h2 id="three-connection-surfaces">Three Connection Surfaces<a class="headerlink" href="#three-connection-surfaces" title="Permanent link">&para;</a></h2>
+<p>The existing Wechatsync source confirms that the browser extension is the WebSocket client and the bridge process is the WebSocket server. The ChatPost control plane must not be described as that WebSocket client.</p>
+<table>
+<thead>
+<tr>
+<th>Field/transport</th>
+<th>Example</th>
+<th>Initiator → receiver</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cdp_url</code></td>
+<td><code>http://127.0.0.1:9227</code></td>
+<td>Runner manager → Chrome</td>
+<td>Startup checks, login navigation, extension proof, and diagnostics.</td>
+</tr>
+<tr>
+<td><code>bridge_ws_url</code></td>
+<td><code>ws://127.0.0.1:9527</code></td>
+<td>Browser extension → bridge server</td>
+<td>The extension receives tasks and returns receipts; RPC messages carry the bridge token.</td>
+</tr>
+<tr>
+<td><code>control_transport</code></td>
+<td><code>stdio</code>; optional <code>http://127.0.0.1:9528</code></td>
+<td>ChatPost adapter → bridge process</td>
+<td>Local default is in-process/stdio; companion HTTP exists only across an explicit process boundary.</td>
+</tr>
+</tbody>
+</table>
+<p>For a managed local runner, ChatPost allocates ports, provisions the exact extension's <code>bridge_ws_url</code>/token, and prefers a stdio control channel with no public listener. Normal users type none of these URLs.</p>
+<p>A remote runner exposes a separate authenticated control API. It never maps the extension WebSocket, CDP, or unauthenticated companion HTTP directly to the public internet.</p>
+<h2 id="lifecycle-from-installation-to-draft">Lifecycle From Installation to Draft<a class="headerlink" href="#lifecycle-from-installation-to-draft" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>CHROME_DEPENDENCY_MISSING
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  -&gt; user runs chatup playwright install &lt;tested-version&gt; --browser chromium
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>CHROME_DEPENDENCY_READY
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>  -&gt; runner config selected and startup requested
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>RUNNER_STARTING
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  -&gt; process + CDP + exact extension + bridge checks
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>RUNNER_READY
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>  -&gt; account registry selected and login checkpoint requested
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>NEEDS_LOGIN
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>  -&gt; visible human login checkpoint
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>AUTH_CHECKING
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>  -&gt; read-only adapter auth
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>ACCOUNT_READY
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>  -&gt; plan
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>PLANNED
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>  -&gt; one explicit receipt-backed draft create-mode run; update/publish stay unsupported
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>RUNNING
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>  -&gt; DRAFT_CREATED -&gt; AWAITING_REVIEW
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>  -&gt; RESULT_UNKNOWN
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>  -&gt; NEEDS_ACTION
+</code></pre></div>
+<p>Any write that may have reached the platform without returning a receipt enters <code>RESULT_UNKNOWN</code> and is never retried automatically.</p>
+<h2 id="state-ownership">State Ownership<a class="headerlink" href="#state-ownership" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Owner</th>
+<th style="text-align: right;">Secret</th>
+<th style="text-align: right;">In ledger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Playwright package, browser revision/version, and binary path</td>
+<td>ChatUp <code>~/.chatarch/playwright/</code></td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">No</td>
+</tr>
+<tr>
+<td>user-data-dir path reference</td>
+<td>Runner config</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">No</td>
+</tr>
+<tr>
+<td>Cookies/local storage inside profile</td>
+<td>Chrome profile</td>
+<td style="text-align: right;">Yes</td>
+<td style="text-align: right;">No</td>
+</tr>
+<tr>
+<td>Bridge URL and ports</td>
+<td>Runner config/state</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">No</td>
+</tr>
+<tr>
+<td>Bridge token</td>
+<td>ChatEnv canonical source plus an exact-extension-owned storage copy</td>
+<td style="text-align: right;">Yes</td>
+<td style="text-align: right;">Reference only</td>
+</tr>
+<tr>
+<td>Account alias and runner binding</td>
+<td>Account registry</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">Target reference</td>
+</tr>
+<tr>
+<td>Source hash, draft ID, review URL</td>
+<td>Publication ledger</td>
+<td style="text-align: right;">No/sensitive metadata</td>
+<td style="text-align: right;">Yes</td>
+</tr>
+<tr>
+<td>Password, code, QR payload</td>
+<td>Never persisted</td>
+<td style="text-align: right;">Yes</td>
+<td style="text-align: right;">No</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../configuration/">Configuration, Environment, and State</a> for the filesystem and precedence model.</p>
+<h2 id="task-oriented-first-acceptance">Task-Oriented First Acceptance<a class="headerlink" href="#task-oriented-first-acceptance" title="Permanent link">&para;</a></h2>
+<p>The repository contains a fixed Chinese MkDocs introduction:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>examples/zhihu/mkdocs-quickstart.md
+</code></pre></div>
+<p>It includes headings, lists, a table, fenced code, a link, a local PNG, and stable marker <code>CHATPOST-MKDOCS-SMOKE-V1</code>. The first end-to-end implementation acceptance uses only this task:</p>
+<ol>
+<li>select an isolated, authorized Zhihu runner;</li>
+<li>require successful auth and plan;</li>
+<li>issue exactly one explicit <code>draft</code> create-mode run without <code>--dry-run</code>;</li>
+<li>read back draft ID, title, marker, code, and image;</li>
+<li>write the ledger receipt;</li>
+<li>stop at human review without final publish.</li>
+</ol>
+<p>See <a href="../zhihu-first-run/">Zhihu First Setup and Draft Acceptance</a>.</p>
+<h2 id="first-functional-release">First Functional Release<a class="headerlink" href="#first-functional-release" title="Permanent link">&para;</a></h2>
+<p>The first release includes:</p>
+<ul>
+<li>a bounded dependency on released <code>chatup&gt;=0.2.12,&lt;0.3.0</code> and <code>chatbrowser&gt;=0.1.5,&lt;0.2.0</code>, plus read-only Chrome descriptor / browser metadata resolution;</li>
+<li>host runner lifecycle and health checks;</li>
+<li>one dedicated user-data-dir per runner;</li>
+<li>ChatEnv bridge secret references;</li>
+<li>non-sensitive account registries, human login checkpoints, and read-only auth;</li>
+<li>plan, one explicit receipt-backed draft create-mode run, and fail-closed boundaries for unsupported update/publish paths;</li>
+<li>review-draft receipts;</li>
+<li>Zhihu as the first adapter.</li>
+</ul>
+<p>Later work includes Docker/remote runners, a multiplexing broker, more adapters, stronger tenant isolation, and separately authorized final-publish capabilities.</p>
+<h2 id="security-boundary">Security Boundary<a class="headerlink" href="#security-boundary" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Never read, export, or transfer platform cookies.</li>
+<li>Never accept platform passwords or one-time codes.</li>
+<li>Never reuse the daily Chrome profile.</li>
+<li>Never let two runners share one user-data-dir.</li>
+<li>Never expose CDP, bridge, or companion HTTP publicly.</li>
+<li>Never combine create and update behind a <code>sync</code> operation with an implicit fallback.</li>
+<li>Never click final Publish automatically in the first release.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "search.share", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+    
+  </body>
+</html>

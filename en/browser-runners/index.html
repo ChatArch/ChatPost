@@ -1,0 +1,1633 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://arch.gh.wzhecnu.cn/ChatPost/en/browser-runners/">
+      
+      
+        <link rel="prev" href="../configuration/">
+      
+      
+        <link rel="next" href="../cli-tree/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.23">
+    
+    
+      
+        <title>Browser Runners and Account Isolation - ChatPost Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.84d31ad4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#browser-runners-and-account-isolation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../" title="ChatPost Documentation" class="md-header__button md-logo" aria-label="ChatPost Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ChatPost Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Browser Runners and Account Isolation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../browser-runners/" hreflang="zh" class="md-select__link">
+              中文
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ChatArch/ChatPost" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChatArch/ChatPost
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../quickstart/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Quickstart
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../architecture/" class="md-tabs__link">
+          
+  
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cli-tree/" class="md-tabs__link">
+          
+  
+  
+  Commands and APIs
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="ChatPost Documentation" class="md-nav__button md-logo" aria-label="ChatPost Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ChatPost Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ChatArch/ChatPost" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChatArch/ChatPost
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quickstart
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Design
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Design
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overall Architecture
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration, Environment, and State
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Browser Runners and Account Isolation
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Browser Runners and Account Isolation
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#direct-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Direct Answers
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Direct Answers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#does-chrome-require-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      Does Chrome require Docker?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#can-chrome-support-multiple-users-or-accounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Can Chrome support multiple users or accounts?
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#browser-persona" class="md-nav__link">
+    <span class="md-ellipsis">
+      Browser Persona
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-not-reuse-chrome-subprofiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why Not Reuse Chrome Subprofiles?
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resource-relationship" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resource Relationship
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-wechatsync-constraint" class="md-nav__link">
+    <span class="md-ellipsis">
+      Current Wechatsync Constraint
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-connection-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Three Connection Surfaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#host-binary-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      Host Binary Runtime
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Host Binary Runtime">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#good-fits" class="md-nav__link">
+    <span class="md-ellipsis">
+      Good Fits
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#required-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      Required Resources
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chatup-managed-chrome-dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      ChatUp-Managed Chrome Dependency
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secure-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      Secure Defaults
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker Runtime
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker Runtime">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#good-fits_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Good Fits
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#every-container-needs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Every Container Needs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#forbidden-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Forbidden Practices
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      Runtime Comparison
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-multi-account-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Proposed Multi-Account Configuration
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ports-and-locks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ports and Locks
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concurrency-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Concurrency Model
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#login-and-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      Login and Recovery
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multiple-humans-and-strong-tenant-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multiple Humans and Strong Tenant Isolation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Boundary
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-release-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      First-Release Decisions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Commands and APIs
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Commands and APIs
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-tree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CLI Tree
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capability-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Capability Map
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface-tree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Python Interface Tree
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#direct-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Direct Answers
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Direct Answers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#does-chrome-require-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      Does Chrome require Docker?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#can-chrome-support-multiple-users-or-accounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Can Chrome support multiple users or accounts?
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#browser-persona" class="md-nav__link">
+    <span class="md-ellipsis">
+      Browser Persona
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-not-reuse-chrome-subprofiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why Not Reuse Chrome Subprofiles?
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resource-relationship" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resource Relationship
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-wechatsync-constraint" class="md-nav__link">
+    <span class="md-ellipsis">
+      Current Wechatsync Constraint
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-connection-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Three Connection Surfaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#host-binary-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      Host Binary Runtime
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Host Binary Runtime">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#good-fits" class="md-nav__link">
+    <span class="md-ellipsis">
+      Good Fits
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#required-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      Required Resources
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chatup-managed-chrome-dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      ChatUp-Managed Chrome Dependency
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secure-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      Secure Defaults
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker Runtime
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker Runtime">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#good-fits_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Good Fits
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#every-container-needs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Every Container Needs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#forbidden-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Forbidden Practices
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      Runtime Comparison
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-multi-account-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Proposed Multi-Account Configuration
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ports-and-locks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ports and Locks
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concurrency-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Concurrency Model
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#login-and-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      Login and Recovery
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multiple-humans-and-strong-tenant-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multiple Humans and Strong Tenant Isolation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Boundary
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-release-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      First-Release Decisions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/ChatArch/ChatPost/edit/main/docs/browser-runners.en.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="browser-runners-and-account-isolation">Browser Runners and Account Isolation<a class="headerlink" href="#browser-runners-and-account-isolation" title="Permanent link">&para;</a></h1>
+<div class="admonition warning">
+<p class="admonition-title">Status: partially implemented, partially proposed</p>
+<p><code>ChatPost 0.1.x</code> implements the task-specific Zhihu/CSDN Runner lifecycle, non-sensitive Profile-registry reads, and <code>chatpost zhihu login/status/logout/draft</code> plus <code>chatpost csdn login/status/logout/draft</code> entrypoints. Generic <code>runner</code> management, multi-account scheduling, and remote models remain proposals.</p>
+</div>
+<p>See <a href="../architecture/">Overall Architecture</a> for the resource model, <a href="../configuration/">Configuration, Environment, and State</a> for persistence, and <a href="../zhihu-first-run/">Zhihu First Setup and Draft Acceptance</a> for the older Zhihu acceptance record. CSDN reuses the same Wechatsync draft contract, but its current adapter saves drafts only and does not final-publish.</p>
+<h2 id="direct-answers">Direct Answers<a class="headerlink" href="#direct-answers" title="Permanent link">&para;</a></h2>
+<h3 id="does-chrome-require-docker">Does Chrome require Docker?<a class="headerlink" href="#does-chrome-require-docker" title="Permanent link">&para;</a></h3>
+<p><strong>No.</strong></p>
+<p>Chrome, Chromium, or Chrome for Testing can run directly as a host binary:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>chrome
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  --user-data-dir=&lt;isolated directory&gt;
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  --remote-debugging-address=127.0.0.1
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  --remote-debugging-port=&lt;unique port&gt;
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  --load-extension=&lt;adapter extension&gt;
+</code></pre></div>
+<p>The existing Markdown-to-Zhihu-draft path used this model without Docker. Chrome's official documentation also invokes <code>chrome --headless</code> and <code>--remote-debugging-port</code> directly, so a container is not part of the browser protocol.</p>
+<p>The first ChatPost runtime should default to <code>host</code>. Docker is optional when image reproducibility, process isolation, or server scheduling justifies the additional operations.</p>
+<h3 id="can-chrome-support-multiple-users-or-accounts">Can Chrome support multiple users or accounts?<a class="headerlink" href="#can-chrome-support-multiple-users-or-accounts" title="Permanent link">&para;</a></h3>
+<p><strong>Chrome can store multiple profiles inside one user-data-dir, but ChatPost should not use those subprofiles as concurrent account isolation units.</strong></p>
+<p>Chromium documents that:</p>
+<ul>
+<li>the user-data-dir stores history, bookmarks, cookies, and local state;</li>
+<li>every Chrome profile is a subdirectory inside the user-data-dir;</li>
+<li>two running Chrome instances cannot share one user-data-dir.</li>
+</ul>
+<p>ChatPost therefore recommends:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>one browser persona
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>= one runner
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>+ one Chrome process
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>+ one dedicated user-data-dir
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>+ one dedicated port set
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>+ one dedicated bridge token
+</code></pre></div>
+<p>Two Zhihu accounts use two personas. Different personas can run concurrently; writes within one persona are serialized.</p>
+<h2 id="browser-persona">Browser Persona<a class="headerlink" href="#browser-persona" title="Permanent link">&para;</a></h2>
+<p>A browser persona is the operational boundary for a group of web sessions. It is not a password container.</p>
+<p>Example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>personal persona
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── zhihu@personal
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>└── csdn@personal
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>brand persona
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>├── zhihu@brand
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>└── xhs@brand
+</code></pre></div>
+<p>One persona may hold sessions for the same identity across different platforms. Deployments that need stronger cross-platform separation can use one persona per platform account.</p>
+<h2 id="why-not-reuse-chrome-subprofiles">Why Not Reuse Chrome Subprofiles?<a class="headerlink" href="#why-not-reuse-chrome-subprofiles" title="Permanent link">&para;</a></h2>
+<p><code>Default</code>, <code>Profile 1</code>, and <code>Profile 2</code> inside one user-data-dir are convenient for manual browsing, but they are a poor first-release runner boundary:</p>
+<ul>
+<li>one Chrome instance still owns the user-data-dir process lock;</li>
+<li>independent Chrome processes cannot safely share it;</li>
+<li>CDP, extension service workers, and bridge routing must identify the subprofile;</li>
+<li>stop, backup, migration, and recovery boundaries become ambiguous;</li>
+<li>some installation-local state is still shared.</li>
+</ul>
+<p>ChatPost chooses the simpler auditable boundary: every runner owns a complete user-data-dir.</p>
+<h2 id="resource-relationship">Resource Relationship<a class="headerlink" href="#resource-relationship" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ChatPost control plane
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── source / plan
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>├── publication ledger
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>├── account registry
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>│   ├── zhihu@personal -&gt; mac-personal
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>│   ├── csdn@personal  -&gt; mac-personal
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>│   └── zhihu@brand    -&gt; mac-brand
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>└── runner registry
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    ├── mac-personal
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    │   ├── host Chrome process
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    │   ├── user-data-dir A
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    │   ├── CDP port A
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    │   └── bridge A
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    └── mac-brand
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>        ├── host Chrome process
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>        ├── user-data-dir B
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>        ├── CDP port B
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>        └── bridge B
+</code></pre></div>
+<p>An <code>account</code> is a logical destination. A <code>runner</code> is an execution environment. A <code>user-data-dir</code> is where the browser session lives. They must remain separate resources.</p>
+<h2 id="current-wechatsync-constraint">Current Wechatsync Constraint<a class="headerlink" href="#current-wechatsync-constraint" title="Permanent link">&para;</a></h2>
+<p>The current Wechatsync bridge keeps one active WebSocket client. A new extension connection becomes the current client, so one bridge is not a router for multiple account runners.</p>
+<p>The first ChatPost implementation should:</p>
+<ul>
+<li>start one bridge instance per runner;</li>
+<li>allocate a unique bridge port and token per runner;</li>
+<li>select a runner in the control plane before calling its adapter;</li>
+<li>never connect multiple Chrome profiles to one current bridge.</li>
+</ul>
+<p>A future broker can introduce <code>runner_id</code> multiplexing, but the current protocol must not be presented as multi-tenant.</p>
+<h2 id="three-connection-surfaces">Three Connection Surfaces<a class="headerlink" href="#three-connection-surfaces" title="Permanent link">&para;</a></h2>
+<p>The verified practice used separate CDP, extension WebSocket, and bridge-control surfaces:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Runner manager -&gt; http://127.0.0.1:&lt;cdp-port&gt; -&gt; Chrome
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Browser extension -&gt; ws://127.0.0.1:&lt;bridge-port&gt; -&gt; bridge server
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>ChatPost adapter -&gt; stdio (or controlled companion HTTP) -&gt; bridge process
+</code></pre></div>
+<p>CDP opens login pages, proves exact extension identity, and supports diagnostics. The extension initiates the WebSocket connection, while local ChatPost calls the bridge process in-process or over stdio by default. A managed runner provisions these connections automatically. CDP, the extension WebSocket, and unauthenticated companion HTTP are never exposed publicly.</p>
+<h2 id="host-binary-runtime">Host Binary Runtime<a class="headerlink" href="#host-binary-runtime" title="Permanent link">&para;</a></h2>
+<p>This is the recommended default.</p>
+<h3 id="good-fits">Good Fits<a class="headerlink" href="#good-fits" title="Permanent link">&para;</a></h3>
+<ul>
+<li>a local Mac, Windows, or Linux machine;</li>
+<li>QR, SMS, CAPTCHA, or first-login checkpoints;</li>
+<li>opening drafts for human review;</li>
+<li>a small number of accounts on one machine;</li>
+<li>a systemd user service on a Linux server.</li>
+</ul>
+<h3 id="required-resources">Required Resources<a class="headerlink" href="#required-resources" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>ChatUp PlaywrightBrowserInstallation descriptor
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>extension directory/version
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>user-data-dir
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>process identity/PID or service unit
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>debug address/port
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>bridge address/port/token reference
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>control transport/endpoint
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>runtime logs
+</code></pre></div>
+<h3 id="chatup-managed-chrome-dependency">ChatUp-Managed Chrome Dependency<a class="headerlink" href="#chatup-managed-chrome-dependency" title="Permanent link">&para;</a></h3>
+<p>The verified practice ran Chrome for Testing directly from a Playwright cache without Docker. Released <code>chatup 0.2.4</code> now turns that temporary dependency into a reusable machine environment:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>~/.chatarch/playwright/
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>└── &lt;playwright-version&gt;/{package,browsers,installation.json}
+</code></pre></div>
+<p>The user installs it with <code>chatup playwright install &lt;chatpost-tested-version&gt; --browser chromium</code>. A ChatPost runner only resolves the descriptor through <code>chatup.playwright.resolve(...)</code>; it owns no download, extraction, upgrade, or browser registry. Chrome stays outside the ChatPost wheel and never overwrites system Chrome. Login state remains only in the runner's <code>chrome-data/</code>.</p>
+<h3 id="secure-defaults">Secure Defaults<a class="headerlink" href="#secure-defaults" title="Permanent link">&para;</a></h3>
+<ul>
+<li>only the owning OS user can read/write the user-data-dir;</li>
+<li>CDP and bridge listeners bind to <code>127.0.0.1</code>;</li>
+<li>debug ports are never exposed to a LAN or the public internet;</li>
+<li>cookies are never exported;</li>
+<li>the daily Chrome default profile is never reused;</li>
+<li>two runners never point at the same user-data-dir.</li>
+</ul>
+<h2 id="docker-runtime">Docker Runtime<a class="headerlink" href="#docker-runtime" title="Permanent link">&para;</a></h2>
+<p>Docker is optional, not required.</p>
+<h3 id="good-fits_1">Good Fits<a class="headerlink" href="#good-fits_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>pinning Chrome, system libraries, and extension versions;</li>
+<li>scheduling on a Linux server;</li>
+<li>giving every persona its own process/filesystem namespace;</li>
+<li>teams willing to maintain images, displays, and persistent volumes.</li>
+</ul>
+<h3 id="every-container-needs">Every Container Needs<a class="headerlink" href="#every-container-needs" title="Permanent link">&para;</a></h3>
+<ul>
+<li>a pinned Chrome/Chromium version;</li>
+<li>a pinned extension version;</li>
+<li>one persistent user-data-dir volume;</li>
+<li>sufficient shared memory and a correct Chrome sandbox setup;</li>
+<li>a visible browser, VNC, or controlled takeover path for first login;</li>
+<li>CDP/bridge mappings bound only to host loopback.</li>
+</ul>
+<h3 id="forbidden-practices">Forbidden Practices<a class="headerlink" href="#forbidden-practices" title="Permanent link">&para;</a></h3>
+<ul>
+<li>never bake a logged-in profile into an image;</li>
+<li>never commit a profile volume to Git;</li>
+<li>never mount one volume into multiple running Chrome processes;</li>
+<li>never expose CDP, VNC, or the bridge publicly;</li>
+<li>never treat a container as a substitute for account/tenant authorization.</li>
+</ul>
+<h2 id="runtime-comparison">Runtime Comparison<a class="headerlink" href="#runtime-comparison" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Host binary</th>
+<th>Docker</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>First-release default</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Chrome installation</td>
+<td>ChatUp-managed Chrome for Testing</td>
+<td>Pinned image version (later backend)</td>
+</tr>
+<tr>
+<td>Login / takeover</td>
+<td>Simplest</td>
+<td>Needs display, VNC, or controlled entry</td>
+</tr>
+<tr>
+<td>Profile persistence</td>
+<td>Normal directory</td>
+<td>Persistent volume</td>
+</tr>
+<tr>
+<td>Extension loading</td>
+<td>Local directory</td>
+<td>Image layer or read-only mount</td>
+</tr>
+<tr>
+<td>Reproducibility</td>
+<td>Pin binary/version</td>
+<td>Pin image digest</td>
+</tr>
+<tr>
+<td>Isolation</td>
+<td>OS process and directory permissions</td>
+<td>Container and volume; strong tenants may still need OS users/VMs</td>
+</tr>
+<tr>
+<td>Operational cost</td>
+<td>Lower</td>
+<td>Higher</td>
+</tr>
+</tbody>
+</table>
+<h2 id="proposed-multi-account-configuration">Proposed Multi-Account Configuration<a class="headerlink" href="#proposed-multi-account-configuration" title="Permanent link">&para;</a></h2>
+<p>This illustrates an expected generic multi-account TOML schema; the <code>0.1.0</code> task-specific Runner does not support it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">[runners.mac-personal]</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"host"</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">profile_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"managed"</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="k">[runners.mac-personal.bridge]</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">ws_bind</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"127.0.0.1"</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">ws_port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"auto"</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">control_transport</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"stdio"</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">token_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"personal"</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="k">[runners.mac-brand]</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"host"</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="n">profile_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"managed"</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="k">[runners.mac-brand.bridge]</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="n">ws_bind</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"127.0.0.1"</span>
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="n">ws_port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"auto"</span>
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="n">control_transport</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"stdio"</span>
+<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a><span class="n">token_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"brand"</span>
+<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>
+<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="k">[accounts.</span><span class="s2">"zhihu@personal"</span><span class="k">]</span>
+<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="n">platform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"zhihu"</span>
+<a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a><span class="n">runner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mac-personal"</span>
+<a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>
+<a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a><span class="k">[accounts.</span><span class="s2">"csdn@personal"</span><span class="k">]</span>
+<a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a><span class="n">platform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"csdn"</span>
+<a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a><span class="n">runner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mac-personal"</span>
+<a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a>
+<a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a><span class="k">[accounts.</span><span class="s2">"zhihu@brand"</span><span class="k">]</span>
+<a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a><span class="n">platform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"zhihu"</span>
+<a id="__codelineno-7-31" name="__codelineno-7-31" href="#__codelineno-7-31"></a><span class="n">runner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mac-brand"</span>
+</code></pre></div>
+<p><code>token_profile</code> references a ChatEnv profile; configuration contains no plaintext token. See <a href="../configuration/">Configuration, Environment, and State</a> for the complete schema and Wechatsync migration map.</p>
+<h2 id="ports-and-locks">Ports and Locks<a class="headerlink" href="#ports-and-locks" title="Permanent link">&para;</a></h2>
+<p>Every runner needs independent leases:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>user_data_dir lock
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>CDP port lease
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>bridge WebSocket port lease
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>optional companion control port lease
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>job lock
+</code></pre></div>
+<p>ChatPost should allocate and persist ports automatically rather than require users to remember fixed numbers.</p>
+<p>Before start, it checks:</p>
+<ol>
+<li>no other runner owns the user-data-dir;</li>
+<li>CDP and bridge ports are available;</li>
+<li>the ChatUp descriptor resolves read-only to an exact executable Chrome binary and the extension version exists;</li>
+<li>directory permissions are safe;</li>
+<li>the bridge binds to loopback;</li>
+<li>the runner identity matches any existing process.</li>
+</ol>
+<h2 id="concurrency-model">Concurrency Model<a class="headerlink" href="#concurrency-model" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>same persona
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  -&gt; one write job at a time
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  -&gt; read-only auth/status must not disrupt an active editor
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>different personas
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>  -&gt; may run concurrently
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>  -&gt; user-data-dirs, ports, and bridges must all be distinct
+</code></pre></div>
+<p>If a connection drops after a create/update may have reached the platform, ChatPost records <code>RESULT_UNKNOWN</code> and waits for readback instead of automatically retrying.</p>
+<h2 id="login-and-recovery">Login and Recovery<a class="headerlink" href="#login-and-recovery" title="Permanent link">&para;</a></h2>
+<p><code>account login</code> is a human checkpoint:</p>
+<ol>
+<li>start or open the correct runner;</li>
+<li>navigate to the platform login page;</li>
+<li>let the user complete QR, verification code, or platform-required checks;</li>
+<li>never read the password or verification code into ChatPost;</li>
+<li>run a read-only adapter auth check;</li>
+<li>record only the verification time/state, not cookies.</li>
+</ol>
+<p>If the platform logs out, the profile is damaged, or Chrome becomes incompatible, the account enters <code>NEEDS_LOGIN</code> or <code>NEEDS_ACTION</code>. It never copies another account's session as recovery.</p>
+<h2 id="multiple-humans-and-strong-tenant-isolation">Multiple Humans and Strong Tenant Isolation<a class="headerlink" href="#multiple-humans-and-strong-tenant-isolation" title="Permanent link">&para;</a></h2>
+<p>Dedicated user-data-dirs are sufficient for one operator's ordinary accounts, but they are not a complete hostile multi-tenant boundary.</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Minimum isolation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One user's accounts across platforms</td>
+<td>Dedicated persona/user-data-dir</td>
+</tr>
+<tr>
+<td>One user's high-value brand accounts</td>
+<td>Dedicated persona, preferably an OS service account or container</td>
+</tr>
+<tr>
+<td>Different humans, teams, or tenants</td>
+<td>Dedicated OS user, container, or VM plus separate secret store</td>
+</tr>
+<tr>
+<td>Untrusted remote runner</td>
+<td>No direct profile access; controlled registration and least privilege</td>
+</tr>
+</tbody>
+</table>
+<h2 id="data-boundary">Data Boundary<a class="headerlink" href="#data-boundary" title="Permanent link">&para;</a></h2>
+<p>ChatPost may store:</p>
+<ul>
+<li>runner name, runtime, version, and health;</li>
+<li>a path reference to the user-data-dir;</li>
+<li>account-to-runner bindings;</li>
+<li>draft/article IDs, content hashes, receipts, and state;</li>
+<li>secret reference names.</li>
+</ul>
+<p>ChatPost never stores:</p>
+<ul>
+<li>Chrome profile contents;</li>
+<li>cookies, local storage, or request headers;</li>
+<li>platform passwords or verification codes;</li>
+<li>plaintext bridge tokens;</li>
+<li>private profile archives.</li>
+</ul>
+<h2 id="first-release-decisions">First-Release Decisions<a class="headerlink" href="#first-release-decisions" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>default runtime       = host binary
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>Chrome owner          = ChatUp (`~/.chatarch/playwright/`)
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>ChatPost resolution   = read-only `chatup.playwright.resolve`
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>Docker                = optional
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>isolation unit        = browser persona / runner
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>multiple same-platform accounts = separate user-data-dirs
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>concurrent writes in one profile = forbidden
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>concurrency across profiles      = allowed
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>bridge                = one instance per runner
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>local control         = prefer in-process / stdio
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>network binding       = loopback only
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>final publish         = human review checkpoint
+</code></pre></div>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Chromium User Data Directory: <a href="https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md">https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md</a></li>
+<li>Chrome Headless: <a href="https://developer.chrome.com/docs/chromium/headless">https://developer.chrome.com/docs/chromium/headless</a></li>
+<li>ChatUp Chrome CLI: <a href="https://arch.gh.wzhecnu.cn/ChatUp/en/cli-tree/">https://arch.gh.wzhecnu.cn/ChatUp/en/cli-tree/</a></li>
+<li>Wechatsync bridge server: <a href="https://github.com/ChatArch/Wechatsync/blob/dev/packages/mcp-server/src/ws-bridge.ts">https://github.com/ChatArch/Wechatsync/blob/dev/packages/mcp-server/src/ws-bridge.ts</a></li>
+<li>Wechatsync extension WebSocket client: <a href="https://github.com/ChatArch/Wechatsync/blob/dev/packages/extension/src/mcp/client.ts">https://github.com/ChatArch/Wechatsync/blob/dev/packages/extension/src/mcp/client.ts</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "search.share", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+    
+  </body>
+</html>

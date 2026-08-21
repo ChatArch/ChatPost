@@ -1,0 +1,1634 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://arch.gh.wzhecnu.cn/ChatPost/browser-runners/">
+      
+      
+        <link rel="prev" href="../configuration/">
+      
+      
+        <link rel="next" href="../cli-tree/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.23">
+    
+    
+      
+        <title>Browser Runner 与账号隔离 - ChatPost 文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.84d31ad4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#browser-runner" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href=".." title="ChatPost 文档" class="md-header__button md-logo" aria-label="ChatPost 文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ChatPost 文档
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Browser Runner 与账号隔离
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              中文
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../en/browser-runners/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="分享" aria-label="分享" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ChatArch/ChatPost" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChatArch/ChatPost
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  首页
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../quickstart/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  快速开始
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../architecture/" class="md-tabs__link">
+          
+  
+  
+  设计
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cli-tree/" class="md-tabs__link">
+          
+  
+  
+  命令与接口
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="ChatPost 文档" class="md-nav__button md-logo" aria-label="ChatPost 文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ChatPost 文档
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ChatArch/ChatPost" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChatArch/ChatPost
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    首页
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    快速开始
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    设计
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            设计
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    总体架构
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    配置、环境与状态
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Browser Runner 与账号隔离
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Browser Runner 与账号隔离
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      直接答案
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="直接答案">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chrome-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      Chrome 一定要 Docker 吗？
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chrome" class="md-nav__link">
+    <span class="md-ellipsis">
+      Chrome 支持多个用户/账号吗？
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#browser-persona" class="md-nav__link">
+    <span class="md-ellipsis">
+      Browser Persona 是什么
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chrome-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      为什么不复用 Chrome 的多个子 Profile
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      资源关系
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wechatsync" class="md-nav__link">
+    <span class="md-ellipsis">
+      当前 Wechatsync 约束
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      三个连接面
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#host-binary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Host Binary 模式
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Host Binary 模式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      适合场景
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      必需资源
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chatup-chrome-dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      ChatUp 管理的 Chrome dependency
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      安全默认值
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker 模式
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker 模式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      适合场景
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      每个容器必须具备
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      禁止事项
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      模式对比
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      多账号配置示例
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      端口与锁
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      并发模型
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      登录与恢复
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      多人和强租户隔离
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      数据边界
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      首版决策摘要
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      参考资料
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    命令与接口
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            命令与接口
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-tree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CLI 树
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capability-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    能力地图
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface-tree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Python 接口树
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      直接答案
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="直接答案">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chrome-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      Chrome 一定要 Docker 吗？
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chrome" class="md-nav__link">
+    <span class="md-ellipsis">
+      Chrome 支持多个用户/账号吗？
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#browser-persona" class="md-nav__link">
+    <span class="md-ellipsis">
+      Browser Persona 是什么
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chrome-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      为什么不复用 Chrome 的多个子 Profile
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      资源关系
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wechatsync" class="md-nav__link">
+    <span class="md-ellipsis">
+      当前 Wechatsync 约束
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      三个连接面
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#host-binary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Host Binary 模式
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Host Binary 模式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      适合场景
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      必需资源
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chatup-chrome-dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      ChatUp 管理的 Chrome dependency
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      安全默认值
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker 模式
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker 模式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      适合场景
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      每个容器必须具备
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      禁止事项
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      模式对比
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      多账号配置示例
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      端口与锁
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      并发模型
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      登录与恢复
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      多人和强租户隔离
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      数据边界
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      首版决策摘要
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      参考资料
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/ChatArch/ChatPost/edit/main/docs/browser-runners.md" title="编辑此页" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="browser-runner">Browser Runner 与账号隔离<a class="headerlink" href="#browser-runner" title="Permanent link">&para;</a></h1>
+<div class="admonition warning">
+<p class="admonition-title">状态：部分实现，部分提案</p>
+<p><code>ChatPost 0.1.x</code> 已实现 task-specific 知乎/CSDN Runner 生命周期、非敏感 Profile registry 读取、<code>chatpost zhihu login/status/logout/draft</code> 和 <code>chatpost csdn login/status/logout/draft</code> 入口。文中通用 <code>runner</code> 管理、多账号调度和远端模型仍是提案。</p>
+</div>
+<p>总体资源关系见 <a href="../architecture/">总体架构设计</a>，持久化 schema 见 <a href="../configuration/">配置、环境与状态设计</a>，知乎旧验收记录见 <a href="../zhihu-first-run/">知乎首次设置与草稿验收</a>。CSDN 复用同一 Wechatsync draft contract，但当前 adapter 只保存草稿，不公开发布。</p>
+<h2 id="_1">直接答案<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<h3 id="chrome-docker">Chrome 一定要 Docker 吗？<a class="headerlink" href="#chrome-docker" title="Permanent link">&para;</a></h3>
+<p><strong>不需要。</strong></p>
+<p>Chrome、Chromium 或 Chrome for Testing 都可以作为普通宿主机二进制直接启动：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>chrome
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  --user-data-dir=&lt;isolated directory&gt;
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  --remote-debugging-address=127.0.0.1
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  --remote-debugging-port=&lt;unique port&gt;
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  --load-extension=&lt;adapter extension&gt;
+</code></pre></div>
+<p>我们已经用这种方式打通 Markdown 到知乎草稿的完整链路，没有使用 Docker。Chrome 官方文档也直接使用 <code>chrome --headless</code> 和 <code>--remote-debugging-port</code>，因此容器不是浏览器协议的一部分。</p>
+<p>ChatPost 首版应默认 <code>runtime=host</code>；Docker 作为可选部署后端，在需要镜像复现、进程隔离或服务器调度时使用。</p>
+<h3 id="chrome">Chrome 支持多个用户/账号吗？<a class="headerlink" href="#chrome" title="Permanent link">&para;</a></h3>
+<p><strong>Chrome 技术上支持一个 user-data-dir 下包含多个 profile，但 ChatPost 不应把这种子 profile 当作并发账号隔离单位。</strong></p>
+<p>Chromium 官方说明：</p>
+<ul>
+<li>user-data-dir 保存历史、书签、Cookie 和本地状态；</li>
+<li>每个 Chrome profile 是 user-data-dir 下的子目录；</li>
+<li>两个运行中的 Chrome 实例不能共享同一个 user-data-dir。</li>
+</ul>
+<p>因此 ChatPost 推荐：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>一个 browser persona
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>= 一个 Runner
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>+ 一个 Chrome 进程
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>+ 一个独立 user-data-dir
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>+ 一组独立端口
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>+ 一个独立 bridge token
+</code></pre></div>
+<p>两个知乎账号应使用两个 persona。不同 persona 可以并行；同一 persona 的发布任务必须串行。</p>
+<h2 id="browser-persona">Browser Persona 是什么<a class="headerlink" href="#browser-persona" title="Permanent link">&para;</a></h2>
+<p>Browser persona 是“这组网页会话属于谁”的运行边界，而不是平台密码容器。</p>
+<p>示例：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>personal persona
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── zhihu@personal
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>└── csdn@personal
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>brand persona
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>├── zhihu@brand
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>└── xhs@brand
+</code></pre></div>
+<p>同一 persona 可以保存不同平台的同一身份组合。如果希望平台之间也完全隔离，可以继续拆成一账号一 persona。</p>
+<h2 id="chrome-profile">为什么不复用 Chrome 的多个子 Profile<a class="headerlink" href="#chrome-profile" title="Permanent link">&para;</a></h2>
+<p>在一个 user-data-dir 中使用 <code>Default</code>、<code>Profile 1</code>、<code>Profile 2</code> 对人工浏览很方便，但不适合作为 ChatPost 首版的 Runner 模型：</p>
+<ul>
+<li>user-data-dir 仍由一个 Chrome 实例持有进程锁；</li>
+<li>多个独立进程无法安全共享它；</li>
+<li>CDP、扩展 service worker 和 bridge 需要额外判断当前属于哪个子 profile；</li>
+<li>停止、备份、迁移和故障恢复的边界不清晰；</li>
+<li>账号间仍共享部分 installation-local state。</li>
+</ul>
+<p>ChatPost 选择更简单且可审计的边界：每个 Runner 拥有完整独立的 user-data-dir。</p>
+<h2 id="_2">资源关系<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ChatPost control plane
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── source / plan
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>├── publication ledger
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>├── account registry
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>│   ├── zhihu@personal -&gt; mac-personal
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>│   ├── csdn@personal  -&gt; mac-personal
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>│   └── zhihu@brand    -&gt; mac-brand
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>└── runner registry
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    ├── mac-personal
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    │   ├── host Chrome process
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    │   ├── user-data-dir A
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    │   ├── CDP port A
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    │   └── bridge A
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    └── mac-brand
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>        ├── host Chrome process
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>        ├── user-data-dir B
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>        ├── CDP port B
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>        └── bridge B
+</code></pre></div>
+<p><code>account</code> 是逻辑发布目标；<code>runner</code> 是执行环境；<code>user-data-dir</code> 是登录态存储位置。三者不能混成一个配置字段。</p>
+<h2 id="wechatsync">当前 Wechatsync 约束<a class="headerlink" href="#wechatsync" title="Permanent link">&para;</a></h2>
+<p>现有 Wechatsync bridge 内部只有一个 active WebSocket client。新的扩展连接会成为当前 client，因此一个 bridge 不能作为多个账号 Runner 的路由器。</p>
+<p>首版 ChatPost 应：</p>
+<ul>
+<li>每个 Runner 启动一个独立 bridge 实例；</li>
+<li>为每个 bridge 分配独立端口和 token；</li>
+<li>先在控制面选择 Runner，再调用该 Runner 的 adapter；</li>
+<li>不让多个 Chrome Profile 同时连接同一个现有 bridge。</li>
+</ul>
+<p>未来可以增加带 <code>runner_id</code> 的 broker，但不能在当前协议上假装已经支持多租户。</p>
+<h2 id="_3">三个连接面<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>现有实践使用 CDP、extension WebSocket 和 bridge control 三个不同的连接面：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Runner manager -&gt; http://127.0.0.1:&lt;cdp-port&gt; -&gt; Chrome
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Browser extension -&gt; ws://127.0.0.1:&lt;bridge-port&gt; -&gt; bridge server
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>ChatPost adapter -&gt; stdio (或受控 companion HTTP) -&gt; bridge process
+</code></pre></div>
+<p>CDP 用于打开登录页、确认 exact extension identity 和诊断。扩展主动连接 WebSocket server；ChatPost 本地默认通过 in-process/stdio 调用 bridge process。Managed Runner 自动配置这些连接，普通用户无需填写 URL。不能把 CDP、extension WebSocket 或未鉴权 companion HTTP 暴露到公网。</p>
+<h2 id="host-binary">Host Binary 模式<a class="headerlink" href="#host-binary" title="Permanent link">&para;</a></h2>
+<p>这是推荐默认值。</p>
+<h3 id="_4">适合场景<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>本地 Mac/Windows/Linux；</li>
+<li>首次扫码、短信验证或 CAPTCHA；</li>
+<li>需要人工打开草稿 Review；</li>
+<li>单机少量账号；</li>
+<li>Linux 服务器上的 systemd user service。</li>
+</ul>
+<h3 id="_5">必需资源<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>ChatUp PlaywrightBrowserInstallation descriptor
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>extension directory/version
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>user-data-dir
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>process identity/PID or service unit
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>debug address/port
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>bridge address/port/token reference
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>control transport/endpoint
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>runtime logs
+</code></pre></div>
+<h3 id="chatup-chrome-dependency">ChatUp 管理的 Chrome dependency<a class="headerlink" href="#chatup-chrome-dependency" title="Permanent link">&para;</a></h3>
+<p>已验证实践使用 Playwright 缓存中的 Chrome for Testing 二进制直接运行，没有 Docker。现在由已发布 <code>chatup 0.2.4</code> 把这个临时依赖提升为可复用机器环境：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>~/.chatarch/playwright/
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>└── &lt;playwright-version&gt;/{package,browsers,installation.json}
+</code></pre></div>
+<p>用户通过 <code>chatup playwright install &lt;chatpost-tested-version&gt; --browser chromium</code> 安装；ChatPost Runner 只通过 <code>chatup.playwright.resolve(...)</code> 解析 descriptor，不拥有下载、解压、升级或 browser registry。Chrome 不打进 ChatPost wheel，也不覆盖系统 Chrome；登录态仍只在 Runner 的 <code>chrome-data/</code> 中。</p>
+<h3 id="_6">安全默认值<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li>user-data-dir 权限仅当前 OS 用户可读写；</li>
+<li>CDP 和 bridge 只监听 <code>127.0.0.1</code>；</li>
+<li>不把 debug port 暴露到局域网或公网；</li>
+<li>不导出 Cookie；</li>
+<li>不使用日常 Chrome 的默认 Profile；</li>
+<li>不让两个 Runner 指向同一个 user-data-dir。</li>
+</ul>
+<h2 id="docker">Docker 模式<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h2>
+<p>Docker 是可选 runtime，而不是要求。</p>
+<h3 id="_7">适合场景<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li>需要固定 Chrome/系统库/扩展版本；</li>
+<li>Linux 服务器统一调度；</li>
+<li>希望每个 persona 有独立进程和文件系统命名空间；</li>
+<li>可以承担镜像、显示与持久卷维护。</li>
+</ul>
+<h3 id="_8">每个容器必须具备<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li>固定版本的 Chrome/Chromium；</li>
+<li>固定版本的扩展；</li>
+<li>一个持久化 user-data-dir volume；</li>
+<li>足够的共享内存和正确的 Chrome sandbox 配置；</li>
+<li>首次登录时的可见浏览器、VNC 或受控人工接管路径；</li>
+<li>只绑定到宿主机 loopback 的 CDP/bridge 映射。</li>
+</ul>
+<h3 id="_9">禁止事项<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<ul>
+<li>不把已登录 profile 烘焙进镜像；</li>
+<li>不把 profile volume 提交到 Git；</li>
+<li>不将同一个 volume 挂给多个同时运行的 Chrome；</li>
+<li>不公开 CDP、VNC 或 bridge 到互联网；</li>
+<li>不因为运行在容器中就弱化账号/租户权限边界。</li>
+</ul>
+<h2 id="_10">模式对比<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Host binary</th>
+<th>Docker</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>首版默认</td>
+<td>是</td>
+<td>否</td>
+</tr>
+<tr>
+<td>Chrome 安装</td>
+<td>ChatUp-managed Chrome for Testing</td>
+<td>镜像内固定版本（后续 backend）</td>
+</tr>
+<tr>
+<td>登录与人工接管</td>
+<td>最简单</td>
+<td>需要显示/VNC/受控入口</td>
+</tr>
+<tr>
+<td>Profile 持久化</td>
+<td>普通目录</td>
+<td>持久卷</td>
+</tr>
+<tr>
+<td>扩展加载</td>
+<td>本地目录</td>
+<td>镜像内或只读挂载</td>
+</tr>
+<tr>
+<td>可复现性</td>
+<td>固定 binary/version</td>
+<td>固定 image digest</td>
+</tr>
+<tr>
+<td>隔离级别</td>
+<td>OS 进程 + 目录权限</td>
+<td>容器 + volume；强租户仍建议 OS user/VM</td>
+</tr>
+<tr>
+<td>运维复杂度</td>
+<td>较低</td>
+<td>较高</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_11">多账号配置示例<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<p>以下只是预期的通用多账号 TOML schema，不是 <code>0.1.0</code> task-specific Runner 已支持配置：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">[runners.mac-personal]</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"host"</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">profile_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"managed"</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="k">[runners.mac-personal.bridge]</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">ws_bind</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"127.0.0.1"</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">ws_port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"auto"</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">control_transport</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"stdio"</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">token_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"personal"</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="k">[runners.mac-brand]</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"host"</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="n">profile_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"managed"</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="k">[runners.mac-brand.bridge]</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="n">ws_bind</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"127.0.0.1"</span>
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="n">ws_port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"auto"</span>
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="n">control_transport</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"stdio"</span>
+<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a><span class="n">token_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"brand"</span>
+<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>
+<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="k">[accounts.</span><span class="s2">"zhihu@personal"</span><span class="k">]</span>
+<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="n">platform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"zhihu"</span>
+<a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a><span class="n">runner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mac-personal"</span>
+<a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>
+<a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a><span class="k">[accounts.</span><span class="s2">"csdn@personal"</span><span class="k">]</span>
+<a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a><span class="n">platform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"csdn"</span>
+<a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a><span class="n">runner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mac-personal"</span>
+<a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a>
+<a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a><span class="k">[accounts.</span><span class="s2">"zhihu@brand"</span><span class="k">]</span>
+<a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a><span class="n">platform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"zhihu"</span>
+<a id="__codelineno-7-31" name="__codelineno-7-31" href="#__codelineno-7-31"></a><span class="n">runner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mac-brand"</span>
+</code></pre></div>
+<p><code>token_profile</code> 指向 ChatEnv profile，配置文件本身不保存 token 明文。完整 schema 和旧 Wechatsync 变量迁移见 <a href="../configuration/">配置、环境与状态设计</a>。</p>
+<h2 id="_12">端口与锁<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<p>每个 Runner 需要独立租约：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>user_data_dir lock
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>CDP port lease
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>bridge WebSocket port lease
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>optional companion control port lease
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>job lock
+</code></pre></div>
+<p>建议由 ChatPost 自动分配并持久化端口，不要求用户记忆固定数字。</p>
+<p>启动前检查：</p>
+<ol>
+<li>user-data-dir 没有被其他 Runner 占用；</li>
+<li>CDP/bridge 端口未被占用；</li>
+<li>ChatUp descriptor 可只读解析到 exact、可执行的 Chrome binary，且扩展版本存在；</li>
+<li>目录权限符合要求；</li>
+<li>bridge 只绑定 loopback；</li>
+<li>Runner identity 与已有进程匹配。</li>
+</ol>
+<h2 id="_13">并发模型<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>同一个 persona
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  -&gt; 同时只允许一个写任务
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  -&gt; auth/status 等只读命令也要避免干扰正在写入的页面
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>不同 persona
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>  -&gt; 可以并行
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>  -&gt; 前提是 user-data-dir、端口和 bridge 均独立
+</code></pre></div>
+<p>创建/更新请求进入平台后如果连接中断，不释放锁并自动重试，而是记录 <code>RESULT_UNKNOWN</code>，等待回查。</p>
+<h2 id="_14">登录与恢复<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
+<p><code>account login</code> 是人工 checkpoint：</p>
+<ol>
+<li>启动或打开正确 Runner；</li>
+<li>导航到平台登录页；</li>
+<li>用户扫码、输入验证码或完成平台要求；</li>
+<li>ChatPost 不读取密码或验证码；</li>
+<li>adapter 运行只读 auth check；</li>
+<li>ledger 只记录最近验证时间和状态，不记录 Cookie。</li>
+</ol>
+<p>如果平台主动注销、Profile 损坏或 Chrome 版本不兼容，状态进入 <code>NEEDS_LOGIN</code> 或 <code>NEEDS_ACTION</code>，而不是自动复制其他账号的 session。</p>
+<h2 id="_15">多人和强租户隔离<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
+<p>独立 user-data-dir 足以隔离同一个人管理的多个普通账号，但不是完整的恶意多租户安全边界。</p>
+<p>建议层级：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>最低隔离</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>同一用户的多个平台账号</td>
+<td>独立 persona/user-data-dir</td>
+</tr>
+<tr>
+<td>同一用户的多个高价值品牌账号</td>
+<td>独立 persona，最好独立 OS service account 或 container</td>
+</tr>
+<tr>
+<td>不同人/团队/租户</td>
+<td>独立 OS user、container 或 VM，并独立 secret store</td>
+</tr>
+<tr>
+<td>不可信远端执行节点</td>
+<td>不直接授予 profile；使用受控 runner 注册和最小权限</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_16">数据边界<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
+<p>ChatPost 可以保存：</p>
+<ul>
+<li>Runner 名称、runtime、版本和健康状态；</li>
+<li>user-data-dir 的路径引用；</li>
+<li>account 到 Runner 的逻辑映射；</li>
+<li>draft/article ID、内容 hash、receipt 和状态；</li>
+<li>secret reference 名称。</li>
+</ul>
+<p>ChatPost 不保存：</p>
+<ul>
+<li>Chrome Profile 文件内容；</li>
+<li>Cookie、Local Storage 或请求头；</li>
+<li>平台密码、短信验证码；</li>
+<li>bridge token 明文；</li>
+<li>私密 profile 的压缩备份。</li>
+</ul>
+<h2 id="_17">首版决策摘要<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>默认 runtime       = host binary
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>Chrome owner        = ChatUp (`~/.chatarch/playwright/`)
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>ChatPost resolution = read-only `chatup.playwright.resolve`
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>Docker             = optional
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>隔离单位           = browser persona / runner
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>同平台多个账号     = 多个独立 user-data-dir
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>同 profile 并发写入 = 禁止
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>不同 profile 并发   = 允许
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>bridge              = 每 runner 一个实例
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>本地 control        = in-process / stdio 优先
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>网络绑定           = loopback only
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>最终发布           = 人工 Review checkpoint
+</code></pre></div>
+<h2 id="_18">参考资料<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Chromium User Data Directory: <a href="https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md">https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md</a></li>
+<li>Chrome Headless: <a href="https://developer.chrome.com/docs/chromium/headless">https://developer.chrome.com/docs/chromium/headless</a></li>
+<li>ChatUp Chrome CLI: <a href="https://arch.gh.wzhecnu.cn/ChatUp/cli-tree/">https://arch.gh.wzhecnu.cn/ChatUp/cli-tree/</a></li>
+<li>Wechatsync bridge server: <a href="https://github.com/ChatArch/Wechatsync/blob/dev/packages/mcp-server/src/ws-bridge.ts">https://github.com/ChatArch/Wechatsync/blob/dev/packages/mcp-server/src/ws-bridge.ts</a></li>
+<li>Wechatsync extension WebSocket client: <a href="https://github.com/ChatArch/Wechatsync/blob/dev/packages/extension/src/mcp/client.ts">https://github.com/ChatArch/Wechatsync/blob/dev/packages/extension/src/mcp/client.ts</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "search.share", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+    
+  </body>
+</html>
