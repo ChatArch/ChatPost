@@ -3,6 +3,40 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_ci_runs_supported_pythons_and_distribution_cli_gates():
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    assert 'python-version: ["3.10", "3.11", "3.12"]' in workflow
+    for command in (
+        "chatpost --version",
+        "chatpost --tree",
+        "chatpost --tree-brief",
+        "python -m build",
+        "python -m twine check dist/*",
+        '"$RUNNER_TEMP/chatpost-wheel/bin/python" -m pip install dist/*.whl',
+        "mkdocs build --strict",
+    ):
+        assert command in workflow
+
+
+def test_public_docs_expose_full_and_brief_tree_commands():
+    checked = (
+        ROOT / "README.md",
+        ROOT / "README.en.md",
+        ROOT / "docs" / "index.md",
+        ROOT / "docs" / "index.en.md",
+        ROOT / "docs" / "quickstart.md",
+        ROOT / "docs" / "quickstart.en.md",
+        ROOT / "docs" / "cli-tree.md",
+        ROOT / "docs" / "cli-tree.en.md",
+        ROOT / "tests" / "cli-tests" / "README.md",
+    )
+    for path in checked:
+        text = path.read_text(encoding="utf-8")
+        assert "chatpost --tree" in text, path
+        assert "chatpost --tree-brief" in text, path
+
+
 def test_publish_workflow_is_tag_only_and_cannot_bypass_version_gate():
     workflow = (ROOT / ".github" / "workflows" / "publish.yml").read_text(
         encoding="utf-8"

@@ -8,40 +8,73 @@
 
 这里的 `PROFILE` 是 registry alias / 浏览器用户数据目录 / 登录态容器，不是平台账号 ID、Cookie、LocalStorage、IndexedDB、session 或 token。`draft` 复用同一个 Profile，但不会改变 `login/status/logout` 的纯浏览器语义。
 
-## 当前真实命令
+## 当前完整命令树
 
-`chatpost --tree` 会打印真实注册 CLI 树：
+根命令通过 ChatStyle `add_tree_option()` 从真实 Click 注册表生成命令树，不维护包内 renderer。`chatpost --tree` 包含参数签名：
 
 ```text
-chatpost  # Browser-level platform login and draft manager.
-├── --help  # Show help for the current command.
-├── --version  # Show package version.
-├── --tree  # Print the registered CLI tree with command purpose and IO shape.
-├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser.
-├── profiles [--platform zhihu|xhs|csdn] [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state.
-├── zhihu  # Zhihu browser login and Wechatsync draft capabilities.
-│   ├── profiles [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles.
-│   ├── status PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Check PROFILE's Zhihu web login state from browser-visible page state.
-│   ├── login PROFILE [--registry REGISTRY] [--timeout TIMEOUT] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff.
-│   ├── logout PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Log out or clear PROFILE's Zhihu browser state after browser-level status.
-│   └── draft PROFILE SOURCE [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.
+chatpost
+├── --help  # Show this message and exit.
+├── --version  # Show the version and exit.
+├── --tree  # Print the registered CLI tree and exit.
+├── --tree-brief  # Print the registered CLI tree without parameter signatures and exit.
+├── csdn  # CSDN browser login and Wechatsync draft capabilities.
+│   ├── draft <PROFILE> <SOURCE> [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output OUTPUT] [--no-interactive]  # Dry-run or create one CSDN draft through Wechatsync; never final-publish.
+│   ├── login <PROFILE> [--registry REGISTRY] [--timeout TIMEOUT] [--qrcode QRCODE-PATH] [--output OUTPUT] [--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff.
+│   ├── logout <PROFILE> [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # Log out or clear PROFILE's CSDN browser state after browser-level status.
+│   ├── profiles [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # List configured CSDN browser Profiles.
+│   └── status <PROFILE> [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # Check PROFILE's CSDN web login state from browser-visible page state.
+├── platforms [--output OUTPUT] [--no-interactive]  # List supported platforms without starting a browser.
+├── profiles [--platform PLATFORM] [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # List configured browser Profiles without checking login state.
 ├── xhs  # XHS browser login system.
-│   ├── profiles [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured XHS browser Profiles.
-│   ├── status PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Check PROFILE's XHS web login state from browser-visible page state.
-│   ├── login PROFILE [--registry REGISTRY] [--timeout TIMEOUT] [--qrcode QRCODE-PATH] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff.
-│   └── logout PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Log out or clear PROFILE's XHS browser state after browser-level status.
-└── csdn  # CSDN browser login and Wechatsync draft capabilities.
-    ├── profiles [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured CSDN browser Profiles.
-    ├── status PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Check PROFILE's CSDN web login state from browser-visible page state.
-    ├── login PROFILE [--registry REGISTRY] [--timeout TIMEOUT] [--qrcode QRCODE-PATH] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff.
-    ├── logout PROFILE [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # Log out or clear PROFILE's CSDN browser state after browser-level status.
-    └── draft PROFILE SOURCE [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output text|json] [-I/--no-interactive]  # Dry-run or create one CSDN draft through Wechatsync; never final-publish.
+│   ├── login <PROFILE> [--registry REGISTRY] [--timeout TIMEOUT] [--qrcode QRCODE-PATH] [--output OUTPUT] [--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff.
+│   ├── logout <PROFILE> [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # Log out or clear PROFILE's XHS browser state after browser-level status.
+│   ├── profiles [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # List configured XHS browser Profiles.
+│   └── status <PROFILE> [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # Check PROFILE's XHS web login state from browser-visible page state.
+└── zhihu  # Zhihu browser login and Wechatsync draft capabilities.
+    ├── draft <PROFILE> <SOURCE> [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output OUTPUT] [--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.
+    ├── login <PROFILE> [--registry REGISTRY] [--timeout TIMEOUT] [--output OUTPUT] [--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff.
+    ├── logout <PROFILE> [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # Log out or clear PROFILE's Zhihu browser state after browser-level status.
+    ├── profiles [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # List configured Zhihu browser Profiles.
+    └── status <PROFILE> [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # Check PROFILE's Zhihu web login state from browser-visible page state.
+```
+
+## 当前简树
+
+`chatpost --tree-brief` 保留同一组可见节点和用途注释，但省略参数签名：
+
+```text
+chatpost
+├── --help  # Show this message and exit.
+├── --version  # Show the version and exit.
+├── --tree  # Print the registered CLI tree and exit.
+├── --tree-brief  # Print the registered CLI tree without parameter signatures and exit.
+├── csdn  # CSDN browser login and Wechatsync draft capabilities.
+│   ├── draft  # Dry-run or create one CSDN draft through Wechatsync; never final-publish.
+│   ├── login  # Open/check a pure browser login session and emit a page-owned handoff.
+│   ├── logout  # Log out or clear PROFILE's CSDN browser state after browser-level status.
+│   ├── profiles  # List configured CSDN browser Profiles.
+│   └── status  # Check PROFILE's CSDN web login state from browser-visible page state.
+├── platforms  # List supported platforms without starting a browser.
+├── profiles  # List configured browser Profiles without checking login state.
+├── xhs  # XHS browser login system.
+│   ├── login  # Open/check a pure browser login session and emit a page-owned handoff.
+│   ├── logout  # Log out or clear PROFILE's XHS browser state after browser-level status.
+│   ├── profiles  # List configured XHS browser Profiles.
+│   └── status  # Check PROFILE's XHS web login state from browser-visible page state.
+└── zhihu  # Zhihu browser login and Wechatsync draft capabilities.
+    ├── draft  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish.
+    ├── login  # Open/check a pure browser login session and emit a page-owned handoff.
+    ├── logout  # Log out or clear PROFILE's Zhihu browser state after browser-level status.
+    ├── profiles  # List configured Zhihu browser Profiles.
+    └── status  # Check PROFILE's Zhihu web login state from browser-visible page state.
 ```
 
 查看真实 help：
 
 ```bash
 chatpost --tree
+chatpost --tree-brief
 chatpost --help
 chatpost platforms --help
 chatpost profiles --help

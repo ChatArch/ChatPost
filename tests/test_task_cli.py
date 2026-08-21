@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from click.testing import CliRunner
+from chatstyle import render_click_tree
 
 from chatpost.cli import main
 
@@ -84,18 +85,23 @@ def test_top_level_tree_prints_complete_login_only_registered_cli_tree():
     result = CliRunner().invoke(main, ["--tree"])
 
     assert result.exit_code == 0, result.output
-    assert "chatpost  # Browser-level platform login and draft manager." in result.output
-    assert "├── --tree  # Print the registered CLI tree with command purpose and IO shape." in result.output
-    assert "├── platforms [--output text|json] [-I/--no-interactive]  # List supported platforms without starting a browser." in result.output
-    assert "├── profiles [--platform zhihu|xhs|csdn] [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured browser Profiles without checking login state." in result.output
-    assert "├── zhihu  # Zhihu browser login and Wechatsync draft capabilities." in result.output
-    assert "│   ├── profiles [--registry REGISTRY] [--output text|json] [-I/--no-interactive]  # List configured Zhihu browser Profiles." in result.output
-    assert "│   ├── login PROFILE [--registry REGISTRY] [--timeout TIMEOUT] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff." in result.output
-    assert "│   └── draft PROFILE SOURCE [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output text|json] [-I/--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish." in result.output
-    assert "├── xhs  # XHS browser login system." in result.output
-    assert "│   ├── login PROFILE [--registry REGISTRY] [--timeout TIMEOUT] [--qrcode QRCODE-PATH] [--output text|json] [-I/--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff." in result.output
-    assert "└── csdn  # CSDN browser login and Wechatsync draft capabilities." in result.output
-    assert "    └── draft PROFILE SOURCE [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output text|json] [-I/--no-interactive]  # Dry-run or create one CSDN draft through Wechatsync; never final-publish." in result.output
+    assert result.output.strip() == render_click_tree(main, root_name="chatpost")
+    assert result.output.splitlines()[0] == "chatpost"
+    assert result.output.splitlines().count("chatpost") == 1
+    assert "├── --help  # Show this message and exit." in result.output
+    assert "├── --version  # Show the version and exit." in result.output
+    assert "├── --tree  # Print the registered CLI tree and exit." in result.output
+    assert "├── --tree-brief  # Print the registered CLI tree without parameter signatures and exit." in result.output
+    assert "platforms [--output OUTPUT] [--no-interactive]  # List supported platforms without starting a browser." in result.output
+    assert "profiles [--platform PLATFORM] [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # List configured browser Profiles without checking login state." in result.output
+    assert "zhihu  # Zhihu browser login and Wechatsync draft capabilities." in result.output
+    assert "profiles [--registry REGISTRY] [--output OUTPUT] [--no-interactive]  # List configured Zhihu browser Profiles." in result.output
+    assert "login <PROFILE> [--registry REGISTRY] [--timeout TIMEOUT] [--output OUTPUT] [--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff." in result.output
+    assert "draft <PROFILE> <SOURCE> [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output OUTPUT] [--no-interactive]  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish." in result.output
+    assert "xhs  # XHS browser login system." in result.output
+    assert "login <PROFILE> [--registry REGISTRY] [--timeout TIMEOUT] [--qrcode QRCODE-PATH] [--output OUTPUT] [--no-interactive]  # Open/check a pure browser login session and emit a page-owned handoff." in result.output
+    assert "csdn  # CSDN browser login and Wechatsync draft capabilities." in result.output
+    assert "draft <PROFILE> <SOURCE> [--registry REGISTRY] [--dry-run] [--receipt RECEIPT] [--output OUTPUT] [--no-interactive]  # Dry-run or create one CSDN draft through Wechatsync; never final-publish." in result.output
     forbidden = [
         "account",
         "qr-artifact",
@@ -109,7 +115,27 @@ def test_top_level_tree_prints_complete_login_only_registered_cli_tree():
         assert text not in result.output
 
 
-def test_cli_tree_is_generated_from_click_registry():
+def test_top_level_tree_brief_omits_registered_signatures():
+    result = CliRunner().invoke(main, ["--tree-brief"])
+
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == render_click_tree(main, root_name="chatpost", brief=True)
+    assert result.output.splitlines()[0] == "chatpost"
+    assert "platforms  # List supported platforms without starting a browser." in result.output
+    assert "zhihu  # Zhihu browser login and Wechatsync draft capabilities." in result.output
+    assert "xhs  # XHS browser login system." in result.output
+    assert "csdn  # CSDN browser login and Wechatsync draft capabilities." in result.output
+    assert "draft  # Dry-run or create one Zhihu draft through Wechatsync; never final-publish." in result.output
+    for signature in (
+        "[--registry REGISTRY]",
+        "[--output OUTPUT]",
+        "<PROFILE>",
+        "<SOURCE>",
+    ):
+        assert signature not in result.output
+
+
+def test_cli_tree_uses_shared_chatstyle_renderer():
     source = (Path(__file__).resolve().parents[1] / "src/chatpost/cli.py").read_text(encoding="utf-8")
 
     stale_lines_name = "_CLI" + "_TREE" + "_LINES"
@@ -117,7 +143,22 @@ def test_cli_tree_is_generated_from_click_registry():
 
     assert stale_lines_name not in source
     assert stale_paths_name not in source
-    assert 'render_command_tree(ctx.command, "chatpost")' in source
+    assert "from chatstyle import add_tree_option" in source
+    assert '@click.group(name="chatpost"' in source
+    assert '@add_tree_option(renderer_options={"root_name": "chatpost"})' in source
+    assert "render_command_tree" not in source
+
+
+def test_bilingual_cli_tree_docs_match_registered_full_and_brief_trees():
+    root = Path(__file__).resolve().parents[1]
+    full_tree = render_click_tree(main, root_name="chatpost")
+    brief_tree = render_click_tree(main, root_name="chatpost", brief=True)
+
+    for relative_path in ("docs/cli-tree.md", "docs/cli-tree.en.md"):
+        text = (root / relative_path).read_text(encoding="utf-8")
+        assert f"```text\n{full_tree}\n```" in text
+        assert f"```text\n{brief_tree}\n```" in text
+        assert "ChatStyle `add_tree_option()`" in text
 
 
 def test_top_level_help_shows_discovery_and_platform_groups_only():
@@ -134,6 +175,7 @@ def test_top_level_help_shows_discovery_and_platform_groups_only():
     assert "\n  login" not in result.output
     assert "\n  post" not in result.output
     assert "--tree" in result.output
+    assert "--tree-brief" in result.output
 
 
 def test_platforms_lists_supported_login_platforms():

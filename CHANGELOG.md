@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.3 - 2026-08-22
+
+### Added
+
+- Expose `chatpost --tree-brief` alongside the registered full command tree.
+
+### Changed
+
+- Use ChatStyle's shared Click tree renderer and declare the public root command name explicitly.
+- Align runtime bounds with ChatStyle 0.2, ChatEnv 0.2.10, ChatUp 0.2.12, and ChatBrowser 0.1.5.
+
 ## 0.1.2 - 2026-08-12
 
 ### Added

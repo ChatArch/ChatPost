@@ -206,7 +206,7 @@ See [Zhihu First Setup and Draft Acceptance](zhihu-first-run.md).
 
 The first release includes:
 
-- a bounded dependency on released `chatup>=0.2.4,<0.3.0` and `chatbrowser>=0.1.2,<0.2.0`, plus read-only Chrome descriptor / browser metadata resolution;
+- a bounded dependency on released `chatup>=0.2.12,<0.3.0` and `chatbrowser>=0.1.5,<0.2.0`, plus read-only Chrome descriptor / browser metadata resolution;
 - host runner lifecycle and health checks;
 - one dedicated user-data-dir per runner;
 - ChatEnv bridge secret references;

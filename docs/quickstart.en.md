@@ -15,6 +15,8 @@ ChatPost     = post orchestration: logical Profile -> platform -> login state ->
 ```bash
 python -m pip install ChatPost
 chatpost --version
+chatpost --tree
+chatpost --tree-brief
 chatup playwright install 1.61.1 --browser chromium --output json -I
 chatbrowser profile create zhihu-test \
   --path "$HOME/.chatarch/chatpost/profiles/test/zhihu" \
