@@ -15,6 +15,8 @@ ChatPost     = post 编排：逻辑 Profile -> 平台 -> 登录态 -> draft/crea
 ```bash
 python -m pip install ChatPost
 chatpost --version
+chatpost --tree
+chatpost --tree-brief
 chatup playwright install 1.61.1 --browser chromium --output json -I
 chatbrowser profile create zhihu-test \
   --path "$HOME/.chatarch/chatpost/profiles/test/zhihu" \

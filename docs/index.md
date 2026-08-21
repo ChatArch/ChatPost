@@ -15,6 +15,7 @@ ChatPost 当前用户可见重点是 **纯浏览器登录基础层 + 独立 Wech
 
 ```bash
 chatpost --tree
+chatpost --tree-brief
 chatpost platforms
 chatpost profiles --platform zhihu
 chatpost profiles --platform xhs

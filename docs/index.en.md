@@ -15,6 +15,7 @@ ChatPost's current user-visible focus is the **pure browser login foundation plu
 
 ```bash
 chatpost --tree
+chatpost --tree-brief
 chatpost platforms
 chatpost profiles --platform zhihu
 chatpost profiles --platform xhs

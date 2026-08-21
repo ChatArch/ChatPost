@@ -50,6 +50,7 @@ pip install -e ".[dev]"
 chatpost --help
 chatpost --version
 chatpost --tree
+chatpost --tree-brief
 chatpost platforms --help
 chatpost profiles --help
 chatpost zhihu --help
@@ -77,4 +78,4 @@ python -m build
 
 `chatpost zhihu/xhs/csdn login/status/logout PROFILE` 是纯浏览器登录基础层：它只管理受控 Chromium Profile 和页面可见登录态，不调用发布适配器、不加载发布扩展、不要求发布 token、不读取或导出 Cookie/LocalStorage/IndexedDB/session/token。知乎未登录时可输出 page-owned `login_url`；小红书与 CSDN 未登录时只支持二维码图片 handoff：`chatpost xhs login PROFILE --qrcode PATH` / `chatpost csdn login PROFILE --qrcode PATH` 写出 mode `0600` 的二维码 artifact，用户可见输出只包含 `qrcode_path`，不暴露 `login_url`、`loginconfirm`、raw data URL、base64 或二维码 token。`chatpost zhihu draft PROFILE SOURCE` 与 `chatpost csdn draft PROFILE SOURCE` 是独立 Wechatsync adapter 入口：dry-run 使用 Wechatsync CLI parser 做预览；create 通过 Wechatsync extension MCP 直连创建一个草稿，不最终公开发布。当前 Wechatsync CSDN adapter 返回 `draftOnly=true`，ChatPost 不提供 CSDN 公开 `post/publish` 命令。小红书草稿/发布尚未进入当前用户可见 CLI。
 
-这个包依赖 `chatstyle>=0.1.1,<0.2.0`、`chatenv>=0.2.0,<0.3.0`、`chatup>=0.2.4,<0.3.0`、`chatbrowser>=0.1.2,<0.2.0`、`qrcode[pil]>=7.4,<9.0`、`websocket-client>=1.8,<2.0` 和 `websockets>=12.0,<16.0`。Playwright package/browser 安装由 ChatUp 负责；浏览器 runtime/Profile/CDP metadata 边界由 ChatBrowser 承担；ChatPost runner 可用 `browser_profile = "zhihu-test"` / `browser_profile = "csdn-test"` 引用 ChatBrowser Profile，但 Wechatsync extension/bridge/receipt 仍属于 ChatPost adapter 层。
+这个包依赖 `chatstyle>=0.2.0,<0.3.0`、`chatenv>=0.2.10,<0.3.0`、`chatup>=0.2.12,<0.3.0`、`chatbrowser>=0.1.5,<0.2.0`、`qrcode[pil]>=7.4,<9.0`、`websocket-client>=1.8,<2.0` 和 `websockets>=12.0,<16.0`。ChatStyle 从真实 Click 注册表生成 `chatpost --tree`（含签名）和 `chatpost --tree-brief`（不含签名）。Playwright package/browser 安装由 ChatUp 负责；浏览器 runtime/Profile/CDP metadata 边界由 ChatBrowser 承担；ChatPost runner 可用 `browser_profile = "zhihu-test"` / `browser_profile = "csdn-test"` 引用 ChatBrowser Profile，但 Wechatsync extension/bridge/receipt 仍属于 ChatPost adapter 层。

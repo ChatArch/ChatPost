@@ -54,7 +54,7 @@ The implemented login foundation defaults to the ChatArch-owned `~/.chatarch/cha
 ChatPost consumes bounded released ChatUp and ChatBrowser dependencies:
 
 ```toml
-dependencies = ["chatup>=0.2.4,<0.3.0", "chatbrowser>=0.1.2,<0.2.0"]
+dependencies = ["chatup>=0.2.12,<0.3.0", "chatbrowser>=0.1.5,<0.2.0"]
 ```
 
 Environment preparation is an independent ChatUp command:
@@ -328,7 +328,7 @@ Migration does not copy `.env` or a profile. ChatUp first supplies the Chrome de
 
 Proposed `config validate` / `doctor` checks at least:
 
-1. `chatup>=0.2.4,<0.3.0` and `chatbrowser>=0.1.2,<0.2.0` are installed, and the ChatPost-compatible version resolves through `chatup.playwright.resolve` to an executable; validation never installs it;
+1. `chatup>=0.2.12,<0.3.0` and `chatbrowser>=0.1.5,<0.2.0` are installed, and the ChatPost-compatible version resolves through `chatup.playwright.resolve` to an executable; validation never installs it;
 2. runner names, profile paths, and port leases are unique;
 3. CDP/bridge listeners bind to loopback and local control defaults to stdio;
 4. token profile references exist without reading/printing values;

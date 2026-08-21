@@ -6,7 +6,7 @@
 
 | 能力 | 状态 | 说明 |
 |---|---|---|
-| CLI 基础入口 | 已实现 | `chatpost --help`、`--version`、`--tree`；`--tree` 打印真实注册 CLI 树。 |
+| CLI 基础入口 | 已实现 | `chatpost --help`、`--version`、`--tree`、`--tree-brief`；ChatStyle 从真实 Click 注册表生成完整树和无参数签名简树。 |
 | 平台与 Profile 发现 | 已实现 | `chatpost platforms`、`chatpost profiles --platform zhihu|xhs|csdn`、`chatpost zhihu profiles`、`chatpost xhs profiles` 和 `chatpost csdn profiles` 只读 registry metadata；不启动浏览器，不读取登录态，不输出 Cookie、LocalStorage、token、password 或 credential。 |
 | 知乎纯浏览器登录/状态/登出 | 已实现 | `chatpost zhihu login/status/logout PROFILE` 只操作受控 Chromium Profile。`status` 用页面 DOM/URL/可见账号入口判断 `LOGGED_IN`、`LOGGED_OUT` 或 `UNKNOWN`；`login` 已登录直接返回，未登录时输出 page-owned `login_url` 或 `browser_opened` handoff；`logout` 先 status，未登录 no-op，已登录才清理知乎 origins。全程不调用发布适配器、不加载发布扩展、不要求发布 token、不读取或导出 Cookie/LocalStorage/IndexedDB/session/token。 |
 | 小红书二维码登录/状态/登出 | 已实现 | `chatpost xhs login/status/logout PROFILE` 只操作受控 Chromium Profile。`login` 未登录时切到小红书二维码登录，写出 mode `0600` PNG artifact，并只输出 `qrcode_path`。不暴露 `login_url`、`loginconfirm`、raw data URL、base64 或二维码 token；二维码必须绑定仍然活着、正在轮询的同一浏览器页。 |

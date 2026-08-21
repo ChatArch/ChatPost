@@ -54,7 +54,7 @@ Chrome installation 是 ChatUp 机器级资源；Profile 是 ChatPost Runner 状
 ChatPost 通过已发布的有界依赖消费 ChatUp 与 ChatBrowser：
 
 ```toml
-dependencies = ["chatup>=0.2.4,<0.3.0", "chatbrowser>=0.1.2,<0.2.0"]
+dependencies = ["chatup>=0.2.12,<0.3.0", "chatbrowser>=0.1.5,<0.2.0"]
 ```
 
 环境准备由 ChatUp 独立完成：
@@ -328,7 +328,7 @@ command options
 
 提案中的 `config validate` / `doctor` 至少检查：
 
-1. 已安装 `chatup>=0.2.4,<0.3.0` 和 `chatbrowser>=0.1.2,<0.2.0`，且 ChatPost 兼容版本可由 `chatup.playwright.resolve` 解析并执行；验证过程不触发安装；
+1. 已安装 `chatup>=0.2.12,<0.3.0` 和 `chatbrowser>=0.1.5,<0.2.0`，且 ChatPost 兼容版本可由 `chatup.playwright.resolve` 解析并执行；验证过程不触发安装；
 2. Runner 名称、Profile 路径和端口租约唯一；
 3. CDP/bridge bind address 为 loopback，本地 control transport 默认 stdio；
 4. token profile 引用存在但不读取/打印值；

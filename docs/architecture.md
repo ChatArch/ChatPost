@@ -206,7 +206,7 @@ examples/zhihu/mkdocs-quickstart.md
 
 首个功能版本包含：
 
-- 对已发布 `chatup>=0.2.4,<0.3.0` 和 `chatbrowser>=0.1.2,<0.2.0` 的有界依赖，以及只读 Chrome descriptor / browser metadata 解析；
+- 对已发布 `chatup>=0.2.12,<0.3.0` 和 `chatbrowser>=0.1.5,<0.2.0` 的有界依赖，以及只读 Chrome descriptor / browser metadata 解析；
 - host Runner 生命周期与健康检查；
 - 一个 Runner 一个独立 user-data-dir；
 - ChatEnv bridge secret reference；

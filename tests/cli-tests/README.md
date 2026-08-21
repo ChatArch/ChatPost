@@ -7,11 +7,12 @@ Current release gate examples:
 ```bash
 export PYTHONPATH=src
 python -m pytest -q tests/test_task_cli.py tests/test_zhihu_cli.py tests/test_xhs_cli.py tests/test_csdn_cli.py
-python -m chatpost.cli --tree
+chatpost --tree
+chatpost --tree-brief
 python -m chatpost.cli csdn draft --help
 ```
 
-The CLI tests lock the public command tree and the browser-vs-adapter boundary:
+The CLI tests lock the public full/brief command trees and the browser-vs-adapter boundary:
 
 - `platforms` and `profiles` include `zhihu`, `xhs`, and `csdn`.
 - `zhihu` and `csdn` expose `profiles/login/status/logout/draft`.
